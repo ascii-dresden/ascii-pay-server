@@ -12,7 +12,7 @@ table! {
 table! {
     authentication_barcodes (id) {
         id -> Text,
-        account -> Text,
+        account_id -> Text,
         code -> Text,
         created -> Timestamp,
     }
@@ -21,7 +21,7 @@ table! {
 table! {
     transactions (id) {
         id -> Text,
-        account -> Text,
+        account_id -> Text,
         amount -> Integer,
         created -> Timestamp,
     }
@@ -30,7 +30,7 @@ table! {
 table! {
     users (id) {
         id -> Text,
-        account -> Text,
+        account_id -> Text,
         first_name -> Text,
         last_name -> Text,
         mail -> Text,

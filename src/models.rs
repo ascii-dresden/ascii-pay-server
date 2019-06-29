@@ -12,7 +12,7 @@ impl Actor for DbExecutor {
     type Context = SyncContext<Self>;
 }
 
-#[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
+#[derive(Debug, Serialize, Deserialize, Queryable, Insertable, Identifiable)]
 pub struct Account {
     pub id: String,
     pub display: String,
@@ -22,10 +22,11 @@ pub struct Account {
     pub updated: NaiveDateTime
 }
 
-#[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
+#[derive(Debug, Serialize, Deserialize, Queryable, Insertable, Identifiable, Associations)]
+#[belongs_to(Account)]
 pub struct User {
     pub id: String,
-    pub account : String,
+    pub account_id : String,
     pub first_name: String,
     pub last_name: String,
     pub mail: String,
@@ -36,11 +37,11 @@ pub struct User {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SlimUser {
-    pub user: String,
+    pub user_id: String,
 }
 
 impl From<User> for SlimUser {
     fn from(user: User) -> Self {
-        SlimUser { user: user.id }
+        SlimUser { user_id: user.id }
     }
 }

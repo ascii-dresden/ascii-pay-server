@@ -25,7 +25,7 @@ struct Claims {
     // expiry
     exp: i64,
     // user uuid
-    user: String,
+    user_id: String,
 }
 
 // struct to get converted to token and back
@@ -34,7 +34,7 @@ impl Claims {
         Claims {
             iss: "localhost".into(),
             sub: "auth".into(),
-            user: user.user.clone(),
+            user_id: user.user_id.clone(),
             iat: Local::now().timestamp(),
             exp: (Local::now() + Duration::hours(24)).timestamp(),
         }
@@ -44,7 +44,7 @@ impl Claims {
 impl From<Claims> for SlimUser {
     fn from(claims: Claims) -> Self {
         SlimUser {
-            user: claims.user,
+            user_id: claims.user_id,
         }
     }
 }

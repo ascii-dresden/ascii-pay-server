@@ -29,7 +29,19 @@ mod utils;
 mod auth_handler;
 mod auth_routes;
 
-fn check_default_user(conn: &SqliteConnection) -> Result<(), ServiceError> {
+fn read_value(prompt: &str, hide_input: bool) -> String {
+    if hide_input {
+        return rpassword::prompt_password_stdout(prompt).unwrap()
+    } else {
+        print!("{}", prompt);
+        stdout().flush().unwrap();
+        let mut value = String::new();
+        stdin().read_line(&mut value).unwrap();
+        return value.trim().to_owned();
+    }
+}
+
+fn check_fallback_user(conn: &SqliteConnection) -> Result<(), ServiceError> {
     use diesel::prelude::*;
     use crate::schema::users::dsl::users;
     use crate::schema::accounts::dsl::accounts;
@@ -38,16 +50,15 @@ fn check_default_user(conn: &SqliteConnection) -> Result<(), ServiceError> {
 
     if items.is_empty() {
         println!("Create the admin user:");
-        print!("mail: ");
-        stdout().flush().unwrap();
-        let mut mail = String::new();
-        stdin().read_line(&mut mail).unwrap();
-        let mail = mail.trim().to_owned();
-        let pass = rpassword::prompt_password_stdout("password: ").unwrap();
+        let user = read_value("username: ", false);
+        let mail = read_value("mail:     ", false);
+        let pass = read_value("password: ", true);
+
+        println!("Create user '{}'({}) with pw: '{}'", &user, &mail, "*".repeat(pass.len()));
 
         let account = Account {
             id: format!("{}", Uuid::new_v4().hyphenated()),
-            display: mail.to_string(),
+            display: user,
             credit: 0,
             limit: 0,
             created: Utc::now().naive_utc(),
@@ -56,10 +67,10 @@ fn check_default_user(conn: &SqliteConnection) -> Result<(), ServiceError> {
 
         let user = User {
             id: format!("{}", Uuid::new_v4().hyphenated()),
-            account: account.id.to_string(),
+            account_id: account.id.to_string(),
             first_name: "".to_owned(),
             last_name: "".to_owned(),
-            mail: mail,
+            mail,
             password: hash_password(&pass).unwrap(),
             created: Utc::now().naive_utc(),
             updated: Utc::now().naive_utc(),
@@ -86,7 +97,7 @@ fn main() -> std::io::Result<()> {
         .expect("Failed to create pool.");
 
     let conn: &SqliteConnection = &pool.get().unwrap();
-    check_default_user(conn).unwrap();
+    check_fallback_user(conn).unwrap();
 
     let addr_db_executor: Addr<DbExecutor> =
         SyncArbiter::start(4, move || DbExecutor(pool.clone()));
