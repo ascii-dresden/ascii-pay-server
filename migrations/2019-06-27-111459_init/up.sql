@@ -22,6 +22,7 @@ CREATE TABLE `authentication_password` (
 CREATE TABLE `transaction` (
   `id` VARCHAR(100) PRIMARY KEY NOT NULL,
   `account` VARCHAR(100) NOT NULL,
+  `cashier` VARCHAR(100),
   `total` INT NOT NULL,
   `date` DATETIME NOT NULL
 );

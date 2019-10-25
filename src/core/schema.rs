@@ -42,6 +42,7 @@ table! {
     transaction (id) {
         id -> Text,
         account -> Text,
+        cashier -> Nullable<Text>,
         total -> Integer,
         date -> Timestamp,
     }

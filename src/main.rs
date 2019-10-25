@@ -6,7 +6,7 @@ mod core;
 
 use diesel::prelude::*;
 
-use crate::core::{Account, Error, authentication_password};
+use crate::core::{authentication_password, Account, Error, transactions};
 
 // For later ref: https://gill.net.in/posts/auth-microservice-rust-actix-web1.0-diesel-complete-tutorial/
 fn main() -> Result<(), Error> {
@@ -18,24 +18,30 @@ fn main() -> Result<(), Error> {
     let conn = SqliteConnection::establish(&database_url)
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
 
-    let accounts = Account::all(&conn)?;
 
-    if accounts.is_empty() {
+    if Account::all(&conn)?.is_empty() {
         let mut account = Account::create(&conn)?;
         account.name = Some("Max Mustermann".into());
         account.update(&conn)?;
 
         authentication_password::register(&conn, &account, "max", "mustermann")?;
-    } else {
-        for mut account in accounts {
-            account.credit += 1;
-            account.update(&conn)?;
-            println!("List accounts: {:?}", account);
-        }
     }
+    let mut account = authentication_password::get(&conn, "max", "mustermann")?;
 
-    let found = authentication_password::get(&conn, "max", "mustermann")?;
-    println!("Test login: {:?}", found);
+
+    transactions::execute(&conn, &mut account, None, -100)?;
+    println!("{:?}", &account);
+
+    let trans = transactions::get_by_user(
+        &conn, 
+        &account, 
+        &(chrono::Local::now().naive_local() - chrono::Duration::hours(24)), 
+        &chrono::Local::now().naive_local()
+    )?;
+
+    for t in trans {
+        println!("- {:?}", t);
+    }
 
     Ok(())
 }

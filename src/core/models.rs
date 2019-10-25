@@ -1,6 +1,6 @@
-use uuid::Uuid;
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error as DBError};
+use uuid::Uuid;
 
 pub type Money = i32;
 pub type DbConnection = SqliteConnection;
@@ -9,7 +9,7 @@ pub type DbConnection = SqliteConnection;
 pub enum Error {
     DbError(String),
     InternalServerError,
-    NotFound
+    NotFound,
 }
 impl From<DBError> for Error {
     fn from(error: DBError) -> Error {
@@ -27,5 +27,8 @@ impl From<DBError> for Error {
 }
 
 pub fn generate_uuid() -> String {
-    Uuid::new_v4().to_hyphenated().encode_upper(&mut Uuid::encode_buffer()).to_string()
+    Uuid::new_v4()
+        .to_hyphenated()
+        .encode_upper(&mut Uuid::encode_buffer())
+        .to_string()
 }
