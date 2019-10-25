@@ -1,38 +1,46 @@
--- Your SQL goes here
-
-CREATE TABLE `accounts` (
+CREATE TABLE `account` (
   `id` VARCHAR(100) PRIMARY KEY NOT NULL,
-  `display` VARCHAR(32) NOT NULL,
   `credit` INT DEFAULT 0 NOT NULL,
   `limit` INT DEFAULT 0 NOT NULL,
-  `created` DATETIME NOT NULL,
-  `updated` DATETIME NOT NULL
+  `name` VARCHAR(64),
+  `mail` VARCHAR(64)
 );
 
-CREATE TABLE `transactions` (
-  `id` VARCHAR(100) PRIMARY KEY NOT NULL,
-  `account_id` VARCHAR(100) UNIQUE NOT NULL,
-  `amount` INT NOT NULL,
-  `created` DATETIME NOT NULL
-);
-CREATE INDEX `transactions_account_index` ON `transactions` (`account_id`);
-
-CREATE TABLE `users` (
-  `id` VARCHAR(100) PRIMARY KEY NOT NULL,
-  `account_id` VARCHAR(100) NOT NULL,
-  `first_name` VARCHAR NOT NULL,
-  `last_name` VARCHAR NOT NULL,
-  `mail` VARCHAR UNIQUE NOT NULL,
-  `password` VARCHAR NOT NULL,
-  `created` DATETIME NOT NULL,
-  `updated` DATETIME NOT NULL
-);
-CREATE INDEX `users_account_index` ON `users` (`account_id`);
-
-CREATE TABLE `authentication_barcodes` (
-  `id` VARCHAR(100) PRIMARY KEY NOT NULL,
-  `account_id` VARCHAR(100) NOT NULL,
+CREATE TABLE `authentication_barcode` (
+  `account` VARCHAR(100) NOT NULL,
   `code` VARCHAR UNIQUE NOT NULL,
-  `created` DATETIME NOT NULL
+  PRIMARY KEY (`account`, `code`)
 );
-CREATE INDEX `authentication_barcodes_account_index` ON `authentication_barcodes` (`account_id`);
+
+CREATE TABLE `authentication_password` (
+  `account` VARCHAR(100) NOT NULL,
+  `username` VARCHAR UNIQUE NOT NULL,
+  `password` VARCHAR NOT NULL,
+  PRIMARY KEY (`account`, `username`)
+);
+
+CREATE TABLE `transaction` (
+  `id` VARCHAR(100) PRIMARY KEY NOT NULL,
+  `account` VARCHAR(100) NOT NULL,
+  `total` INT NOT NULL,
+  `date` DATETIME NOT NULL
+);
+
+CREATE TABLE `product` (
+  `id` VARCHAR(100) PRIMARY KEY NOT NULL,
+  `name` VARCHAR(64) NOT NULL
+);
+
+CREATE TABLE `price` (
+  `product` VARCHAR(100) NOT NULL,
+  `validity_start` DATETIME NOT NULL,
+  `value` INT NOT NULL,
+  PRIMARY KEY (`product`, `validity_start`)
+);
+
+CREATE TABLE `transaction_product` (
+  `transaction` VARCHAR(100) NOT NULL,
+  `product` VARCHAR(100) NOT NULL,
+  `amount` INT NOT NULL,
+  PRIMARY KEY (`transaction`, `product`)
+);

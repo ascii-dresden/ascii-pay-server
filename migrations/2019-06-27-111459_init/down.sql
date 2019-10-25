@@ -1,12 +1,7 @@
--- This file should undo anything in `up.sql`
-
-DROP TABLE `accounts`;
-
-DROP INDEX `transactions_account_index`;
-DROP TABLE `transactions`;
-
-DROP INDEX `users_account_index`;
-DROP TABLE `users`;
-
-DROP INDEX `authentication_barcodes_account_index`;
-DROP TABLE `authentication_barcodes`;
+DROP TABLE `account`;
+DROP TABLE `authentication_barcode`;
+DROP TABLE `authentication_password`;
+DROP TABLE `transaction`;
+DROP TABLE `product`;
+DROP TABLE `price`;
+DROP TABLE `transaction_product`;
