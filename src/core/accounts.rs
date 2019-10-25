@@ -3,7 +3,7 @@ use diesel::prelude::*;
 use crate::core::schema::account;
 use crate::core::{generate_uuid, DbConnection, Error, Money};
 
-#[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset)]
+#[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset, PartialEq, Eq, Hash)]
 #[table_name = "account"]
 pub struct Account {
     pub id: String,

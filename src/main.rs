@@ -6,7 +6,7 @@ mod core;
 
 use diesel::prelude::*;
 
-use crate::core::{authentication_password, Account, Error, transactions};
+use crate::core::{authentication_password, transactions, Account, Error};
 
 // For later ref: https://gill.net.in/posts/auth-microservice-rust-actix-web1.0-diesel-complete-tutorial/
 fn main() -> Result<(), Error> {
@@ -18,7 +18,6 @@ fn main() -> Result<(), Error> {
     let conn = SqliteConnection::establish(&database_url)
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
 
-
     if Account::all(&conn)?.is_empty() {
         let mut account = Account::create(&conn)?;
         account.name = Some("Max Mustermann".into());
@@ -28,20 +27,21 @@ fn main() -> Result<(), Error> {
     }
     let mut account = authentication_password::get(&conn, "max", "mustermann")?;
 
-
-    transactions::execute(&conn, &mut account, None, -100)?;
+    transactions::execute(&conn, &mut account, None, 100)?;
     println!("{:?}", &account);
 
     let trans = transactions::get_by_user(
-        &conn, 
-        &account, 
-        &(chrono::Local::now().naive_local() - chrono::Duration::hours(24)), 
-        &chrono::Local::now().naive_local()
+        &conn,
+        &account,
+        &(chrono::Local::now().naive_local() - chrono::Duration::hours(24)),
+        &chrono::Local::now().naive_local(),
     )?;
 
     for t in trans {
         println!("- {:?}", t);
     }
+
+    println!("{:?}", transactions::validate_all(&conn)?);
 
     Ok(())
 }

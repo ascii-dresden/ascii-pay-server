@@ -1,5 +1,7 @@
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
+use std::collections::HashMap;
+use std::convert::TryFrom;
 
 use crate::core::schema::transaction;
 use crate::core::{generate_uuid, Account, DbConnection, Error, Money};
@@ -21,7 +23,7 @@ pub fn execute(
     total: Money,
 ) -> Result<(), Error> {
     use crate::core::schema::transaction::dsl;
-    
+
     let new_credit = account.credit + total;
 
     let result = conn.exclusive_transaction(|| {
@@ -73,4 +75,53 @@ pub fn get_by_user(
         .load::<Transaction>(conn)?;
 
     Ok(results)
+}
+
+#[derive(Debug)]
+pub enum ValidationError {
+    Invalid(Money),
+    NoData,
+}
+
+fn validate_account(
+    conn: &DbConnection,
+    account: &Account,
+) -> Result<Option<ValidationError>, Error> {
+    use crate::core::schema::transaction::dsl;
+
+    conn.exclusive_transaction(|| {
+        let account = Account::get(conn, &account.id)?;
+
+        let result = dsl::transaction
+            .select(diesel::dsl::sum(dsl::total))
+            .filter(dsl::account.eq(account.id.to_string()))
+            .first::<Option<i64>>(conn)?;
+
+        if let Some(sum) = result {
+            let sum = i32::try_from(sum).map_err(|_| Error::InternalServerError)?;
+            if sum == account.credit {
+                Ok(None)
+            } else {
+                Ok(Some(ValidationError::Invalid(sum)))
+            }
+        } else {
+            Ok(Some(ValidationError::NoData))
+        }
+    })
+}
+
+pub fn validate_all(conn: &DbConnection) -> Result<HashMap<Account, ValidationError>, Error> {
+    let accounts = Account::all(conn)?;
+
+    let map = accounts
+        .into_iter()
+        .map(|a| {
+            let r = validate_account(conn, &a).unwrap_or(Some(ValidationError::NoData));
+            (a, r)
+        })
+        .filter(|(_, r)| r.is_some())
+        .map(|(a, r)| (a, r.unwrap()))
+        .collect::<HashMap<_, _>>();
+
+    Ok(map)
 }
