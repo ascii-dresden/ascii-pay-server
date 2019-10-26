@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 pub type Money = i32;
 pub type DbConnection = SqliteConnection;
+pub type DB = diesel::sqlite::Sqlite;
 
 #[derive(Debug)]
 pub enum Error {

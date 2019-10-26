@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 
 use crate::core::schema::transaction;
+use crate::core::Product;
 use crate::core::{generate_uuid, Account, DbConnection, Error, Money};
 
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset)]
@@ -21,7 +22,7 @@ pub fn execute(
     account: &mut Account,
     cashier: Option<&Account>,
     total: Money,
-) -> Result<(), Error> {
+) -> Result<Transaction, Error> {
     use crate::core::schema::transaction::dsl;
 
     let new_credit = account.credit + total;
@@ -48,7 +49,7 @@ pub fn execute(
 
         account.update(conn)?;
 
-        Ok(())
+        Ok(a)
     });
 
     if result.is_ok() {
@@ -124,4 +125,43 @@ pub fn validate_all(conn: &DbConnection) -> Result<HashMap<Account, ValidationEr
         .collect::<HashMap<_, _>>();
 
     Ok(map)
+}
+
+impl Transaction {
+    pub fn add_products(
+        &self,
+        conn: &DbConnection,
+        products: HashMap<Product, i32>,
+    ) -> Result<(), Error> {
+        use crate::core::schema::transaction_product::dsl;
+
+        for (product, amount) in products {
+            diesel::insert_into(dsl::transaction_product)
+                .values((
+                    dsl::transaction.eq(&self.id),
+                    dsl::product.eq(&product.id),
+                    dsl::amount.eq(amount),
+                ))
+                .execute(conn)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn get_products(&self, conn: &DbConnection) -> Result<HashMap<Product, i32>, Error> {
+        use crate::core::schema::transaction_product::dsl;
+
+        let results = dsl::transaction_product
+            .filter(dsl::transaction.eq(&self.id))
+            .load::<(String, String, i32)>(conn)?;
+
+        let mut map = HashMap::new();
+
+        for (_, p, a) in results {
+            let product = Product::get(conn, &p)?;
+            map.insert(product, a);
+        }
+
+        Ok(map)
+    }
 }
