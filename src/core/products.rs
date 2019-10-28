@@ -1,7 +1,7 @@
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 
-use crate::core::{generate_uuid, DbConnection, Error, Money, DB};
+use crate::core::{generate_uuid, DbConnection, ServiceError, Money, DB};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Product {
@@ -49,7 +49,7 @@ impl
 }
 
 impl Product {
-    pub fn create(conn: &DbConnection, name: &str) -> Result<Product, Error> {
+    pub fn create(conn: &DbConnection, name: &str) -> Result<Product, ServiceError> {
         use crate::core::schema::product::dsl;
 
         let p = Product {
@@ -65,7 +65,7 @@ impl Product {
         Ok(p)
     }
 
-    pub fn update(&self, conn: &DbConnection) -> Result<(), Error> {
+    pub fn update(&self, conn: &DbConnection) -> Result<(), ServiceError> {
         use crate::core::schema::product::dsl;
 
         diesel::update(dsl::product)
@@ -80,7 +80,7 @@ impl Product {
         conn: &DbConnection,
         validity_start: NaiveDateTime,
         value: Money,
-    ) -> Result<(), Error> {
+    ) -> Result<(), ServiceError> {
         use crate::core::schema::price::dsl;
 
         let p = Price {
@@ -100,7 +100,7 @@ impl Product {
         Ok(())
     }
 
-    fn load_prices(&mut self, conn: &DbConnection) -> Result<(), Error> {
+    fn load_prices(&mut self, conn: &DbConnection) -> Result<(), ServiceError> {
         use crate::core::schema::price::dsl;
 
         let results = dsl::price
@@ -112,7 +112,7 @@ impl Product {
         Ok(())
     }
 
-    pub fn all(conn: &DbConnection) -> Result<Vec<Product>, Error> {
+    pub fn all(conn: &DbConnection) -> Result<Vec<Product>, ServiceError> {
         use crate::core::schema::product::dsl;
 
         let mut results = dsl::product.load::<Product>(conn)?;
@@ -124,12 +124,12 @@ impl Product {
         Ok(results)
     }
 
-    pub fn get(conn: &DbConnection, id: &str) -> Result<Product, Error> {
+    pub fn get(conn: &DbConnection, id: &str) -> Result<Product, ServiceError> {
         use crate::core::schema::product::dsl;
 
         let mut results = dsl::product.filter(dsl::id.eq(id)).load::<Product>(conn)?;
 
-        let mut a = results.pop().ok_or_else(|| Error::NotFound)?;
+        let mut a = results.pop().ok_or_else(|| ServiceError::NotFound)?;
 
         a.load_prices(conn)?;
 

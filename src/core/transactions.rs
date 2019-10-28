@@ -5,7 +5,7 @@ use std::convert::TryFrom;
 
 use crate::core::schema::transaction;
 use crate::core::Product;
-use crate::core::{generate_uuid, Account, DbConnection, Error, Money};
+use crate::core::{generate_uuid, Account, DbConnection, ServiceError, Money};
 
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset)]
 #[table_name = "transaction"]
@@ -22,7 +22,7 @@ pub fn execute(
     account: &mut Account,
     cashier: Option<&Account>,
     total: Money,
-) -> Result<Transaction, Error> {
+) -> Result<Transaction, ServiceError> {
     use crate::core::schema::transaction::dsl;
 
     let new_credit = account.credit + total;
@@ -31,7 +31,7 @@ pub fn execute(
         let mut account = Account::get(conn, &account.id)?;
 
         if new_credit < account.limit && new_credit < account.credit {
-            return Err(Error::InternalServerError);
+            return Err(ServiceError::InternalServerError);
         }
 
         let a = Transaction {
@@ -64,7 +64,7 @@ pub fn get_by_user(
     account: &Account,
     from: &NaiveDateTime,
     to: &NaiveDateTime,
-) -> Result<Vec<Transaction>, Error> {
+) -> Result<Vec<Transaction>, ServiceError> {
     use crate::core::schema::transaction::dsl;
 
     let results = dsl::transaction
@@ -87,7 +87,7 @@ pub enum ValidationError {
 fn validate_account(
     conn: &DbConnection,
     account: &Account,
-) -> Result<Option<ValidationError>, Error> {
+) -> Result<Option<ValidationError>, ServiceError> {
     use crate::core::schema::transaction::dsl;
 
     conn.exclusive_transaction(|| {
@@ -99,7 +99,7 @@ fn validate_account(
             .first::<Option<i64>>(conn)?;
 
         if let Some(sum) = result {
-            let sum = i32::try_from(sum).map_err(|_| Error::InternalServerError)?;
+            let sum = i32::try_from(sum).map_err(|_| ServiceError::InternalServerError)?;
             if sum == account.credit {
                 Ok(None)
             } else {
@@ -111,7 +111,7 @@ fn validate_account(
     })
 }
 
-pub fn validate_all(conn: &DbConnection) -> Result<HashMap<Account, ValidationError>, Error> {
+pub fn validate_all(conn: &DbConnection) -> Result<HashMap<Account, ValidationError>, ServiceError> {
     let accounts = Account::all(conn)?;
 
     let map = accounts
@@ -132,7 +132,7 @@ impl Transaction {
         &self,
         conn: &DbConnection,
         products: HashMap<Product, i32>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), ServiceError> {
         use crate::core::schema::transaction_product::dsl;
 
         for (product, amount) in products {
@@ -148,7 +148,7 @@ impl Transaction {
         Ok(())
     }
 
-    pub fn get_products(&self, conn: &DbConnection) -> Result<HashMap<Product, i32>, Error> {
+    pub fn get_products(&self, conn: &DbConnection) -> Result<HashMap<Product, i32>, ServiceError> {
         use crate::core::schema::transaction_product::dsl;
 
         let results = dsl::transaction_product

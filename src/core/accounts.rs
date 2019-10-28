@@ -1,7 +1,7 @@
 use diesel::prelude::*;
 
 use crate::core::schema::account;
-use crate::core::{generate_uuid, DbConnection, Error, Money};
+use crate::core::{generate_uuid, DbConnection, ServiceError, Money};
 
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset, PartialEq, Eq, Hash)]
 #[table_name = "account"]
@@ -14,7 +14,7 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn create(conn: &DbConnection) -> Result<Account, Error> {
+    pub fn create(conn: &DbConnection) -> Result<Account, ServiceError> {
         use crate::core::schema::account::dsl;
 
         let a = Account {
@@ -30,7 +30,7 @@ impl Account {
         Ok(a)
     }
 
-    pub fn update(&self, conn: &DbConnection) -> Result<(), Error> {
+    pub fn update(&self, conn: &DbConnection) -> Result<(), ServiceError> {
         use crate::core::schema::account::dsl;
 
         diesel::update(dsl::account).set(self).execute(conn)?;
@@ -38,7 +38,7 @@ impl Account {
         Ok(())
     }
 
-    pub fn all(conn: &DbConnection) -> Result<Vec<Account>, Error> {
+    pub fn all(conn: &DbConnection) -> Result<Vec<Account>, ServiceError> {
         use crate::core::schema::account::dsl;
 
         let results = dsl::account.load::<Account>(conn)?;
@@ -46,12 +46,12 @@ impl Account {
         Ok(results)
     }
 
-    pub fn get(conn: &DbConnection, id: &str) -> Result<Account, Error> {
+    pub fn get(conn: &DbConnection, id: &str) -> Result<Account, ServiceError> {
         use crate::core::schema::account::dsl;
 
         let mut results = dsl::account.filter(dsl::id.eq(id)).load::<Account>(conn)?;
 
-        let a = results.pop().ok_or_else(|| Error::NotFound)?;
+        let a = results.pop().ok_or_else(|| ServiceError::NotFound)?;
 
         Ok(a)
     }
