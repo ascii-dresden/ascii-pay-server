@@ -8,6 +8,8 @@ build = "build.rs"
 [dependencies]
 actix-identity = '0.1.0'
 actix-web = '1.0.3'
+actix-files = "0.1.7"
+handlebars = '2.0.2'
 argonautica = '0.2.0'
 chrono = {version = '0.4.6', features = ['serde']}
 derive_more = '0.15.0'

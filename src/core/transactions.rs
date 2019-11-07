@@ -5,7 +5,7 @@ use std::convert::TryFrom;
 
 use crate::core::schema::transaction;
 use crate::core::Product;
-use crate::core::{generate_uuid, Account, DbConnection, ServiceError, Money};
+use crate::core::{generate_uuid, Account, DbConnection, Money, ServiceError};
 
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset)]
 #[table_name = "transaction"]
@@ -111,7 +111,9 @@ fn validate_account(
     })
 }
 
-pub fn validate_all(conn: &DbConnection) -> Result<HashMap<Account, ValidationError>, ServiceError> {
+pub fn validate_all(
+    conn: &DbConnection,
+) -> Result<HashMap<Account, ValidationError>, ServiceError> {
     let accounts = Account::all(conn)?;
 
     let map = accounts

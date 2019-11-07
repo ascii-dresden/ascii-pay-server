@@ -1,7 +1,7 @@
 use diesel::prelude::*;
 
 use crate::core::schema::account;
-use crate::core::{generate_uuid, DbConnection, ServiceError, Money};
+use crate::core::{generate_uuid, DbConnection, Money, ServiceError};
 
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset, PartialEq, Eq, Hash)]
 #[table_name = "account"]

@@ -4,21 +4,17 @@ use actix_web::{
 };
 use futures::Future;
 
-
-use crate::core::{Pool, ServiceError, authentication_password, Account};
+use crate::core::{authentication_password, Account, Pool, ServiceError};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "method", content = "value")]
 pub enum AuthData {
-    #[serde(rename = "password")] 
-    Password {
-        username: String, 
-        password: String
-    }
+    #[serde(rename = "password")]
+    Password { username: String, password: String },
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoggedAccount {
-    id: String
+    id: String,
 }
 impl FromRequest for LoggedAccount {
     type Error = Error;
@@ -49,16 +45,16 @@ pub fn login(
         let conn = &pool.get().unwrap();
 
         match auth_data {
-            AuthData::Password{username, password} => {
+            AuthData::Password { username, password } => {
                 authentication_password::get(conn, &username, &password)
             }
         }
-    }).then(
+    })
+    .then(
         move |res: Result<Account, BlockingError<ServiceError>>| match res {
             Ok(account) => {
-                let logged_account = serde_json::to_string(&LoggedAccount {
-                    id: account.id
-                }).unwrap();
+                let logged_account =
+                    serde_json::to_string(&LoggedAccount { id: account.id }).unwrap();
                 id.remember(logged_account);
                 Ok(HttpResponse::Ok().finish())
             }

@@ -1,7 +1,7 @@
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 
-use crate::core::{generate_uuid, DbConnection, ServiceError, Money, DB};
+use crate::core::{generate_uuid, DbConnection, Money, ServiceError, DB};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Product {

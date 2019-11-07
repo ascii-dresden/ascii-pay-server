@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+
+{{> head title="ascii prepaid system" }}
+
+<body>
+    <h1>ascii prepaid system</h1>
+    <div>
+        <h2>Login</h2>
+        <form method="POST" action="/login">
+            <label for="username">Username:</label>
+            <input type="text" name="username" />
+            <label for="password">Password:</label>
+            <input type="password" name="password" />
+            <input type="submit" value="Login" />
+        </form>
+        {{#if error}}<span class="error">Login error!</span>{{/if}}
+    </div>
+</body>
+</html>

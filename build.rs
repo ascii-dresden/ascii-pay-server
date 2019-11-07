@@ -38,11 +38,11 @@ fn process_files(path: &Path) -> io::Result<()> {
 }
 
 fn main() {
-    // build any sass files found in the templates folder
-    let sass_path = Path::new("static/templates/");
+    // build any sass files found in the stylesheets folder
+    let sass_path = Path::new("static/stylesheets/");
     if !sass_path.exists() {
         panic!(
-            "The static template path at {} could not be found. Please make sure it exists.",
+            "The static stylesheets path at {} could not be found. Please make sure it exists.",
             sass_path.canonicalize().expect("Invalid path").display()
         );
     } else {

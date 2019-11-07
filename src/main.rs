@@ -2,14 +2,20 @@
 extern crate diesel;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate serde_json;
+extern crate handlebars;
 extern crate uuid;
 
 use diesel::r2d2::{self, ConnectionManager};
 
+mod api;
 mod core;
+mod server;
 mod web;
 
 use crate::core::{DbConnection, ServiceError};
+use server::start_server;
 
 // For later ref: https://gill.net.in/posts/auth-microservice-rust-actix-web1.0-diesel-complete-tutorial/
 fn main() -> Result<(), ServiceError> {
@@ -25,14 +31,8 @@ fn main() -> Result<(), ServiceError> {
         .expect("Failed to create pool.");
 
     // Setup web server
-    let domain = std::env::var("DOMAIN").unwrap_or_else(|_| "localhost".to_string());
-    let host = std::env::var("HOST").unwrap_or_else(|_| "localhost".to_string());
-    let port = std::env::var("PORT")
-        .unwrap_or_else(|_| "".to_string())
-        .parse::<i32>()
-        .unwrap_or(8080);
 
-    web::init(&domain, &host, port, pool)?;
+    start_server(pool)?;
 
     Ok(())
 }

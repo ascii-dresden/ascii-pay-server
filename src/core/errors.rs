@@ -1,9 +1,8 @@
+use actix_web::{error::ResponseError, HttpResponse};
+use derive_more::Display;
 use diesel::result::{DatabaseErrorKind, Error as DBError};
 use std::io::Error as IOError;
 use uuid::parser::ParseError;
-use derive_more::Display;
-use actix_web::{error::ResponseError, HttpResponse};
-
 
 #[derive(Debug, Display)]
 pub enum ServiceError {
@@ -47,7 +46,9 @@ impl From<IOError> for ServiceError {
 impl ResponseError for ServiceError {
     fn error_response(&self) -> HttpResponse {
         match self {
-            ServiceError::InternalServerError => HttpResponse::InternalServerError().json("Internal Server Error, Please try later"),
+            ServiceError::InternalServerError => {
+                HttpResponse::InternalServerError().json("Internal Server Error, Please try later")
+            }
             ServiceError::DbError(ref message) => HttpResponse::InternalServerError().json(message),
             ServiceError::BadRequest(ref message) => HttpResponse::BadRequest().json(message),
             ServiceError::NotFound => HttpResponse::NotFound().json("NotFound"),
