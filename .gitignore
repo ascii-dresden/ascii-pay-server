@@ -4,3 +4,4 @@
 /.idea
 /*.db
 .vscode/
+static/templates/**/*.css

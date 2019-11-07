@@ -1,8 +1,9 @@
 [package]
 name = 'ascii-prepaid-system'
 version = '0.1.0'
-authors = ['Lars Westermann <lars-westermann@live.de>']
+authors = ['Lars Westermann <lars-westermann@live.de>', 'Felix Wittwer <dev@felixwittwer.de>']
 edition = '2018'
+build = "build.rs"
 
 [dependencies]
 actix-identity = '0.1.0'
@@ -20,3 +21,6 @@ serde = '1.0'
 serde_derive = '1.0'
 serde_json = '1.0'
 uuid = {version = '0.7', features = ['serde', 'v4']}
+
+[build-dependencies]
+sass-rs = "0.2.2"
