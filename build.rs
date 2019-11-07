@@ -5,7 +5,6 @@ use std::io::Write;
 use std::path::Path;
 
 fn process_files(path: &Path) -> io::Result<()> {
-    println!("Checking path {}", path.display());
     if path.is_dir() {
         // recurse and register paths as rebuild conditions
         println!("cargo:rerun-if-changed={}", path.display());
@@ -31,8 +30,6 @@ fn process_files(path: &Path) -> io::Result<()> {
                     }
                     Err(msg) => panic!("Compilation of sass failed: {}", msg),
                 }
-            } else {
-                println!("Skipping non-sass file with: {}", path.display());
             }
         }
     }
