@@ -29,10 +29,12 @@ impl FromRequest for LoggedAccount {
     }
 }
 
-pub fn index(hb: web::Data<Handlebars>, logged_account: Option<LoggedAccount>, req: HttpRequest, pool: web::Data<Pool>) -> HttpResponse {
-    println!("{:?}", &logged_account);
-    println!("---- '{}' ----", req.query_string());
-
+pub fn index(
+    hb: web::Data<Handlebars>,
+    logged_account: Option<LoggedAccount>,
+    req: HttpRequest,
+    pool: web::Data<Pool>,
+) -> HttpResponse {
     match logged_account {
         None => {
             let data = json!({
@@ -44,12 +46,18 @@ pub fn index(hb: web::Data<Handlebars>, logged_account: Option<LoggedAccount>, r
         }
         Some(account_id) => {
             let conn = &pool.get().unwrap();
-            let account = Account::get(&conn, &account_id.id).unwrap();
+            let account = Account::get(&conn, &account_id.id);
+            match account {
+                Ok(account) => {
+                    let data = json!({ "name": account.name.unwrap_or(account.id) });
+                    let body = hb.render("home", &data).unwrap();
 
-            let data = json!({ "name": account.name.unwrap_or(account.id) });
-            let body = hb.render("home", &data).unwrap();
-
-            HttpResponse::Ok().body(body)
+                    HttpResponse::Ok().body(body)
+                }
+                Err(_) => HttpResponse::Found()
+                    .header(http::header::LOCATION, "/logout")
+                    .finish(),
+            }
         }
     }
 }
