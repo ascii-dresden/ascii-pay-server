@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+
+{{> _head title="Accounts" }}
+
+<body>
+    {{> _navigation active="accounts" }}
+
+    <div class="content">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each this}}
+                <tr>
+                    <td>{{name}}</td>
+                    <td>
+                        <a href="/account/{{id}}">Edit</a>
+                    </td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

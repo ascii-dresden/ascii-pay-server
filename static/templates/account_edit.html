@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+
+{{> _head title="Edit account" }}
+
+<body>
+    {{> _navigation active="accounts" }}
+
+    <div class="content">
+        <form method="POST">
+            <input type="hidden" name="id" value="{{id}}" readonly/>
+            <div>
+                <label for="name">Name</label>
+                <input type="text" name="name" value="{{name}}"/>
+            </div>
+            <div>
+                <label for="mail">Mail</label>
+                <input type="text" name="mail" value="{{mail}}"/>
+            </div>
+            <div>
+                <label for="credit">Credit</label>
+                <input type="number" name="credit" value="{{credit}}" readonly/>
+            </div>
+            <div>
+                <label for="limit">Limit</label>
+                <input type="number" name="limit" value="{{limit}}"/>
+            </div>
+            <input type="submit" value="Save" />
+        </form>
+    </div>
+</body>
+</html>

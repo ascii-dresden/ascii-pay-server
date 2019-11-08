@@ -1,32 +1,14 @@
 use actix_identity::Identity;
-use actix_web::{dev::Payload, http, web, Error, FromRequest, HttpRequest, HttpResponse};
+use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
 
-use crate::core::{authentication_password, Account, Pool, ServiceError};
+use crate::core::{authentication_password, Account, Pool};
+use crate::web::LoggedAccount;
 
 #[derive(Serialize, Deserialize)]
 pub struct LoginForm {
     username: String,
     password: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct LoggedAccount {
-    id: String,
-}
-
-impl FromRequest for LoggedAccount {
-    type Error = Error;
-    type Future = Result<LoggedAccount, Error>;
-    type Config = ();
-
-    fn from_request(req: &HttpRequest, pl: &mut Payload) -> Self::Future {
-        if let Some(identity) = Identity::from_request(req, pl)?.identity() {
-            let account: LoggedAccount = serde_json::from_str(&identity)?;
-            return Ok(account);
-        }
-        Err(ServiceError::Unauthorized.into())
-    }
 }
 
 pub fn index(
