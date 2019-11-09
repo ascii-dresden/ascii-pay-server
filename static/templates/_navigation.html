@@ -1,9 +1,12 @@
-<div class="navigation">
-    <div class="left">
-        <a href="/"{{#if (eq active "home")}} class="active"{{/if}}>Home</a>
-        <a href="/accounts"{{#if (eq active "accounts")}} class="active"{{/if}}>Accounts</a>
-    </div>
-    <div class="right">
-        <a href="/logout">Logout</a>
-    </div>
-</div>
+<header class="navbar">
+    <section class="navbar-section">
+        <a href="/" class="btn btn-link{{#if (eq active "home")}} active{{/if}}">Dashboard</a>
+        <a href="/accounts" class="btn btn-link{{#if (eq active "home")}} active{{/if}}">Accounts</a>
+    </section>
+    <section class="navbar-center">
+        <a class="navbar-brand mr-2">asciipay</a>
+    </section>
+    <section class="navbar-section">
+        <a href="/logout" class="btn btn-link">Logout</a>
+    </section>
+</header>

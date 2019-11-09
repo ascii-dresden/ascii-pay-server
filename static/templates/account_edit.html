@@ -4,28 +4,47 @@
 {{> _head title="Edit account" }}
 
 <body>
-    {{> _navigation active="accounts" }}
+    <div class="container grid-lg">
+        {{> _navigation active="accounts" }}
 
-    <div class="content">
-        <form method="POST">
+        <h1>Edit account</h1>
+
+        <form class="form-horizontal" method="POST">
             <input type="hidden" name="id" value="{{id}}" readonly/>
-            <div>
-                <label for="name">Name</label>
-                <input type="text" name="name" value="{{name}}"/>
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="name">Name</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <input class="form-input" type="text" name="name" value="{{name}}"/>
+                </div>
             </div>
-            <div>
-                <label for="mail">Mail</label>
-                <input type="text" name="mail" value="{{mail}}"/>
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="mail">Mail</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <input class="form-input" type="text" name="mail" value="{{mail}}"/>
+                </div>
             </div>
-            <div>
-                <label for="credit">Credit</label>
-                <input type="number" name="credit" value="{{credit}}" readonly/>
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="credit">Credit</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <input class="form-input" type="number" name="credit" value="{{credit}}" readonly/>
+                </div>
             </div>
-            <div>
-                <label for="limit">Limit</label>
-                <input type="number" name="limit" value="{{limit}}"/>
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="limit">Limit</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <input class="form-input" type="number" name="limit" value="{{limit}}"/>
+                </div>
             </div>
-            <input type="submit" value="Save" />
+            <input class="btn btn-primary" type="submit" value="Save" />
+            <a class="btn" href="/accounts">Cancel</a>
         </form>
     </div>
 </body>
