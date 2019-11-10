@@ -15,6 +15,7 @@ use crate::core::{generate_uuid, DbConnection, Money, ServiceError};
     Serialize,
     Deserialize,
 )]
+#[changeset_options(treat_none_as_null = "true")]
 #[table_name = "account"]
 pub struct Account {
     pub id: String,
@@ -44,7 +45,7 @@ impl Account {
     pub fn update(&self, conn: &DbConnection) -> Result<(), ServiceError> {
         use crate::core::schema::account::dsl;
 
-        diesel::update(dsl::account).set(self).execute(conn)?;
+        diesel::update(dsl::account.find(&self.id)).set(self).execute(conn)?;
 
         Ok(())
     }

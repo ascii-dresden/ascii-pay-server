@@ -50,9 +50,15 @@ pub fn init(config: &mut web::ServiceConfig) {
             .service(web::resource("/logout").route(web::get().to(index::logout)))
             .service(web::resource("/accounts").route(web::get().to(accounts::list)))
             .service(
+                web::resource("/account/create")
+                    .route(web::post().to(accounts::create_post))
+                    .route(web::get().to(accounts::create_get)),
+            )
+            .service(web::resource("/account/delete/{account_id}").route(web::get().to(accounts::delete_get)))
+            .service(
                 web::resource("/account/{account_id}")
-                    .route(web::post().to(accounts::save))
-                    .route(web::get().to(accounts::edit)),
-            ),
+                    .route(web::post().to(accounts::edit_post))
+                    .route(web::get().to(accounts::edit_get)),
+            )
     );
 }

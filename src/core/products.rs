@@ -68,7 +68,7 @@ impl Product {
     pub fn update(&self, conn: &DbConnection) -> Result<(), ServiceError> {
         use crate::core::schema::product::dsl;
 
-        diesel::update(dsl::product)
+        diesel::update(dsl::product.find(&self.id))
             .set(dsl::name.eq(&self.name))
             .execute(conn)?;
 

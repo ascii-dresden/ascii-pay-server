@@ -43,8 +43,15 @@
                     <input class="form-input" type="number" name="limit" value="{{limit}}"/>
                 </div>
             </div>
-            <input class="btn btn-primary" type="submit" value="Save" />
-            <a class="btn" href="/accounts">Cancel</a>
+            <div class="columns">
+                <div class="column col-8 col-sm-12">
+                    <input class="btn btn-primary" type="submit" value="Save" />
+                    <a class="btn" href="/accounts">Cancel</a>
+                </div>
+                <div class="column col-ml-auto col-auto">
+                    <a class="btn btn-error" href="/account/delete/{{id}}">Delete</a>
+                </div>
+            </div>
         </form>
     </div>
 </body>
