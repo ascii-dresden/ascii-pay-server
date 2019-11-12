@@ -1,8 +1,6 @@
 use actix_web::{error::ResponseError, HttpResponse};
 use derive_more::Display;
 use diesel::result::{DatabaseErrorKind, Error as DBError};
-use std::io::Error as IOError;
-use uuid::parser::ParseError;
 
 #[derive(Debug, Display)]
 pub enum ServiceError {
@@ -37,8 +35,28 @@ impl From<DBError> for ServiceError {
     }
 }
 
-impl From<IOError> for ServiceError {
-    fn from(_: IOError) -> ServiceError {
+impl From<std::io::Error> for ServiceError {
+    fn from(_: std::io::Error) -> ServiceError {
+        ServiceError::InternalServerError
+    }
+}
+impl From<handlebars::RenderError> for ServiceError {
+    fn from(_: handlebars::RenderError) -> ServiceError {
+        ServiceError::InternalServerError
+    }
+}
+impl From<r2d2::Error> for ServiceError {
+    fn from(_: r2d2::Error) -> ServiceError {
+        ServiceError::InternalServerError
+    }
+}
+impl From<uuid::parser::ParseError> for ServiceError {
+    fn from(_: uuid::parser::ParseError) -> ServiceError {
+        ServiceError::BadRequest("Invalid UUID".into())
+    }
+}
+impl From<serde_json::Error> for ServiceError {
+    fn from(_: serde_json::Error) -> ServiceError {
         ServiceError::InternalServerError
     }
 }
@@ -54,11 +72,5 @@ impl ResponseError for ServiceError {
             ServiceError::NotFound => HttpResponse::NotFound().json("NotFound"),
             ServiceError::Unauthorized => HttpResponse::Unauthorized().json("Unauthorized"),
         }
-    }
-}
-
-impl From<ParseError> for ServiceError {
-    fn from(_: ParseError) -> ServiceError {
-        ServiceError::BadRequest("Invalid UUID".into())
     }
 }

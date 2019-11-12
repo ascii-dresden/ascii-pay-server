@@ -1,21 +1,22 @@
 use actix_web::{middleware, web, App, HttpServer};
-use handlebars::{Handlebars, RenderError, RenderContext, Helper, Context, Output};
+use handlebars::{Context, Handlebars, Helper, Output, RenderContext, RenderError};
 
 use crate::api as module_api;
 use crate::core::{Pool, ServiceError};
 use crate::web as module_web;
 
 fn currency_helper(
-    helper: &Helper, 
-    _: &Handlebars, 
-    _: &Context, 
-    _: &mut RenderContext, 
-    out: &mut dyn Output
+    helper: &Helper,
+    _: &Handlebars,
+    _: &Context,
+    _: &mut RenderContext,
+    out: &mut dyn Output,
 ) -> Result<(), RenderError> {
-    let param = helper.param(0).unwrap();
-    if let Some(cents) = param.value().as_f64() {
-        out.write(&format!("{:.2}", cents / 100.0))?;
-    } 
+    if let Some(param) = helper.param(0) {
+        if let Some(cents) = param.value().as_f64() {
+            out.write(&format!("{:.2}", cents / 100.0))?;
+        }
+    }
     Ok(())
 }
 

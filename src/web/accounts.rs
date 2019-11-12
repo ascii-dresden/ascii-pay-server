@@ -2,20 +2,26 @@ use actix_web::{http, web, HttpResponse};
 use handlebars::Handlebars;
 
 use crate::core::{Account, Pool};
-use crate::web::LoggedAccount;
+use crate::web::{LoggedAccount, WebResult};
 
 #[derive(Deserialize)]
 pub struct Search {
     search: Option<String>,
 }
 
-pub fn list(hb: web::Data<Handlebars>, _: LoggedAccount, pool: web::Data<Pool>, query: web::Query<Search>) -> HttpResponse {
-    let conn = &pool.get().unwrap();
-    let mut all_accounts = Account::all(&conn).unwrap();
+pub fn list(
+    hb: web::Data<Handlebars>,
+    _: LoggedAccount,
+    pool: web::Data<Pool>,
+    query: web::Query<Search>,
+) -> WebResult<HttpResponse> {
+    let conn = &pool.get()?;
+    let mut all_accounts = Account::all(&conn)?;
 
     let search = if let Some(search) = &query.search {
         let lower_search = search.to_ascii_lowercase();
-        all_accounts = all_accounts.into_iter()
+        all_accounts = all_accounts
+            .into_iter()
             .filter(|a| {
                 if let Some(name) = &a.name {
                     name.to_ascii_lowercase().contains(&lower_search)
@@ -34,9 +40,9 @@ pub fn list(hb: web::Data<Handlebars>, _: LoggedAccount, pool: web::Data<Pool>, 
         "accounts": all_accounts
     });
 
-    let body = hb.render("account_list", &data).unwrap();
+    let body = hb.render("account_list", &data)?;
 
-    HttpResponse::Ok().body(body)
+    Ok(HttpResponse::Ok().body(body))
 }
 
 pub fn edit_get(
@@ -44,13 +50,13 @@ pub fn edit_get(
     _: LoggedAccount,
     pool: web::Data<Pool>,
     account_id: web::Path<String>,
-) -> HttpResponse {
-    let conn = &pool.get().unwrap();
-    let account = Account::get(&conn, &account_id).unwrap();
+) -> WebResult<HttpResponse> {
+    let conn = &pool.get()?;
+    let account = Account::get(&conn, &account_id)?;
 
-    let body = hb.render("account_edit", &account).unwrap();
+    let body = hb.render("account_edit", &account)?;
 
-    HttpResponse::Ok().body(body)
+    Ok(HttpResponse::Ok().body(body))
 }
 
 pub fn edit_post(
@@ -58,52 +64,49 @@ pub fn edit_post(
     pool: web::Data<Pool>,
     account: web::Form<Account>,
     account_id: web::Path<String>,
-) -> HttpResponse {
+) -> WebResult<HttpResponse> {
     if *account_id != account.id {
         panic!("Oh no");
     }
 
-    let conn = &pool.get().unwrap();
-    let mut server_account = Account::get(&conn, &account_id).unwrap();
+    let conn = &pool.get()?;
+    let mut server_account = Account::get(&conn, &account_id)?;
 
     server_account.name = account.name.empty_to_none();
     server_account.mail = account.mail.empty_to_none();
     server_account.limit = account.limit;
 
-    server_account.update(&conn).unwrap();
+    server_account.update(&conn)?;
 
-    HttpResponse::Found()
+    Ok(HttpResponse::Found()
         .header(http::header::LOCATION, "/accounts")
-        .finish()
+        .finish())
 }
 
-pub fn create_get(
-    hb: web::Data<Handlebars>,
-    _: LoggedAccount,
-) -> HttpResponse {
-    let body = hb.render("account_create", &false).unwrap();
+pub fn create_get(hb: web::Data<Handlebars>, _: LoggedAccount) -> WebResult<HttpResponse> {
+    let body = hb.render("account_create", &false)?;
 
-    HttpResponse::Ok().body(body)
+    Ok(HttpResponse::Ok().body(body))
 }
 
 pub fn create_post(
     _: LoggedAccount,
     pool: web::Data<Pool>,
     account: web::Form<Account>,
-) -> HttpResponse {
-    let conn = &pool.get().unwrap();
+) -> WebResult<HttpResponse> {
+    let conn = &pool.get()?;
 
-    let mut server_account = Account::create(&conn).unwrap();
+    let mut server_account = Account::create(&conn)?;
 
     server_account.name = account.name.empty_to_none();
     server_account.mail = account.mail.empty_to_none();
     server_account.limit = account.limit;
 
-    server_account.update(&conn).unwrap();
+    server_account.update(&conn)?;
 
-    HttpResponse::Found()
+    Ok(HttpResponse::Found()
         .header(http::header::LOCATION, "/accounts")
-        .finish()
+        .finish())
 }
 
 pub fn delete_get(
@@ -127,10 +130,12 @@ impl EmptyToNone<String> for Option<String> {
     fn empty_to_none(&self) -> Option<String> {
         match self {
             None => None,
-            Some(s) => if s.is_empty() {
-                None
-            } else {
-                Some(s.clone())
+            Some(s) => {
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.clone())
+                }
             }
         }
     }

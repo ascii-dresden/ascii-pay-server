@@ -124,7 +124,7 @@ pub fn validate_all(
             (a, r)
         })
         .filter(|(_, r)| r.is_some())
-        .map(|(a, r)| (a, r.unwrap()))
+        .map(|(a, r)| (a, r.expect("Filter removes all none values!")))
         .collect::<HashMap<_, _>>();
 
     Ok(map)

@@ -22,16 +22,20 @@ pub struct Price {
 
 pub mod naive_date_time_serializer {
     use chrono::{NaiveDate, NaiveDateTime};
-    use serde::{Serializer, Deserializer, de::Visitor, de::Error, de::Unexpected};
+    use serde::{de::Error, de::Unexpected, de::Visitor, Deserializer, Serializer};
     use std::fmt;
 
-    pub fn serialize<S>(date: &NaiveDateTime, serializer: S) -> Result<S::Ok, S::Error> 
-    where S: Serializer {
+    pub fn serialize<S>(date: &NaiveDateTime, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
         serializer.serialize_str(&date.format("%Y-%m-%d").to_string())
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error> 
-    where D: Deserializer<'de> {
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
         struct NaiveVisitor;
 
         impl<'de> Visitor<'de> for NaiveVisitor {
@@ -54,7 +58,16 @@ pub mod naive_date_time_serializer {
     }
 }
 
-impl diesel::Queryable<(diesel::sql_types::Text, diesel::sql_types::Text, diesel::sql_types::Text), DB> for Product {
+impl
+    diesel::Queryable<
+        (
+            diesel::sql_types::Text,
+            diesel::sql_types::Text,
+            diesel::sql_types::Text,
+        ),
+        DB,
+    > for Product
+{
     type Row = (String, String, String);
 
     fn build(row: Self::Row) -> Self {
@@ -63,7 +76,7 @@ impl diesel::Queryable<(diesel::sql_types::Text, diesel::sql_types::Text, diesel
             name: row.1,
             category: row.2,
             prices: vec![],
-            current_price: None
+            current_price: None,
         }
     }
 }
@@ -89,7 +102,11 @@ impl
 }
 
 impl Product {
-    pub fn create(conn: &DbConnection, name: &str, category: &str) -> Result<Product, ServiceError> {
+    pub fn create(
+        conn: &DbConnection,
+        name: &str,
+        category: &str,
+    ) -> Result<Product, ServiceError> {
         use crate::core::schema::product::dsl;
 
         let p = Product {
@@ -101,7 +118,11 @@ impl Product {
         };
 
         diesel::insert_into(dsl::product)
-            .values((dsl::id.eq(&p.id), dsl::name.eq(&p.name), dsl::category.eq(&p.category)))
+            .values((
+                dsl::id.eq(&p.id),
+                dsl::name.eq(&p.name),
+                dsl::category.eq(&p.category),
+            ))
             .execute(conn)?;
 
         Ok(p)
@@ -160,11 +181,14 @@ impl Product {
             index += 1;
         }
 
-        diesel::delete(dsl::price.filter(
-            dsl::product.eq(&self.id).and(
-                dsl::validity_start.eq(validity_start)
-            )
-        )).execute(conn)?;
+        diesel::delete(
+            dsl::price.filter(
+                dsl::product
+                    .eq(&self.id)
+                    .and(dsl::validity_start.eq(validity_start)),
+            ),
+        )
+        .execute(conn)?;
 
         self.prices.remove(index);
 
@@ -172,7 +196,6 @@ impl Product {
 
         Ok(())
     }
-
 
     fn load_prices(&mut self, conn: &DbConnection) -> Result<(), ServiceError> {
         use crate::core::schema::price::dsl;
@@ -191,13 +214,15 @@ impl Product {
     fn calc_current_price(&mut self) {
         let now = Utc::now().naive_utc();
 
-        let current = self.prices.iter()
+        let current = self
+            .prices
+            .iter()
             .filter(|p| p.validity_start <= now)
             .max_by(|p1, p2| p1.validity_start.cmp(&p2.validity_start));
 
         self.current_price = match current {
             Some(price) => Some(price.value),
-            None => None
+            None => None,
         };
     }
 

@@ -45,7 +45,9 @@ impl Account {
     pub fn update(&self, conn: &DbConnection) -> Result<(), ServiceError> {
         use crate::core::schema::account::dsl;
 
-        diesel::update(dsl::account.find(&self.id)).set(self).execute(conn)?;
+        diesel::update(dsl::account.find(&self.id))
+            .set(self)
+            .execute(conn)?;
 
         Ok(())
     }

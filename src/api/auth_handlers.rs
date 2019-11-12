@@ -42,7 +42,7 @@ pub fn login(
 ) -> impl Future<Item = HttpResponse, Error = ServiceError> {
     web::block(move || {
         let auth_data = auth_data.into_inner();
-        let conn = &pool.get().unwrap();
+        let conn = &pool.get()?;
 
         match auth_data {
             AuthData::Password { username, password } => {
@@ -53,8 +53,7 @@ pub fn login(
     .then(
         move |res: Result<Account, BlockingError<ServiceError>>| match res {
             Ok(account) => {
-                let logged_account =
-                    serde_json::to_string(&LoggedAccount { id: account.id }).unwrap();
+                let logged_account = serde_json::to_string(&LoggedAccount { id: account.id })?;
                 id.remember(logged_account);
                 Ok(HttpResponse::Ok().finish())
             }
