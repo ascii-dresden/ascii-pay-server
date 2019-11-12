@@ -1,4 +1,5 @@
 mod accounts;
+mod products;
 mod index;
 
 use actix_files as fs;
@@ -45,6 +46,7 @@ pub fn init(config: &mut web::ServiceConfig) {
                     .secure(false),
             ))
             .service(fs::Files::new("/stylesheets", "static/stylesheets/"))
+            .service(fs::Files::new("/images", "static/images/"))
             .service(web::resource("").route(web::get().to(index::index)))
             .service(web::resource("/login").route(web::post().to(index::login)))
             .service(web::resource("/logout").route(web::get().to(index::logout)))
@@ -59,6 +61,18 @@ pub fn init(config: &mut web::ServiceConfig) {
                 web::resource("/account/{account_id}")
                     .route(web::post().to(accounts::edit_post))
                     .route(web::get().to(accounts::edit_get)),
+            )
+            .service(web::resource("/products").route(web::get().to(products::list)))
+            .service(
+                web::resource("/product/create")
+                    .route(web::post().to(products::create_post))
+                    .route(web::get().to(products::create_get)),
+            )
+            .service(web::resource("/product/delete/{product_id}").route(web::get().to(products::delete_get)))
+            .service(
+                web::resource("/product/{product_id}")
+                    .route(web::post().to(products::edit_post))
+                    .route(web::get().to(products::edit_get)),
             )
     );
 }

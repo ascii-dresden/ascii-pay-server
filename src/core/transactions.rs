@@ -59,6 +59,7 @@ pub fn execute(
     result
 }
 
+// Pagination reference: https://github.com/diesel-rs/diesel/blob/v1.3.0/examples/postgres/advanced-blog-cli/src/pagination.rs
 pub fn get_by_user(
     conn: &DbConnection,
     account: &Account,

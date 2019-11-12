@@ -10,5 +10,5 @@ mod utils;
 
 pub use crate::core::accounts::Account;
 pub use crate::core::errors::*;
-pub use crate::core::products::Product;
+pub use crate::core::products::{Product, Price, naive_date_time_serializer};
 pub use crate::core::utils::*;

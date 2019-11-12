@@ -35,6 +35,7 @@ table! {
     product (id) {
         id -> Text,
         name -> Text,
+        category -> Text,
     }
 }
 

@@ -1,11 +1,14 @@
 <header class="navbar">
     <section class="navbar-section">
         <a href="/" class="btn btn-link{{#if (eq active "home")}} active{{/if}}">Dashboard</a>
-        <a href="/accounts" class="btn btn-link{{#if (eq active "home")}} active{{/if}}">Accounts</a>
+        <a href="/accounts" class="btn btn-link{{#if (eq active "accounts")}} active{{/if}}">Accounts</a>
+        <a href="/products" class="btn btn-link{{#if (eq active "products")}} active{{/if}}">Products</a>
     </section>
+    <!--
     <section class="navbar-center">
         <a class="navbar-brand mr-2">asciipay</a>
     </section>
+    -->
     <section class="navbar-section">
         <a href="/logout" class="btn btn-link">Logout</a>
     </section>
