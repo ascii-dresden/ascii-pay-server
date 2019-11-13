@@ -17,11 +17,13 @@ mod core;
 mod server;
 mod web;
 
-use crate::core::{authentication_password, Account, DbConnection, Pool, ServiceError};
+use crate::core::{
+    authentication_password, Account, DbConnection, Permission, Pool, ServiceResult,
+};
 use server::start_server;
 
 // For later ref: https://gill.net.in/posts/auth-microservice-rust-actix-web1.0-diesel-complete-tutorial/
-fn main() -> Result<(), ServiceError> {
+fn main() -> ServiceResult<()> {
     dotenv::dotenv().ok();
     std::env::set_var("RUST_LOG", "actix_web=info,actix_server=info");
     env_logger::init();
@@ -42,6 +44,11 @@ fn main() -> Result<(), ServiceError> {
     Ok(())
 }
 
+/// Read a value from stdin
+///
+/// # Arguments
+/// * `prompt` - A prompt that descripes the required input
+/// * `hide_input` - Specifies if the input value is visible or hidden
 fn read_value(prompt: &str, hide_input: bool) -> String {
     if hide_input {
         loop {
@@ -59,19 +66,25 @@ fn read_value(prompt: &str, hide_input: bool) -> String {
         stdout().flush().unwrap();
         let mut value = String::new();
         stdin().read_line(&mut value).unwrap();
-        return value.trim().to_owned();
+        value.trim().to_owned()
     }
 }
 
+/// Check if a initial user exists. Otherwise create a new one
 fn check_admin(pool: &Pool) {
     let conn = &pool.get().unwrap();
-    if Account::all(&conn).unwrap().is_empty() {
+    if Account::all(&conn)
+        .unwrap()
+        .iter()
+        .find(|a| a.permission.is_admin())
+        .is_none()
+    {
         let fullname = read_value("Fullname: ", false);
         let username = read_value("Username: ", false);
         let password = read_value("Password: ", true);
 
-        let mut account = Account::create(&conn).unwrap();
-        account.name = Some(fullname.into());
+        let mut account = Account::create(&conn, Permission::ADMIN).unwrap();
+        account.name = Some(fullname);
         account.update(&conn).unwrap();
         authentication_password::register(&conn, &account, &username, &password).unwrap();
     }

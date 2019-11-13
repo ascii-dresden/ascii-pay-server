@@ -43,6 +43,18 @@
                     <input class="form-input" type="number" name="limit" value="{{limit}}"/>
                 </div>
             </div>
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="permission">Permission</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <select class="form-select" name="permission">
+                        <option value="DEFAULT" {{#if (eq permission "DEFAULT")}}selected="selected"{{/if}}>Default</option>
+                        <option value="MEMBER" {{#if (eq permission "MEMBER")}}selected="selected"{{/if}}>Member</option>
+                        <option value="ADMIN" {{#if (eq permission "ADMIN")}}selected="selected"{{/if}}>Admin</option>
+                    </select>
+                </div>
+            </div>
             <div class="columns">
                 <div class="column col-8 col-sm-12">
                     <input class="btn btn-primary" type="submit" value="Save" />

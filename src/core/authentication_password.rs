@@ -2,8 +2,9 @@ use argonautica::{Hasher, Verifier};
 use diesel::prelude::*;
 
 use crate::core::schema::authentication_password;
-use crate::core::{Account, DbConnection, ServiceError};
+use crate::core::{Account, DbConnection, ServiceError, ServiceResult};
 
+/// Represent a username - password authentication for the given account
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset)]
 #[table_name = "authentication_password"]
 #[primary_key(account)]
@@ -13,12 +14,13 @@ struct AuthenticationPassword {
     password: String,
 }
 
+/// Set the username and password as authentication method for the given account
 pub fn register(
     conn: &DbConnection,
     account: &Account,
     username: &str,
     password: &str,
-) -> Result<(), ServiceError> {
+) -> ServiceResult<()> {
     use crate::core::schema::authentication_password::dsl;
 
     let a = AuthenticationPassword {
@@ -27,6 +29,7 @@ pub fn register(
         password: hash_password(password)?,
     };
 
+    remove(&conn, &account)?;
     diesel::insert_into(dsl::authentication_password)
         .values(&a)
         .execute(conn)?;
@@ -34,7 +37,8 @@ pub fn register(
     Ok(())
 }
 
-pub fn remove(conn: &DbConnection, account: &Account) -> Result<(), ServiceError> {
+/// Remove the username -password authentication for the given account
+pub fn remove(conn: &DbConnection, account: &Account) -> ServiceResult<()> {
     use crate::core::schema::authentication_password::dsl;
 
     diesel::delete(dsl::authentication_password.filter(dsl::account.eq(&account.id)))
@@ -42,7 +46,10 @@ pub fn remove(conn: &DbConnection, account: &Account) -> Result<(), ServiceError
 
     Ok(())
 }
-pub fn get(conn: &DbConnection, username: &str, password: &str) -> Result<Account, ServiceError> {
+
+/// Get account by username and password.
+/// Return `ServiceError` if no account is registered for given username - passoword pair
+pub fn get(conn: &DbConnection, username: &str, password: &str) -> ServiceResult<Account> {
     use crate::core::schema::authentication_password::dsl;
 
     let mut results = dsl::authentication_password
@@ -65,7 +72,8 @@ lazy_static::lazy_static! {
 pub  static ref SECRET_KEY: String = std::env::var("SECRET_KEY").unwrap_or_else(|_| "0123".repeat(8));
 }
 
-fn hash_password(password: &str) -> Result<String, ServiceError> {
+/// Create the hash version of a password
+fn hash_password(password: &str) -> ServiceResult<String> {
     Hasher::default()
         .with_password(password)
         .with_secret_key(SECRET_KEY.as_str())
@@ -76,7 +84,8 @@ fn hash_password(password: &str) -> Result<String, ServiceError> {
         })
 }
 
-fn verify(hash: &str, password: &str) -> Result<bool, ServiceError> {
+/// Verify a password to its hash version
+fn verify(hash: &str, password: &str) -> ServiceResult<bool> {
     Verifier::default()
         .with_hash(hash)
         .with_password(password)

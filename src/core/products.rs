@@ -1,8 +1,9 @@
 use chrono::{NaiveDateTime, Utc};
 use diesel::prelude::*;
 
-use crate::core::{generate_uuid, DbConnection, Money, ServiceError, DB};
+use crate::core::{generate_uuid, DbConnection, Money, ServiceError, ServiceResult, DB};
 
+/// Represent a product
 #[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Product {
     pub id: String,
@@ -13,6 +14,9 @@ pub struct Product {
     pub current_price: Option<Money>,
 }
 
+/// Represent a price of a product with a validity
+///
+/// The price with the newest `validity_start` lower than the current datetime is the current valid price.
 #[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Price {
     #[serde(with = "naive_date_time_serializer")]
@@ -20,6 +24,7 @@ pub struct Price {
     pub value: Money,
 }
 
+/// Serialize/Deserialize a datetime to/from only a date
 pub mod naive_date_time_serializer {
     use chrono::{NaiveDate, NaiveDateTime};
     use serde::{de::Error, de::Unexpected, de::Visitor, Deserializer, Serializer};
@@ -58,6 +63,9 @@ pub mod naive_date_time_serializer {
     }
 }
 
+/// Custom db loader for `Product`
+///
+/// Ignore price vec
 impl
     diesel::Queryable<
         (
@@ -81,6 +89,9 @@ impl
     }
 }
 
+/// Custom db loader for `Price`
+///
+/// Skip product id
 impl
     diesel::Queryable<
         (
@@ -102,11 +113,8 @@ impl
 }
 
 impl Product {
-    pub fn create(
-        conn: &DbConnection,
-        name: &str,
-        category: &str,
-    ) -> Result<Product, ServiceError> {
+    /// Create a new product with the given name and category
+    pub fn create(conn: &DbConnection, name: &str, category: &str) -> ServiceResult<Product> {
         use crate::core::schema::product::dsl;
 
         let p = Product {
@@ -128,22 +136,28 @@ impl Product {
         Ok(p)
     }
 
-    pub fn update(&self, conn: &DbConnection) -> Result<(), ServiceError> {
+    /// Save the current product data to the database
+    ///
+    /// This ignores all changes to the `prices` vec
+    pub fn update(&self, conn: &DbConnection) -> ServiceResult<()> {
         use crate::core::schema::product::dsl;
 
         diesel::update(dsl::product.find(&self.id))
-            .set(dsl::name.eq(&self.name))
+            .set((dsl::name.eq(&self.name), dsl::category.eq(&self.category)))
             .execute(conn)?;
 
         Ok(())
     }
 
+    /// Add and save a new price to the product
+    ///
+    /// This updates the `prices` vec and the `current_price`
     pub fn add_price(
         &mut self,
         conn: &DbConnection,
         validity_start: NaiveDateTime,
         value: Money,
-    ) -> Result<(), ServiceError> {
+    ) -> ServiceResult<()> {
         use crate::core::schema::price::dsl;
 
         let p = Price {
@@ -166,11 +180,14 @@ impl Product {
         Ok(())
     }
 
+    /// Remove and save a price from the product by its `validity_start`
+    ///
+    /// This updates the `prices` vec and the `current_price`
     pub fn remove_price(
         &mut self,
         conn: &DbConnection,
         validity_start: NaiveDateTime,
-    ) -> Result<(), ServiceError> {
+    ) -> ServiceResult<()> {
         use crate::core::schema::price::dsl;
 
         let mut index = 0;
@@ -197,7 +214,10 @@ impl Product {
         Ok(())
     }
 
-    fn load_prices(&mut self, conn: &DbConnection) -> Result<(), ServiceError> {
+    /// Load the prices for this product
+    ///
+    /// This updates the `prices` vec and the `current_price`
+    fn load_prices(&mut self, conn: &DbConnection) -> ServiceResult<()> {
         use crate::core::schema::price::dsl;
 
         let results = dsl::price
@@ -211,6 +231,7 @@ impl Product {
         Ok(())
     }
 
+    /// Calculate the `current_price` based on the `prices` vec
     fn calc_current_price(&mut self) {
         let now = Utc::now().naive_utc();
 
@@ -226,7 +247,8 @@ impl Product {
         };
     }
 
-    pub fn all(conn: &DbConnection) -> Result<Vec<Product>, ServiceError> {
+    /// List all products
+    pub fn all(conn: &DbConnection) -> ServiceResult<Vec<Product>> {
         use crate::core::schema::product::dsl;
 
         let mut results = dsl::product.load::<Product>(conn)?;
@@ -238,7 +260,8 @@ impl Product {
         Ok(results)
     }
 
-    pub fn get(conn: &DbConnection, id: &str) -> Result<Product, ServiceError> {
+    /// Get a product by the `id`
+    pub fn get(conn: &DbConnection, id: &str) -> ServiceResult<Product> {
         use crate::core::schema::product::dsl;
 
         let mut results = dsl::product.filter(dsl::id.eq(id)).load::<Product>(conn)?;

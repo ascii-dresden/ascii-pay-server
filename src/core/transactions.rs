@@ -4,9 +4,11 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 
 use crate::core::schema::transaction;
-use crate::core::Product;
-use crate::core::{generate_uuid, Account, DbConnection, Money, ServiceError};
+use crate::core::{
+    generate_uuid, Account, DbConnection, Money, Product, ServiceError, ServiceResult,
+};
 
+/// Represent a transaction
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset)]
 #[table_name = "transaction"]
 pub struct Transaction {
@@ -17,18 +19,28 @@ pub struct Transaction {
     pub date: NaiveDateTime,
 }
 
+/// Execute a transaction on the given `account` with the given `total`
+///
+/// # Internal steps
+/// * 1 Start a sql transaction
+/// * 2 Requery the account credit
+/// * 3 Calculate the new credit
+/// * 4 Check if the account limit allows the new credit
+/// * 5 Create and save the transaction (with optional cashier refernece)
+/// * 6 Save the new credit to the account
 pub fn execute(
     conn: &DbConnection,
     account: &mut Account,
     cashier: Option<&Account>,
     total: Money,
-) -> Result<Transaction, ServiceError> {
+) -> ServiceResult<Transaction> {
     use crate::core::schema::transaction::dsl;
 
-    let new_credit = account.credit + total;
+    let mut new_credit = account.credit;
 
     let result = conn.exclusive_transaction(|| {
         let mut account = Account::get(conn, &account.id)?;
+        new_credit = account.credit + total;
 
         if new_credit < account.limit && new_credit < account.credit {
             return Err(ServiceError::InternalServerError);
@@ -60,12 +72,13 @@ pub fn execute(
 }
 
 // Pagination reference: https://github.com/diesel-rs/diesel/blob/v1.3.0/examples/postgres/advanced-blog-cli/src/pagination.rs
-pub fn get_by_user(
+/// List all transactions of a account between the given datetimes
+pub fn get_by_account(
     conn: &DbConnection,
     account: &Account,
     from: &NaiveDateTime,
     to: &NaiveDateTime,
-) -> Result<Vec<Transaction>, ServiceError> {
+) -> ServiceResult<Vec<Transaction>> {
     use crate::core::schema::transaction::dsl;
 
     let results = dsl::transaction
@@ -85,10 +98,11 @@ pub enum ValidationError {
     NoData,
 }
 
+/// Check if the credit of an account is valid to its transactions
 fn validate_account(
     conn: &DbConnection,
     account: &Account,
-) -> Result<Option<ValidationError>, ServiceError> {
+) -> ServiceResult<Option<ValidationError>> {
     use crate::core::schema::transaction::dsl;
 
     conn.exclusive_transaction(|| {
@@ -112,9 +126,8 @@ fn validate_account(
     })
 }
 
-pub fn validate_all(
-    conn: &DbConnection,
-) -> Result<HashMap<Account, ValidationError>, ServiceError> {
+/// List all accounts with validation erros of their credit to their transactions
+pub fn validate_all(conn: &DbConnection) -> ServiceResult<HashMap<Account, ValidationError>> {
     let accounts = Account::all(conn)?;
 
     let map = accounts
@@ -131,11 +144,12 @@ pub fn validate_all(
 }
 
 impl Transaction {
+    /// Assign products with amounts to this transaction
     pub fn add_products(
         &self,
         conn: &DbConnection,
         products: HashMap<Product, i32>,
-    ) -> Result<(), ServiceError> {
+    ) -> ServiceResult<()> {
         use crate::core::schema::transaction_product::dsl;
 
         for (product, amount) in products {
@@ -151,7 +165,8 @@ impl Transaction {
         Ok(())
     }
 
-    pub fn get_products(&self, conn: &DbConnection) -> Result<HashMap<Product, i32>, ServiceError> {
+    /// List assigned products with amounts of this transaction
+    pub fn get_products(&self, conn: &DbConnection) -> ServiceResult<HashMap<Product, i32>> {
         use crate::core::schema::transaction_product::dsl;
 
         let results = dsl::transaction_product

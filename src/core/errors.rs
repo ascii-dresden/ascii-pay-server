@@ -1,7 +1,10 @@
 use actix_web::{error::ResponseError, HttpResponse};
 use derive_more::Display;
-use diesel::result::{DatabaseErrorKind, Error as DBError};
+use diesel::result::DatabaseErrorKind;
 
+/// Represent errors in the application
+///
+/// All `ServiceError`s can be transformed to http errors.
 #[derive(Debug, Display)]
 pub enum ServiceError {
     #[display(fmt = "Db Error: {}", _0)]
@@ -20,10 +23,13 @@ pub enum ServiceError {
     Unauthorized,
 }
 
-impl From<DBError> for ServiceError {
-    fn from(error: DBError) -> ServiceError {
+/// Helper for `ServiceError` result
+pub type ServiceResult<T> = Result<T, ServiceError>;
+
+impl From<diesel::result::Error> for ServiceError {
+    fn from(error: diesel::result::Error) -> ServiceError {
         match error {
-            DBError::DatabaseError(kind, info) => {
+            diesel::result::Error::DatabaseError(kind, info) => {
                 if let DatabaseErrorKind::UniqueViolation = kind {
                     let message = info.details().unwrap_or_else(|| info.message()).to_string();
                     return ServiceError::DbError(message);
@@ -61,6 +67,7 @@ impl From<serde_json::Error> for ServiceError {
     }
 }
 
+/// Transform `ServiceError` to `HttpResponse`
 impl ResponseError for ServiceError {
     fn error_response(&self) -> HttpResponse {
         match self {

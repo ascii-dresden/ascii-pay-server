@@ -1,20 +1,16 @@
 use actix_web::{http, web, HttpResponse};
 use handlebars::Handlebars;
 
-use crate::core::{Account, Pool};
-use crate::web::{LoggedAccount, WebResult};
+use crate::core::{Account, Pool, ServiceResult};
+use crate::web::utils::{EmptyToNone, LoggedAccount, Search};
 
-#[derive(Deserialize)]
-pub struct Search {
-    search: Option<String>,
-}
-
-pub fn list(
+/// GET route for `/accounts`
+pub fn get_accounts(
     hb: web::Data<Handlebars>,
     _: LoggedAccount,
     pool: web::Data<Pool>,
     query: web::Query<Search>,
-) -> WebResult<HttpResponse> {
+) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
     let mut all_accounts = Account::all(&conn)?;
 
@@ -45,12 +41,13 @@ pub fn list(
     Ok(HttpResponse::Ok().body(body))
 }
 
-pub fn edit_get(
+/// GET route for `/account/{account_id}`
+pub fn get_account_edit(
     hb: web::Data<Handlebars>,
     _: LoggedAccount,
     pool: web::Data<Pool>,
     account_id: web::Path<String>,
-) -> WebResult<HttpResponse> {
+) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
     let account = Account::get(&conn, &account_id)?;
 
@@ -59,12 +56,13 @@ pub fn edit_get(
     Ok(HttpResponse::Ok().body(body))
 }
 
-pub fn edit_post(
+/// POST route for `/account/{account_id}`
+pub fn post_account_edit(
     _: LoggedAccount,
     pool: web::Data<Pool>,
     account: web::Form<Account>,
     account_id: web::Path<String>,
-) -> WebResult<HttpResponse> {
+) -> ServiceResult<HttpResponse> {
     if *account_id != account.id {
         panic!("Oh no");
     }
@@ -74,6 +72,7 @@ pub fn edit_post(
 
     server_account.name = account.name.empty_to_none();
     server_account.mail = account.mail.empty_to_none();
+    server_account.permission = account.permission;
     server_account.limit = account.limit;
 
     server_account.update(&conn)?;
@@ -83,20 +82,25 @@ pub fn edit_post(
         .finish())
 }
 
-pub fn create_get(hb: web::Data<Handlebars>, _: LoggedAccount) -> WebResult<HttpResponse> {
+/// GET route for `/account/create`
+pub fn get_account_create(
+    hb: web::Data<Handlebars>,
+    _: LoggedAccount,
+) -> ServiceResult<HttpResponse> {
     let body = hb.render("account_create", &false)?;
 
     Ok(HttpResponse::Ok().body(body))
 }
 
-pub fn create_post(
+/// POST route for `/account/create`
+pub fn post_account_create(
     _: LoggedAccount,
     pool: web::Data<Pool>,
     account: web::Form<Account>,
-) -> WebResult<HttpResponse> {
+) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
 
-    let mut server_account = Account::create(&conn)?;
+    let mut server_account = Account::create(&conn, account.permission)?;
 
     server_account.name = account.name.empty_to_none();
     server_account.mail = account.mail.empty_to_none();
@@ -109,6 +113,7 @@ pub fn create_post(
         .finish())
 }
 
+/// GET route for `/account/delete/{account_id}`
 pub fn delete_get(
     _hb: web::Data<Handlebars>,
     _: LoggedAccount,
@@ -120,23 +125,4 @@ pub fn delete_get(
     HttpResponse::Found()
         .header(http::header::LOCATION, "/accounts")
         .finish()
-}
-
-trait EmptyToNone<T> {
-    fn empty_to_none(&self) -> Option<T>;
-}
-
-impl EmptyToNone<String> for Option<String> {
-    fn empty_to_none(&self) -> Option<String> {
-        match self {
-            None => None,
-            Some(s) => {
-                if s.is_empty() {
-                    None
-                } else {
-                    Some(s.clone())
-                }
-            }
-        }
-    }
 }

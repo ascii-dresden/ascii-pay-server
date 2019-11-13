@@ -2,13 +2,8 @@ use actix_web::{http, web, HttpResponse};
 use handlebars::Handlebars;
 use std::collections::HashMap;
 
-use crate::core::{Money, Pool, Product};
-use crate::web::{LoggedAccount, WebResult};
-
-#[derive(Deserialize)]
-pub struct Search {
-    search: Option<String>,
-}
+use crate::core::{Money, Pool, Product, ServiceResult};
+use crate::web::utils::{LoggedAccount, Search};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FormProduct {
@@ -24,12 +19,13 @@ pub struct FormProduct {
     pub extra: HashMap<String, String>,
 }
 
-pub fn list(
+/// GET route for `/products`
+pub fn get_products(
     hb: web::Data<Handlebars>,
     _: LoggedAccount,
     pool: web::Data<Pool>,
     query: web::Query<Search>,
-) -> WebResult<HttpResponse> {
+) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
     let mut all_products = Product::all(&conn)?;
 
@@ -54,12 +50,13 @@ pub fn list(
     Ok(HttpResponse::Ok().body(body))
 }
 
-pub fn edit_get(
+/// GET route for `/product/{product_id}`
+pub fn get_product_edit(
     hb: web::Data<Handlebars>,
     _: LoggedAccount,
     pool: web::Data<Pool>,
     product_id: web::Path<String>,
-) -> WebResult<HttpResponse> {
+) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
     let product = Product::get(&conn, &product_id)?;
 
@@ -68,12 +65,13 @@ pub fn edit_get(
     Ok(HttpResponse::Ok().body(body))
 }
 
-pub fn edit_post(
+/// POST route for `/product/{product_id}`
+pub fn post_product_edit(
     _: LoggedAccount,
     pool: web::Data<Pool>,
     product: web::Form<FormProduct>,
     product_id: web::Path<String>,
-) -> WebResult<HttpResponse> {
+) -> ServiceResult<HttpResponse> {
     if *product_id != product.id {
         panic!("at the disco");
     }
@@ -89,7 +87,6 @@ pub fn edit_post(
     let mut delete_indeces = product
         .extra
         .keys()
-        .into_iter()
         .filter_map(|k| k.trim_start_matches("delete-price-").parse::<usize>().ok())
         .collect::<Vec<usize>>();
 
@@ -112,17 +109,22 @@ pub fn edit_post(
         .finish())
 }
 
-pub fn create_get(hb: web::Data<Handlebars>, _: LoggedAccount) -> WebResult<HttpResponse> {
+/// GET route for `/product/create`
+pub fn get_product_create(
+    hb: web::Data<Handlebars>,
+    _: LoggedAccount,
+) -> ServiceResult<HttpResponse> {
     let body = hb.render("product_create", &false)?;
 
     Ok(HttpResponse::Ok().body(body))
 }
 
-pub fn create_post(
+/// POST route for `/product/create`
+pub fn post_product_create(
     _: LoggedAccount,
     pool: web::Data<Pool>,
     product: web::Form<FormProduct>,
-) -> WebResult<HttpResponse> {
+) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
 
     let mut server_product = Product::create(&conn, &product.name, &product.category)?;
@@ -140,7 +142,8 @@ pub fn create_post(
         .finish())
 }
 
-pub fn delete_get(
+/// GET route for `/product/delete/{product_id}`
+pub fn get_product_delete(
     _hb: web::Data<Handlebars>,
     _: LoggedAccount,
     _pool: web::Data<Pool>,
@@ -151,23 +154,4 @@ pub fn delete_get(
     HttpResponse::Found()
         .header(http::header::LOCATION, "/products")
         .finish()
-}
-
-trait EmptyToNone<T> {
-    fn empty_to_none(&self) -> Option<T>;
-}
-
-impl EmptyToNone<String> for Option<String> {
-    fn empty_to_none(&self) -> Option<String> {
-        match self {
-            None => None,
-            Some(s) => {
-                if s.is_empty() {
-                    None
-                } else {
-                    Some(s.clone())
-                }
-            }
-        }
-    }
 }

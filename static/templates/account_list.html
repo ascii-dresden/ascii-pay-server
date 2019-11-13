@@ -27,6 +27,7 @@
             <thead>
                 <tr>
                     <th>Name</th>
+                    <th>Permission</th>
                     <th>Mail</th>
                     <th>Action</th>
                 </tr>
@@ -35,6 +36,7 @@
                 {{#each accounts}}
                 <tr>
                     <td>{{name}}</td>
+                    <td style="text-transform: lowercase;">{{#if (ne permission "DEFAULT")}}{{permission}}{{/if}}</td>
                     <td>{{mail}}</td>
                     <td>
                         <a href="/account/{{id}}">Edit</a>

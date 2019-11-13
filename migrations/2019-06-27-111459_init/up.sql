@@ -3,7 +3,8 @@ CREATE TABLE `account` (
   `credit` INT DEFAULT 0 NOT NULL,
   `limit` INT DEFAULT 0 NOT NULL,
   `name` VARCHAR(64),
-  `mail` VARCHAR(64)
+  `mail` VARCHAR(64),
+  `permission` SMALLINT NOT NULL
 );
 
 CREATE TABLE `authentication_barcode` (

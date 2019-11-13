@@ -5,6 +5,7 @@ table! {
         limit -> Integer,
         name -> Nullable<Text>,
         mail -> Nullable<Text>,
+        permission -> SmallInt,
     }
 }
 
