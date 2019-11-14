@@ -70,11 +70,11 @@ impl Session {
 
         let mut results = dsl::session.filter(dsl::id.eq(id)).load::<Session>(conn)?;
 
-        let a = results.pop().ok_or_else(|| ServiceError::NotFound)?;
+        let a = results.pop().ok_or_else(|| ServiceError::Expired)?;
 
         if a.valid_until < Local::now().naive_local() {
             a.delete(&conn)?;
-            return Err(ServiceError::NotFound);
+            return Err(ServiceError::Expired);
         }
 
         Ok(a)

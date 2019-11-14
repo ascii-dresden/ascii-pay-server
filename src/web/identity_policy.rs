@@ -39,7 +39,12 @@ impl DbIdentityPolicy {
         req: &mut ServiceRequest,
         session_id: String,
     ) -> ServiceResult<Option<String>> {
-        let pool: web::Data<Pool> = req.app_data().ok_or(ServiceError::InternalServerError)?;
+        let pool: web::Data<Pool> = req.app_data().ok_or(
+            ServiceError::InternalServerError(
+                "r2d2 error",
+                "Can not extract database from request".to_owned()
+            )
+        )?;
         let conn = &pool.get()?;
 
         let mut session = Session::get(&conn, &session_id)?;
@@ -65,16 +70,14 @@ impl IdentityPolicy for DbIdentityPolicy {
     fn from_request(&self, req: &mut ServiceRequest) -> Self::Future {
         let cookie_data = self.cookie_policy.from_request(req)?;
 
-        Ok(match cookie_data {
-            Some(session_id) => {
-                let res = self.load_logged_account(req, session_id);
-                match res {
-                    Ok(x) => x,
-                    Err(_) => None,
-                }
-            }
-            None => None,
-        })
+        match cookie_data {
+            // Some(session_id) => self.load_logged_account(req, session_id).map_err(|err| err.actix()),
+            Some(session_id) => match self.load_logged_account(req, session_id).ok() {
+                Some(s) => Ok(s),
+                None => Ok(None)
+            },
+            None => Ok(None),
+        }
     }
 
     fn to_response<B>(
@@ -86,7 +89,10 @@ impl IdentityPolicy for DbIdentityPolicy {
         let id = match id {
             Some(account_str) => {
                 let logged_account: LoggedAccount = serde_json::from_str(&account_str)
-                    .map_err(|_| ServiceError::InternalServerError.actix())?;
+                    .map_err(|err| {
+                        let e: ServiceError = err.into();
+                        e.actix()
+                    })?;
 
                 Some(logged_account.session_id)
             }

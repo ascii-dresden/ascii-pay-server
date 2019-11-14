@@ -1,26 +1,25 @@
 use actix_web::{error::ResponseError, Error as ActixError, HttpResponse};
 use derive_more::Display;
-use diesel::result::DatabaseErrorKind;
 
 /// Represent errors in the application
 ///
 /// All `ServiceError`s can be transformed to http errors.
 #[derive(Debug, Display)]
 pub enum ServiceError {
-    #[display(fmt = "Db Error: {}", _0)]
-    DbError(String),
+    #[display(fmt = "Bad Request: '{}'\n{}", _0, _1)]
+    BadRequest(&'static str, String),
 
-    #[display(fmt = "Bad Request: {}", _0)]
-    BadRequest(String),
-
-    #[display(fmt = "Internal Server Error")]
-    InternalServerError,
+    #[display(fmt = "Internal Server Error: '{}'\n{}", _0, _1)]
+    InternalServerError(&'static str, String),
 
     #[display(fmt = "Not Found")]
     NotFound,
 
     #[display(fmt = "Unauthorized")]
     Unauthorized,
+
+    #[display(fmt = "Session is expired")]
+    Expired,
 }
 
 impl ServiceError {
@@ -34,49 +33,40 @@ pub type ServiceResult<T> = Result<T, ServiceError>;
 
 impl From<diesel::result::Error> for ServiceError {
     fn from(error: diesel::result::Error) -> ServiceError {
-        match error {
-            diesel::result::Error::DatabaseError(kind, info) => {
-                if let DatabaseErrorKind::UniqueViolation = kind {
-                    let message = info.details().unwrap_or_else(|| info.message()).to_string();
-                    return ServiceError::DbError(message);
-                }
-                ServiceError::InternalServerError
-            }
-            _ => ServiceError::InternalServerError,
-        }
+        ServiceError::InternalServerError("Database error", format!("{}", error))
     }
 }
 
 impl From<std::io::Error> for ServiceError {
-    fn from(_: std::io::Error) -> ServiceError {
-        ServiceError::InternalServerError
+    fn from(error: std::io::Error) -> ServiceError {
+        ServiceError::InternalServerError("IO error", format!("{}", error))
     }
 }
 impl From<handlebars::RenderError> for ServiceError {
-    fn from(_: handlebars::RenderError) -> ServiceError {
-        ServiceError::InternalServerError
+    fn from(error: handlebars::RenderError) -> ServiceError {
+        ServiceError::InternalServerError("Render error", format!("{}", error))
     }
 }
 impl From<r2d2::Error> for ServiceError {
-    fn from(_: r2d2::Error) -> ServiceError {
-        ServiceError::InternalServerError
+    fn from(error: r2d2::Error) -> ServiceError {
+        ServiceError::InternalServerError("r2d2 error", format!("{}", error))
     }
 }
 impl From<uuid::parser::ParseError> for ServiceError {
-    fn from(_: uuid::parser::ParseError) -> ServiceError {
-        ServiceError::BadRequest("Invalid UUID".into())
+    fn from(error: uuid::parser::ParseError) -> ServiceError {
+        ServiceError::BadRequest("Invalid UUID", format!("{}", error))
     }
 }
 impl From<serde_json::Error> for ServiceError {
-    fn from(_: serde_json::Error) -> ServiceError {
-        ServiceError::InternalServerError
+    fn from(error: serde_json::Error) -> ServiceError {
+        ServiceError::InternalServerError("Serialization error", format!("{}", error))
     }
 }
 /*
 /// nightly - allow `?` on Option<T> to unwrap
 impl From<std::option::NoneError> for ServiceError {
-    fn from(_: std::option::NoneError) -> ServiceError {
-        ServiceError::InternalServerError
+    fn from(error: std::option::NoneError) -> ServiceError {
+        ServiceError::InternalServerError("None error", format!("{}", error))
     }
 }
 */
@@ -85,13 +75,21 @@ impl From<std::option::NoneError> for ServiceError {
 impl ResponseError for ServiceError {
     fn error_response(&self) -> HttpResponse {
         match self {
-            ServiceError::InternalServerError => {
-                HttpResponse::InternalServerError().json("Internal Server Error, Please try later")
+            ServiceError::InternalServerError(ref source, ref cause) => {
+                HttpResponse::InternalServerError().json(json!({
+                    "message": "Internal Server Error, Please try later",
+                    "source": source,
+                    "cause": cause
+                }))
             }
-            ServiceError::DbError(ref message) => HttpResponse::InternalServerError().json(message),
-            ServiceError::BadRequest(ref message) => HttpResponse::BadRequest().json(message),
+            ServiceError::BadRequest(ref source, ref cause) => HttpResponse::BadRequest().json(json!({
+                "message": "Internal Server Error, Please try later",
+                "source": source,
+                "cause": cause
+            })),
             ServiceError::NotFound => HttpResponse::NotFound().json("NotFound"),
             ServiceError::Unauthorized => HttpResponse::Unauthorized().json("Unauthorized"),
+            ServiceError::Expired => HttpResponse::Unauthorized().json("Session has expired, login again"),
         }
     }
 }
