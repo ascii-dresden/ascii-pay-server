@@ -1,4 +1,4 @@
-use actix_web::{error::ResponseError, HttpResponse};
+use actix_web::{error::ResponseError, Error as ActixError, HttpResponse};
 use derive_more::Display;
 use diesel::result::DatabaseErrorKind;
 
@@ -21,6 +21,12 @@ pub enum ServiceError {
 
     #[display(fmt = "Unauthorized")]
     Unauthorized,
+}
+
+impl ServiceError {
+    pub fn actix(self) -> ActixError {
+        self.into()
+    }
 }
 
 /// Helper for `ServiceError` result
@@ -66,6 +72,14 @@ impl From<serde_json::Error> for ServiceError {
         ServiceError::InternalServerError
     }
 }
+/*
+/// nightly - allow `?` on Option<T> to unwrap
+impl From<std::option::NoneError> for ServiceError {
+    fn from(_: std::option::NoneError) -> ServiceError {
+        ServiceError::InternalServerError
+    }
+}
+*/
 
 /// Transform `ServiceError` to `HttpResponse`
 impl ResponseError for ServiceError {

@@ -3,7 +3,8 @@ use handlebars::Handlebars;
 use std::collections::HashMap;
 
 use crate::core::{Money, Pool, Product, ServiceResult};
-use crate::web::utils::{LoggedAccount, Search};
+use crate::web::identity_policy::LoggedAccount;
+use crate::web::utils::Search;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FormProduct {
@@ -22,11 +23,14 @@ pub struct FormProduct {
 /// GET route for `/products`
 pub fn get_products(
     hb: web::Data<Handlebars>,
-    _: LoggedAccount,
+    logged_account: LoggedAccount,
     pool: web::Data<Pool>,
     query: web::Query<Search>,
 ) -> ServiceResult<HttpResponse> {
+    logged_account.require_member()?;
+
     let conn = &pool.get()?;
+
     let mut all_products = Product::all(&conn)?;
 
     let search = if let Some(search) = &query.search {
@@ -53,11 +57,14 @@ pub fn get_products(
 /// GET route for `/product/{product_id}`
 pub fn get_product_edit(
     hb: web::Data<Handlebars>,
-    _: LoggedAccount,
+    logged_account: LoggedAccount,
     pool: web::Data<Pool>,
     product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
+    logged_account.require_member()?;
+
     let conn = &pool.get()?;
+
     let product = Product::get(&conn, &product_id)?;
 
     let body = hb.render("product_edit", &product)?;
@@ -67,16 +74,19 @@ pub fn get_product_edit(
 
 /// POST route for `/product/{product_id}`
 pub fn post_product_edit(
-    _: LoggedAccount,
+    logged_account: LoggedAccount,
     pool: web::Data<Pool>,
     product: web::Form<FormProduct>,
     product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
+    logged_account.require_member()?;
+
     if *product_id != product.id {
         panic!("at the disco");
     }
 
     let conn = &pool.get()?;
+
     let mut server_product = Product::get(&conn, &product_id)?;
 
     server_product.name = product.name.clone();
@@ -112,8 +122,10 @@ pub fn post_product_edit(
 /// GET route for `/product/create`
 pub fn get_product_create(
     hb: web::Data<Handlebars>,
-    _: LoggedAccount,
+    logged_account: LoggedAccount,
 ) -> ServiceResult<HttpResponse> {
+    logged_account.require_member()?;
+
     let body = hb.render("product_create", &false)?;
 
     Ok(HttpResponse::Ok().body(body))
@@ -121,10 +133,12 @@ pub fn get_product_create(
 
 /// POST route for `/product/create`
 pub fn post_product_create(
-    _: LoggedAccount,
+    logged_account: LoggedAccount,
     pool: web::Data<Pool>,
     product: web::Form<FormProduct>,
 ) -> ServiceResult<HttpResponse> {
+    logged_account.require_member()?;
+
     let conn = &pool.get()?;
 
     let mut server_product = Product::create(&conn, &product.name, &product.category)?;
@@ -145,13 +159,14 @@ pub fn post_product_create(
 /// GET route for `/product/delete/{product_id}`
 pub fn get_product_delete(
     _hb: web::Data<Handlebars>,
-    _: LoggedAccount,
-    _pool: web::Data<Pool>,
+    logged_account: LoggedAccount,
     _product_id: web::Path<String>,
-) -> HttpResponse {
+) -> ServiceResult<HttpResponse> {
+    logged_account.require_member()?;
+
     println!("Delete is not supported!");
 
-    HttpResponse::Found()
+    Ok(HttpResponse::Found()
         .header(http::header::LOCATION, "/products")
-        .finish()
+        .finish())
 }

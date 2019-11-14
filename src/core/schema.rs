@@ -41,6 +41,14 @@ table! {
 }
 
 table! {
+    session (id) {
+        id -> Text,
+        account_id -> Text,
+        valid_until -> Timestamp,
+    }
+}
+
+table! {
     transaction (id) {
         id -> Text,
         account -> Text,
@@ -64,6 +72,7 @@ allow_tables_to_appear_in_same_query!(
     authentication_password,
     price,
     product,
+    session,
     transaction,
     transaction_product,
 );

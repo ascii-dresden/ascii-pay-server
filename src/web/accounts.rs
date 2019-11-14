@@ -2,16 +2,20 @@ use actix_web::{http, web, HttpResponse};
 use handlebars::Handlebars;
 
 use crate::core::{Account, Pool, ServiceResult};
-use crate::web::utils::{EmptyToNone, LoggedAccount, Search};
+use crate::web::identity_policy::LoggedAccount;
+use crate::web::utils::{EmptyToNone, Search};
 
 /// GET route for `/accounts`
 pub fn get_accounts(
-    hb: web::Data<Handlebars>,
-    _: LoggedAccount,
     pool: web::Data<Pool>,
+    hb: web::Data<Handlebars>,
+    logged_account: LoggedAccount,
     query: web::Query<Search>,
 ) -> ServiceResult<HttpResponse> {
+    logged_account.require_member()?;
+
     let conn = &pool.get()?;
+
     let mut all_accounts = Account::all(&conn)?;
 
     let search = if let Some(search) = &query.search {
@@ -43,12 +47,15 @@ pub fn get_accounts(
 
 /// GET route for `/account/{account_id}`
 pub fn get_account_edit(
-    hb: web::Data<Handlebars>,
-    _: LoggedAccount,
     pool: web::Data<Pool>,
+    hb: web::Data<Handlebars>,
+    logged_account: LoggedAccount,
     account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
+    logged_account.require_member()?;
+
     let conn = &pool.get()?;
+
     let account = Account::get(&conn, &account_id)?;
 
     let body = hb.render("account_edit", &account)?;
@@ -58,16 +65,19 @@ pub fn get_account_edit(
 
 /// POST route for `/account/{account_id}`
 pub fn post_account_edit(
-    _: LoggedAccount,
     pool: web::Data<Pool>,
+    logged_account: LoggedAccount,
     account: web::Form<Account>,
     account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
+    logged_account.require_member()?;
+
     if *account_id != account.id {
         panic!("Oh no");
     }
 
     let conn = &pool.get()?;
+
     let mut server_account = Account::get(&conn, &account_id)?;
 
     server_account.name = account.name.empty_to_none();
@@ -85,8 +95,10 @@ pub fn post_account_edit(
 /// GET route for `/account/create`
 pub fn get_account_create(
     hb: web::Data<Handlebars>,
-    _: LoggedAccount,
+    logged_account: LoggedAccount,
 ) -> ServiceResult<HttpResponse> {
+    logged_account.require_member()?;
+
     let body = hb.render("account_create", &false)?;
 
     Ok(HttpResponse::Ok().body(body))
@@ -94,10 +106,12 @@ pub fn get_account_create(
 
 /// POST route for `/account/create`
 pub fn post_account_create(
-    _: LoggedAccount,
     pool: web::Data<Pool>,
+    logged_account: LoggedAccount,
     account: web::Form<Account>,
 ) -> ServiceResult<HttpResponse> {
+    logged_account.require_member()?;
+
     let conn = &pool.get()?;
 
     let mut server_account = Account::create(&conn, account.permission)?;
@@ -116,13 +130,14 @@ pub fn post_account_create(
 /// GET route for `/account/delete/{account_id}`
 pub fn delete_get(
     _hb: web::Data<Handlebars>,
-    _: LoggedAccount,
-    _pool: web::Data<Pool>,
+    logged_account: LoggedAccount,
     _account_id: web::Path<String>,
-) -> HttpResponse {
+) -> ServiceResult<HttpResponse> {
+    logged_account.require_member()?;
+
     println!("Delete is not supported!");
 
-    HttpResponse::Found()
+    Ok(HttpResponse::Found()
         .header(http::header::LOCATION, "/accounts")
-        .finish()
+        .finish())
 }

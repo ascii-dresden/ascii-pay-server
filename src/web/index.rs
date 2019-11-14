@@ -2,8 +2,8 @@ use actix_identity::Identity;
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
 
-use crate::core::{authentication_password, Account, Pool, ServiceResult};
-use crate::web::utils::LoggedAccount;
+use crate::core::{authentication_password, Pool, ServiceResult};
+use crate::web::identity_policy::LoggedAccount;
 
 #[derive(Serialize, Deserialize)]
 pub struct LoginForm {
@@ -15,14 +15,14 @@ pub struct LoginForm {
 ///
 /// Show login form or dashboard
 pub fn get_index(
+    pool: web::Data<Pool>,
     hb: web::Data<Handlebars>,
     logged_account: Option<LoggedAccount>,
     req: HttpRequest,
-    pool: web::Data<Pool>,
 ) -> ServiceResult<HttpResponse> {
     match logged_account {
         None => get_index_login(hb, req),
-        Some(account) => get_index_dashboard(hb, account, pool),
+        Some(account) => get_index_dashboard(pool, hb, account),
     }
 }
 
@@ -38,39 +38,28 @@ fn get_index_login(hb: web::Data<Handlebars>, req: HttpRequest) -> ServiceResult
 
 /// GET route for `/` if user is logged in
 fn get_index_dashboard(
+    _pool: web::Data<Pool>,
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
-    pool: web::Data<Pool>,
 ) -> ServiceResult<HttpResponse> {
-    let conn = &pool.get()?;
-    let account = Account::get(&conn, &logged_account.id);
-    match account {
-        Ok(account) => {
-            let data = json!({ "name": account.name.unwrap_or(account.id) });
-            let body = hb.render("home", &data)?;
+    let data = json!({ "name": logged_account.account.name.unwrap_or(logged_account.account.id) });
+    let body = hb.render("home", &data)?;
 
-            Ok(HttpResponse::Ok().body(body))
-        }
-        Err(_) => Ok(HttpResponse::Found()
-            .header(http::header::LOCATION, "/logout")
-            .finish()),
-    }
+    Ok(HttpResponse::Ok().body(body))
 }
 
 /// POST route for `/`
 pub fn post_index_login(
-    params: web::Form<LoginForm>,
-    id: Identity,
     pool: web::Data<Pool>,
+    id: Identity,
+    params: web::Form<LoginForm>,
 ) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
 
     let login_result = authentication_password::get(conn, &params.username, &params.password);
     match login_result {
         Ok(account) => {
-            let logged_account =
-                serde_json::to_string(&LoggedAccount::new(account.id, account.permission))?;
-            id.remember(logged_account);
+            LoggedAccount::new(&conn, account)?.save(id)?;
 
             Ok(HttpResponse::Found()
                 .header(http::header::LOCATION, "/")
@@ -83,9 +72,16 @@ pub fn post_index_login(
 }
 
 /// GET route for `/logout`
-pub fn get_logout(id: Identity) -> HttpResponse {
-    id.forget();
-    HttpResponse::Found()
+pub fn get_logout(
+    pool: web::Data<Pool>,
+    logged_account: LoggedAccount,
+    id: Identity,
+) -> ServiceResult<HttpResponse> {
+    let conn = &pool.get()?;
+
+    logged_account.forget(conn, id)?;
+
+    Ok(HttpResponse::Found()
         .header(http::header::LOCATION, "/")
-        .finish()
+        .finish())
 }

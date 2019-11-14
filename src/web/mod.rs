@@ -1,32 +1,20 @@
 mod accounts;
+mod identity_policy;
 mod index;
 mod products;
 mod utils;
 
 use actix_files as fs;
-use actix_identity::{CookieIdentityPolicy, IdentityService};
+use actix_identity::IdentityService;
 use actix_web::web;
-
-// Encryption key for cookies
-lazy_static::lazy_static! {
-static ref SECRET_KEY: String = std::env::var("SECRET_KEY").unwrap_or_else(|_| "0123".repeat(8));
-}
+use identity_policy::DbIdentityPolicy;
 
 /// Setup routes for admin ui
 pub fn init(config: &mut web::ServiceConfig) {
-    let domain = std::env::var("DOMAIN").unwrap_or_else(|_| "localhost".to_string());
-
     config.service(
         web::scope("/")
             // Set identity service for encrypted cookies
-            .wrap(IdentityService::new(
-                CookieIdentityPolicy::new(SECRET_KEY.as_bytes())
-                    .name("auth")
-                    .path("/")
-                    .domain(&domain)
-                    .max_age_time(chrono::Duration::days(1))
-                    .secure(false),
-            ))
+            .wrap(IdentityService::new(DbIdentityPolicy::new()))
             // Setup static routes
             .service(fs::Files::new("/stylesheets", "static/stylesheets/"))
             .service(fs::Files::new("/images", "static/images/"))

@@ -47,3 +47,9 @@ CREATE TABLE `transaction_product` (
   `amount` INT NOT NULL,
   PRIMARY KEY (`transaction`, `product`)
 );
+
+CREATE TABLE `session` (
+  `id` VARCHAR(100) PRIMARY KEY NOT NULL,
+  `account_id` VARCHAR(100) NOT NULL,
+  `valid_until` DATETIME NOT NULL
+);
