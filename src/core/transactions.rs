@@ -9,7 +9,7 @@ use crate::core::{
 };
 
 /// Represent a transaction
-#[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset)]
+#[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset, Serialize, Deserialize)]
 #[table_name = "transaction"]
 pub struct Transaction {
     pub id: String,
@@ -91,6 +91,7 @@ pub fn get_by_account(
                 .eq(account.id.to_string())
                 .and(dsl::date.between(from, to)),
         )
+        .order(dsl::date.desc())
         .load::<Transaction>(conn)?;
 
     Ok(results)

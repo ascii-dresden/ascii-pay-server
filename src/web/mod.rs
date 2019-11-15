@@ -3,6 +3,7 @@ mod identity_policy;
 mod index;
 mod products;
 mod utils;
+mod transactions;
 
 use actix_files as fs;
 use actix_identity::IdentityService;
@@ -62,6 +63,9 @@ pub fn init(config: &mut web::ServiceConfig) {
                 web::resource("/product/{product_id}")
                     .route(web::post().to(products::post_product_edit))
                     .route(web::get().to(products::get_product_edit)),
-            ),
+            )
+            // Setup transaction mangement related routes
+            .service(web::resource("/transactions/{account_id}").route(web::get().to(transactions::get_transactions)))
+            .service(web::resource("/transaction/execute/{account_id}").route(web::post().to(transactions::post_execute_transaction))),
     );
 }

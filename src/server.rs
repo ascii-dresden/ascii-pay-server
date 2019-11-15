@@ -1,5 +1,6 @@
 use actix_web::{middleware, web, App, HttpServer};
 use handlebars::{Context, Handlebars, Helper, Output, RenderContext, RenderError};
+use chrono::NaiveDateTime;
 
 use crate::api as module_api;
 use crate::core::{Pool, ServiceError, ServiceResult};
@@ -16,6 +17,24 @@ fn currency_helper(
     if let Some(param) = helper.param(0) {
         if let Some(cents) = param.value().as_f64() {
             out.write(&format!("{:.2}", cents / 100.0))?;
+        }
+    }
+    Ok(())
+}
+
+fn format_datetime_helper(
+    helper: &Helper,
+    _: &Handlebars,
+    _: &Context,
+    _: &mut RenderContext,
+    out: &mut dyn Output,
+) -> Result<(), RenderError> {
+    if let Some(param) = helper.param(0) {
+        if let Some(datetime) = param.value().as_str() {
+            match NaiveDateTime::parse_from_str(datetime, "%Y-%m-%dT%H:%M:%S%.f"){
+                Ok(d) => out.write(&d.format("%d.%m.%Y - %H:%M").to_string())?,
+                Err(_) => out.write(datetime)?
+            };
         }
     }
     Ok(())
@@ -41,6 +60,7 @@ pub fn start_server(pool: Pool) -> ServiceResult<()> {
 
     // Set handlebars helper function for cent/euro converter
     handlebars.register_helper("currency", Box::new(currency_helper));
+    handlebars.register_helper("format_datetime", Box::new(format_datetime_helper));
 
     // Move handlebars reference to actix
     let handlebars_ref = web::Data::new(handlebars);
