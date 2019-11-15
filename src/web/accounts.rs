@@ -1,9 +1,18 @@
 use actix_web::{http, web, HttpResponse};
 use handlebars::Handlebars;
 
-use crate::core::{Account, Pool, ServiceError, ServiceResult};
+use crate::core::{Account, Permission, Money, Pool, ServiceError, ServiceResult};
 use crate::web::identity_policy::LoggedAccount;
 use crate::web::utils::{EmptyToNone, Search};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FormAccount {
+    pub id: String,
+    pub name: String,
+    pub mail: String,
+    pub limit: f32,
+    pub permission: Permission,
+}
 
 /// GET route for `/accounts`
 pub fn get_accounts(
@@ -67,7 +76,7 @@ pub fn get_account_edit(
 pub fn post_account_edit(
     pool: web::Data<Pool>,
     logged_account: LoggedAccount,
-    account: web::Form<Account>,
+    account: web::Form<FormAccount>,
     account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
     logged_account.require_member()?;
@@ -86,7 +95,7 @@ pub fn post_account_edit(
     server_account.name = account.name.empty_to_none();
     server_account.mail = account.mail.empty_to_none();
     server_account.permission = account.permission;
-    server_account.limit = account.limit;
+    server_account.limit = (account.limit * 100.0) as Money;
 
     server_account.update(&conn)?;
 
@@ -111,7 +120,7 @@ pub fn get_account_create(
 pub fn post_account_create(
     pool: web::Data<Pool>,
     logged_account: LoggedAccount,
-    account: web::Form<Account>,
+    account: web::Form<FormAccount>,
 ) -> ServiceResult<HttpResponse> {
     logged_account.require_member()?;
 
@@ -121,7 +130,7 @@ pub fn post_account_create(
 
     server_account.name = account.name.empty_to_none();
     server_account.mail = account.mail.empty_to_none();
-    server_account.limit = account.limit;
+    server_account.limit = (account.limit * 100.0) as Money;
 
     server_account.update(&conn)?;
 

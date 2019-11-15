@@ -17,6 +17,15 @@ impl EmptyToNone<String> for Option<String> {
         }
     }
 }
+impl EmptyToNone<String> for String {
+    fn empty_to_none(&self) -> Option<String> {
+        if self.is_empty() {
+            None
+        } else {
+            Some(self.clone())
+        }
+    }
+}
 
 /// Helper to deserialize search queries
 #[derive(Deserialize)]
