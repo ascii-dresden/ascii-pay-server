@@ -39,10 +39,15 @@ impl DbIdentityPolicy {
         req: &mut ServiceRequest,
         session_id: String,
     ) -> ServiceResult<Option<String>> {
-        let pool: web::Data<Pool> = req.app_data().ok_or(ServiceError::InternalServerError(
-            "r2d2 error",
-            "Can not extract database from request".to_owned(),
-        ))?;
+        let pool: web::Data<Pool> = match req.app_data() {
+            Some(pool) => pool,
+            None => {
+                return Err(ServiceError::InternalServerError(
+                    "r2d2 error",
+                    "Can not extract database from request".to_owned(),
+                ))
+            }
+        };
         let conn = &pool.get()?;
 
         let mut session = Session::get(&conn, &session_id)?;

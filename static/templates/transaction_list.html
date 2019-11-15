@@ -12,7 +12,7 @@
         <div class="columns">
             <div class="column col-4 col-sm-12">
                 <div>Credit</div>
-                <h1 class="d-block">{{currency account.credit}}€</h1>
+                <h1 class="d-block{{#if (lt account.credit 0)}} currency-negative{{/if}}{{#if (gt account.credit 0)}} currency-positive{{/if}}">{{currency account.credit}}€</h1>
             </div>
             <div class="column col-ml-auto col-4 col-sm-12" style="margin-top: auto; margin-bottom: auto;">
                 <form action="/transaction/execute/{{account.id}}" method="POST">
@@ -57,7 +57,7 @@
                 {{#each transactions}}
                 <tr>
                     <td>{{format_datetime date}}</td>
-                    <td>{{currency total}}</td>
+                    <td class="{{#if (lt total 0)}}currency-negative{{/if}}{{#if (gt total 0)}}currency-positive{{/if}}">{{currency total}}</td>
                     <td>
                         <a href="#">Edit</a>
                     </td>

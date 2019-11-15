@@ -8,7 +8,7 @@ use crate::core::{generate_uuid, DbConnection, Money, ServiceError, ServiceResul
 // Encryption key for cookies
 lazy_static::lazy_static! {
 pub static ref IMAGE_PATH: String = std::env::var("IMAGE_PATH")
-    .unwrap_or("img/".to_owned());
+    .unwrap_or_else(|_| "img/".to_owned());
 }
 
 /// Represent a product
@@ -282,7 +282,7 @@ impl Product {
 
         if let Some(name) = self.image.clone() {
             let p = format!("{}/{}", IMAGE_PATH.clone(), name);
-            
+
             if Path::new(&p).exists() {
                 fs::remove_file(p)?;
             }

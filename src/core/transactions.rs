@@ -36,6 +36,16 @@ pub fn execute(
 ) -> ServiceResult<Transaction> {
     use crate::core::schema::transaction::dsl;
 
+    // TODO: Are empty transaction useful? You can still assign products
+    /*
+    if total == 0 {
+        return Err(ServiceError::BadRequest(
+            "Empty transaction",
+            "Cannot perform a transaction with a total of zero".to_owned()
+        ))
+    }
+    */
+
     let mut new_credit = account.credit;
 
     let result = conn.exclusive_transaction(|| {

@@ -1,6 +1,6 @@
 use actix_web::{middleware, web, App, HttpServer};
-use handlebars::{Context, Handlebars, Helper, Output, RenderContext, RenderError};
 use chrono::NaiveDateTime;
+use handlebars::{Context, Handlebars, Helper, Output, RenderContext, RenderError};
 
 use crate::api as module_api;
 use crate::core::{Pool, ServiceError, ServiceResult};
@@ -31,9 +31,9 @@ fn format_datetime_helper(
 ) -> Result<(), RenderError> {
     if let Some(param) = helper.param(0) {
         if let Some(datetime) = param.value().as_str() {
-            match NaiveDateTime::parse_from_str(datetime, "%Y-%m-%dT%H:%M:%S%.f"){
+            match NaiveDateTime::parse_from_str(datetime, "%Y-%m-%dT%H:%M:%S%.f") {
                 Ok(d) => out.write(&d.format("%d.%m.%Y - %H:%M").to_string())?,
-                Err(_) => out.write(datetime)?
+                Err(_) => out.write(datetime)?,
             };
         }
     }

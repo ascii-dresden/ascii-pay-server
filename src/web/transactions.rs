@@ -1,10 +1,9 @@
 use actix_web::{http, web, HttpResponse};
+use chrono::{Duration, Local, NaiveDateTime};
 use handlebars::Handlebars;
-use chrono::{Local, NaiveDateTime, Duration};
 
-use crate::core::{Account, Pool, Money, ServiceResult, transactions};
+use crate::core::{transactions, Account, Money, Pool, ServiceResult};
 use crate::web::identity_policy::LoggedAccount;
-
 
 /// Helper to deserialize from-to queries
 #[derive(Deserialize, Serialize)]
@@ -14,7 +13,7 @@ pub struct FromToQuery {
     pub from: Option<NaiveDateTime>,
     #[serde(with = "naive_date_time_option_serializer")]
     #[serde(default = "get_none")]
-    pub to: Option<NaiveDateTime>
+    pub to: Option<NaiveDateTime>,
 }
 
 fn get_none() -> Option<NaiveDateTime> {
@@ -24,7 +23,7 @@ fn get_none() -> Option<NaiveDateTime> {
 /// Helper to deserialize execute queries
 #[derive(Deserialize)]
 pub struct Execute {
-    pub total: f32
+    pub total: f32,
 }
 
 /// GET route for `/transactions/{account_id}`
@@ -33,7 +32,7 @@ pub fn get_transactions(
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
     account_id: web::Path<String>,
-    query: web::Query<FromToQuery>
+    query: web::Query<FromToQuery>,
 ) -> ServiceResult<HttpResponse> {
     logged_account.require_member()?;
 
@@ -43,8 +42,12 @@ pub fn get_transactions(
 
     let now = Local::now().naive_local();
 
-    let from = query.from.unwrap_or_else(|| now - Duration::days(30)).date().and_hms(0, 0, 0);
-    let to = query.to.unwrap_or_else(|| now).date().and_hms(23,59,59);
+    let from = query
+        .from
+        .unwrap_or_else(|| now - Duration::days(30))
+        .date()
+        .and_hms(0, 0, 0);
+    let to = query.to.unwrap_or_else(|| now).date().and_hms(23, 59, 59);
 
     let list = transactions::get_by_account(&conn, &account, &from, &to)?;
 
@@ -67,23 +70,28 @@ pub fn post_execute_transaction(
     pool: web::Data<Pool>,
     logged_account: LoggedAccount,
     account_id: web::Path<String>,
-    execute_form: web::Form<Execute>
+    execute_form: web::Form<Execute>,
 ) -> ServiceResult<HttpResponse> {
     logged_account.require_member()?;
 
-    let conn = &pool.get()?;
+    if execute_form.total != 0.0 {
+        let conn = &pool.get()?;
 
-    let mut account = Account::get(&conn, &account_id)?;
+        let mut account = Account::get(&conn, &account_id)?;
 
-    transactions::execute(
-        &conn,
-        &mut account,
-        Some(&logged_account.account),
-        (execute_form.total * 100.0) as Money
-    )?;
+        transactions::execute(
+            &conn,
+            &mut account,
+            Some(&logged_account.account),
+            (execute_form.total * 100.0) as Money,
+        )?;
+    }
 
     Ok(HttpResponse::Found()
-        .header(http::header::LOCATION, format!("/transactions/{}", &account_id))
+        .header(
+            http::header::LOCATION,
+            format!("/transactions/{}", &account_id),
+        )
         .finish())
 }
 
@@ -99,7 +107,7 @@ pub mod naive_date_time_option_serializer {
     {
         match date {
             Some(d) => serializer.serialize_str(&d.format("%Y-%m-%d").to_string()),
-            None => serializer.serialize_str("")
+            None => serializer.serialize_str(""),
         }
     }
 
@@ -127,7 +135,7 @@ pub mod naive_date_time_option_serializer {
         }
         match deserializer.deserialize_string(NaiveVisitor) {
             Ok(x) => Ok(x),
-            Err(_) => Ok(None)
+            Err(_) => Ok(None),
         }
     }
 }

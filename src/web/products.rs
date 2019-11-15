@@ -159,7 +159,10 @@ pub fn post_product_create(
     }
 
     Ok(HttpResponse::Found()
-        .header(http::header::LOCATION, format!("/product/{}", server_product.id))
+        .header(
+            http::header::LOCATION,
+            format!("/product/{}", server_product.id),
+        )
         .finish())
 }
 
@@ -226,7 +229,7 @@ pub fn post_product_upload_image(
         })
 }
 
-const ALLOWED_EXTENSIONS: [&'static str; 4] = ["png", "jpg", "jpeg", "svg"];
+const ALLOWED_EXTENSIONS: [&str; 4] = ["png", "jpg", "jpeg", "svg"];
 
 /// Read the multipart stream and save content to file
 fn save_file(
