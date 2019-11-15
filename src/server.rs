@@ -60,8 +60,5 @@ pub fn start_server(pool: Pool) -> ServiceResult<()> {
     })
     .bind(address)?
     .run()
-    .map_err(|err| ServiceError::InternalServerError(
-        "Server error",
-        format!("{}", err)
-    ))
+    .map_err(|err| ServiceError::InternalServerError("Server error", format!("{}", err)))
 }

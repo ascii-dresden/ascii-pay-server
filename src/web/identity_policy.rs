@@ -1,4 +1,4 @@
-//! Implement custom IdentityPolicy that stores a session id 
+//! Implement custom IdentityPolicy that stores a session id
 //! with the `CookieSessionPolicy` and the session data in the database
 use actix_identity::CookieIdentityPolicy;
 use actix_identity::Identity;
@@ -39,12 +39,10 @@ impl DbIdentityPolicy {
         req: &mut ServiceRequest,
         session_id: String,
     ) -> ServiceResult<Option<String>> {
-        let pool: web::Data<Pool> = req.app_data().ok_or(
-            ServiceError::InternalServerError(
-                "r2d2 error",
-                "Can not extract database from request".to_owned()
-            )
-        )?;
+        let pool: web::Data<Pool> = req.app_data().ok_or(ServiceError::InternalServerError(
+            "r2d2 error",
+            "Can not extract database from request".to_owned(),
+        ))?;
         let conn = &pool.get()?;
 
         let mut session = Session::get(&conn, &session_id)?;
@@ -74,7 +72,7 @@ impl IdentityPolicy for DbIdentityPolicy {
             // Some(session_id) => self.load_logged_account(req, session_id).map_err(|err| err.actix()),
             Some(session_id) => match self.load_logged_account(req, session_id).ok() {
                 Some(s) => Ok(s),
-                None => Ok(None)
+                None => Ok(None),
             },
             None => Ok(None),
         }
@@ -88,8 +86,8 @@ impl IdentityPolicy for DbIdentityPolicy {
     ) -> Self::ResponseFuture {
         let id = match id {
             Some(account_str) => {
-                let logged_account: LoggedAccount = serde_json::from_str(&account_str)
-                    .map_err(|err| {
+                let logged_account: LoggedAccount =
+                    serde_json::from_str(&account_str).map_err(|err| {
                         let e: ServiceError = err.into();
                         e.actix()
                     })?;

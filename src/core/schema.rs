@@ -37,6 +37,7 @@ table! {
         id -> Text,
         name -> Text,
         category -> Text,
+        image -> Nullable<Text>,
     }
 }
 

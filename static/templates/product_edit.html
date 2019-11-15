@@ -90,6 +90,38 @@
                 </div>
             </div>
         </form>
+
+        <div class="divider text-center" data-content="OR"></div>
+
+        <form class="form-horizontal" method="POST" enctype="multipart/form-data" action="/product/upload-image/{{id}}">
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="image" >Image</label>
+                </div>
+                <div class="col-3 col-sm-12">
+                    {{#if image}}
+                    <img class="img-responsive" src="/product/image/{{image}}" />
+                    {{/if}}
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="image" >Upload new image</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <input class="form-input" type="file" accept="image/*" name="image"/>
+                </div>
+            </div>
+
+            <div class="columns">
+                <div class="column col-8 col-sm-12">
+                    <input class="btn btn-primary" type="submit" value="Upload" />
+                </div>
+                <div class="column col-ml-auto col-auto">
+                    <a class="btn btn-error" href="/product/remove-image/{{id}}">Remove image</a>
+                </div>
+            </div>
+        </form>
     </div>
 </body>
 </html>

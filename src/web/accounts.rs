@@ -1,7 +1,7 @@
 use actix_web::{http, web, HttpResponse};
 use handlebars::Handlebars;
 
-use crate::core::{Account, Pool, ServiceResult};
+use crate::core::{Account, Pool, ServiceError, ServiceResult};
 use crate::web::identity_policy::LoggedAccount;
 use crate::web::utils::{EmptyToNone, Search};
 
@@ -73,7 +73,10 @@ pub fn post_account_edit(
     logged_account.require_member()?;
 
     if *account_id != account.id {
-        panic!("Oh no");
+        return Err(ServiceError::BadRequest(
+            "Id missmage",
+            "The product id of the url and the form do not match!".to_owned(),
+        ));
     }
 
     let conn = &pool.get()?;

@@ -82,14 +82,18 @@ impl ResponseError for ServiceError {
                     "cause": cause
                 }))
             }
-            ServiceError::BadRequest(ref source, ref cause) => HttpResponse::BadRequest().json(json!({
-                "message": "Internal Server Error, Please try later",
-                "source": source,
-                "cause": cause
-            })),
+            ServiceError::BadRequest(ref source, ref cause) => {
+                HttpResponse::BadRequest().json(json!({
+                    "message": "Internal Server Error, Please try later",
+                    "source": source,
+                    "cause": cause
+                }))
+            }
             ServiceError::NotFound => HttpResponse::NotFound().json("NotFound"),
             ServiceError::Unauthorized => HttpResponse::Unauthorized().json("Unauthorized"),
-            ServiceError::Expired => HttpResponse::Unauthorized().json("Session has expired, login again"),
+            ServiceError::Expired => {
+                HttpResponse::Unauthorized().json("Session has expired, login again")
+            }
         }
     }
 }

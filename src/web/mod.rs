@@ -18,6 +18,7 @@ pub fn init(config: &mut web::ServiceConfig) {
             // Setup static routes
             .service(fs::Files::new("/stylesheets", "static/stylesheets/"))
             .service(fs::Files::new("/images", "static/images/"))
+            .service(fs::Files::new("/product/image", "img/"))
             // Setup index/login routes
             .service(web::resource("").route(web::get().to(index::get_index)))
             .service(web::resource("/login").route(web::post().to(index::post_index_login)))
@@ -48,6 +49,14 @@ pub fn init(config: &mut web::ServiceConfig) {
             .service(
                 web::resource("/product/delete/{product_id}")
                     .route(web::get().to(products::get_product_delete)),
+            )
+            .service(
+                web::resource("/product/remove-image/{product_id}")
+                    .route(web::get().to(products::get_product_remove_image)),
+            )
+            .service(
+                web::resource("/product/upload-image/{product_id}")
+                    .route(web::post().to_async(products::post_product_upload_image)),
             )
             .service(
                 web::resource("/product/{product_id}")

@@ -3,5 +3,6 @@
 /*.iml
 /.idea
 /*.db
+/img
 .vscode/
 static/templates/**/*.css

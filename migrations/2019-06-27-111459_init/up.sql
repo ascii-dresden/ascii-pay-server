@@ -31,7 +31,8 @@ CREATE TABLE `transaction` (
 CREATE TABLE `product` (
   `id` VARCHAR(100) PRIMARY KEY NOT NULL,
   `name` VARCHAR(64) NOT NULL,
-  `category` VARCHAR(64) NOT NULL
+  `category` VARCHAR(64) NOT NULL,
+  `image` VARCHAR(100)
 );
 
 CREATE TABLE `price` (

@@ -1,10 +1,14 @@
-use actix_web::{http, web, HttpResponse};
+use actix_web::{error, http, web, HttpResponse};
 use handlebars::Handlebars;
 use std::collections::HashMap;
 
-use crate::core::{Money, Pool, Product, ServiceResult};
+use crate::core::{DbConnection, Money, Pool, Product, ServiceError, ServiceResult};
 use crate::web::identity_policy::LoggedAccount;
 use crate::web::utils::Search;
+use actix_multipart::{Field, Multipart, MultipartError};
+use futures::future::{err, Either};
+use futures::{Future, Stream};
+use std::io::Write;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FormProduct {
@@ -82,7 +86,10 @@ pub fn post_product_edit(
     logged_account.require_member()?;
 
     if *product_id != product.id {
-        panic!("at the disco");
+        return Err(ServiceError::BadRequest(
+            "Id missmage",
+            "The product id of the url and the form do not match!".to_owned(),
+        ));
     }
 
     let conn = &pool.get()?;
@@ -152,7 +159,7 @@ pub fn post_product_create(
     }
 
     Ok(HttpResponse::Found()
-        .header(http::header::LOCATION, "/products")
+        .header(http::header::LOCATION, format!("/product/{}", server_product.id))
         .finish())
 }
 
@@ -169,4 +176,104 @@ pub fn get_product_delete(
     Ok(HttpResponse::Found()
         .header(http::header::LOCATION, "/products")
         .finish())
+}
+
+/// GET route for `/product/remove-image/{product_id}`
+pub fn get_product_remove_image(
+    pool: web::Data<Pool>,
+    logged_account: LoggedAccount,
+    product_id: web::Path<String>,
+) -> ServiceResult<HttpResponse> {
+    logged_account.require_member()?;
+
+    let conn = &pool.get()?;
+
+    let mut product = Product::get(&conn, &product_id)?;
+
+    product.remove_image(&conn)?;
+
+    Ok(HttpResponse::Found()
+        .header(http::header::LOCATION, format!("/product/{}", &product_id))
+        .finish())
+}
+
+/// POST route for `/product/upload-image/{product_id}`
+pub fn post_product_upload_image(
+    pool: web::Data<Pool>,
+    logged_account: LoggedAccount,
+    product_id: web::Path<String>,
+    multipart: Multipart,
+) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
+    logged_account.require_member().unwrap();
+
+    let mut product = Product::get(&pool.clone().get().unwrap(), &product_id).unwrap();
+    let location = format!("/product/{}", &product_id);
+
+    multipart
+        .map_err(error::ErrorInternalServerError)
+        .map(move |field| save_file(field, pool.get().unwrap(), &mut product).into_stream())
+        .flatten()
+        .collect()
+        .map(|_sizes| {
+            // println!("###: {:?}", sizes);
+            HttpResponse::Found()
+                .header(http::header::LOCATION, location)
+                .finish()
+        })
+        .map_err(|e| {
+            println!("--- failed: {}", e);
+            e
+        })
+}
+
+const ALLOWED_EXTENSIONS: [&'static str; 4] = ["png", "jpg", "jpeg", "svg"];
+
+/// Read the multipart stream and save content to file
+fn save_file(
+    field: Field,
+    conn: r2d2::PooledConnection<diesel::r2d2::ConnectionManager<DbConnection>>,
+    product: &mut Product,
+) -> impl Future<Item = i64, Error = actix_web::Error> {
+    let file_extension = field
+        .content_type()
+        .subtype()
+        .as_str()
+        .to_ascii_lowercase()
+        .to_owned();
+
+    if !ALLOWED_EXTENSIONS.iter().any(|s| s == &file_extension) {
+        return Either::A(err(error::ErrorInternalServerError(
+            ServiceError::InternalServerError("Unsupported", "".to_owned()),
+        )));
+    }
+
+    let file = match product.set_image(&conn, &file_extension) {
+        Ok(file) => file,
+        Err(e) => return Either::A(err(error::ErrorInternalServerError(e))),
+    };
+
+    Either::B(
+        field
+            .fold((file, 0i64), move |(mut file, mut acc), bytes| {
+                // fs operations are blocking, we have to execute writes
+                // on threadpool
+                web::block(move || {
+                    file.write_all(bytes.as_ref()).map_err(|e| {
+                        println!("file.write_all failed: {:?}", e);
+                        MultipartError::Payload(actix_web::error::PayloadError::Io(e))
+                    })?;
+                    acc += bytes.len() as i64;
+                    Ok((file, acc))
+                })
+                .map_err(|e: error::BlockingError<MultipartError>| match e {
+                    error::BlockingError::Error(e) => e,
+                    error::BlockingError::Canceled => MultipartError::Incomplete,
+                })
+            })
+            .map(|(_, acc)| acc)
+            .map_err(|e| {
+                println!("save_file failed, {:?}", e);
+                error::ErrorInternalServerError(e)
+            }),
+    )
 }

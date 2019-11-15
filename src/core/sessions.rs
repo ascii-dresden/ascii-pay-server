@@ -41,9 +41,7 @@ impl Session {
         };
 
         diesel::delete(dsl::session.filter(dsl::id.eq(&a.id))).execute(conn)?;
-        diesel::insert_into(dsl::session)
-            .values(&a)
-            .execute(conn)?;
+        diesel::insert_into(dsl::session).values(&a).execute(conn)?;
 
         Ok(a)
     }

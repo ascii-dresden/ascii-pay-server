@@ -91,6 +91,5 @@ fn verify(hash: &str, password: &str) -> ServiceResult<bool> {
         .with_password(password)
         .with_secret_key(SECRET_KEY.as_str())
         .verify()
-        .map_err(|err| 
-            ServiceError::InternalServerError("Hash password", format!("{}", err)))
+        .map_err(|err| ServiceError::InternalServerError("Hash password", format!("{}", err)))
 }

@@ -44,8 +44,9 @@ pub fn execute(
 
         if new_credit < account.limit && new_credit < account.credit {
             return Err(ServiceError::InternalServerError(
-                "Transaction error", 
-                "The transaction can not be performed. Check the account credit and limit".to_owned()
+                "Transaction error",
+                "The transaction can not be performed. Check the account credit and limit"
+                    .to_owned(),
             ));
         }
 
@@ -117,10 +118,9 @@ fn validate_account(
             .first::<Option<i64>>(conn)?;
 
         if let Some(sum) = result {
-            let sum = i32::try_from(sum).map_err(|error| ServiceError::InternalServerError(
-                "Validation error",
-                format!("{}", error)
-            ))?;
+            let sum = i32::try_from(sum).map_err(|error| {
+                ServiceError::InternalServerError("Validation error", format!("{}", error))
+            })?;
             if sum == account.credit {
                 Ok(None)
             } else {

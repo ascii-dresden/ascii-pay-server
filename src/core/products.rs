@@ -1,7 +1,15 @@
 use chrono::{NaiveDateTime, Utc};
 use diesel::prelude::*;
+use std::fs::{self, File};
+use std::path::Path;
 
 use crate::core::{generate_uuid, DbConnection, Money, ServiceError, ServiceResult, DB};
+
+// Encryption key for cookies
+lazy_static::lazy_static! {
+pub static ref IMAGE_PATH: String = std::env::var("IMAGE_PATH")
+    .unwrap_or("img/".to_owned());
+}
 
 /// Represent a product
 #[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -9,6 +17,7 @@ pub struct Product {
     pub id: String,
     pub name: String,
     pub category: String,
+    pub image: Option<String>,
     #[serde(default = "std::vec::Vec::new")]
     pub prices: Vec<Price>,
     pub current_price: Option<Money>,
@@ -72,17 +81,19 @@ impl
             diesel::sql_types::Text,
             diesel::sql_types::Text,
             diesel::sql_types::Text,
+            diesel::sql_types::Nullable<diesel::sql_types::Text>,
         ),
         DB,
     > for Product
 {
-    type Row = (String, String, String);
+    type Row = (String, String, String, Option<String>);
 
     fn build(row: Self::Row) -> Self {
         Product {
             id: row.0,
             name: row.1,
             category: row.2,
+            image: row.3,
             prices: vec![],
             current_price: None,
         }
@@ -121,6 +132,7 @@ impl Product {
             id: generate_uuid(),
             name: name.to_string(),
             category: category.to_string(),
+            image: None,
             prices: vec![],
             current_price: None,
         };
@@ -245,6 +257,43 @@ impl Product {
             Some(price) => Some(price.value),
             None => None,
         };
+    }
+
+    pub fn set_image(&mut self, conn: &DbConnection, file_extension: &str) -> ServiceResult<File> {
+        use crate::core::schema::product::dsl;
+
+        self.remove_image(&conn)?;
+
+        let name = format!("{}.{}", generate_uuid(), file_extension);
+        self.image = Some(name.clone());
+
+        fs::create_dir_all(IMAGE_PATH.clone())?;
+        let file = File::create(format!("{}/{}", IMAGE_PATH.clone(), name))?;
+
+        diesel::update(dsl::product.find(&self.id))
+            .set(dsl::image.eq(&self.image))
+            .execute(conn)?;
+
+        Ok(file)
+    }
+
+    pub fn remove_image(&mut self, conn: &DbConnection) -> ServiceResult<()> {
+        use crate::core::schema::product::dsl;
+
+        if let Some(name) = self.image.clone() {
+            let p = format!("{}/{}", IMAGE_PATH.clone(), name);
+            
+            if Path::new(&p).exists() {
+                fs::remove_file(p)?;
+            }
+
+            self.image = None;
+            diesel::update(dsl::product.find(&self.id))
+                .set(dsl::image.eq(&self.image))
+                .execute(conn)?;
+        }
+
+        Ok(())
     }
 
     /// List all products
