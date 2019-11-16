@@ -21,8 +21,12 @@ pub fn init(config: &mut web::ServiceConfig) {
             .service(fs::Files::new("/images", "static/images/"))
             .service(fs::Files::new("/product/image", "img/"))
             // Setup index/login routes
-            .service(web::resource("").route(web::get().to(index::get_index)))
-            .service(web::resource("/login").route(web::post().to(index::post_index_login)))
+            .service(web::resource("").route(web::get().to(index::get_index_dashboard)))
+            .service(
+                web::resource("/login")
+                    .route(web::post().to(index::post_index_login))
+                    .route(web::get().to(index::get_index_login))
+            )
             .service(web::resource("/logout").route(web::get().to(index::get_logout)))
             // Setup account mangement related routes
             .service(web::resource("/accounts").route(web::get().to(accounts::get_accounts)))

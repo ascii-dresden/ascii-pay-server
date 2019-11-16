@@ -1,4 +1,4 @@
-use actix_web::{error::ResponseError, Error as ActixError, HttpResponse};
+use actix_web::{error::ResponseError, http, Error as ActixError, HttpResponse};
 use derive_more::Display;
 
 /// Represent errors in the application
@@ -20,6 +20,9 @@ pub enum ServiceError {
 
     #[display(fmt = "Session is expired")]
     Expired,
+
+    #[display(fmt = "You have insufficient privileges to view this site")]
+    InsufficientPrivileges,
 }
 
 impl ServiceError {
@@ -32,33 +35,37 @@ impl ServiceError {
 pub type ServiceResult<T> = Result<T, ServiceError>;
 
 impl From<diesel::result::Error> for ServiceError {
-    fn from(error: diesel::result::Error) -> ServiceError {
+    fn from(error: diesel::result::Error) -> Self {
         ServiceError::InternalServerError("Database error", format!("{}", error))
     }
 }
 
 impl From<std::io::Error> for ServiceError {
-    fn from(error: std::io::Error) -> ServiceError {
+    fn from(error: std::io::Error) -> Self {
         ServiceError::InternalServerError("IO error", format!("{}", error))
     }
 }
+
 impl From<handlebars::RenderError> for ServiceError {
-    fn from(error: handlebars::RenderError) -> ServiceError {
+    fn from(error: handlebars::RenderError) -> Self {
         ServiceError::InternalServerError("Render error", format!("{}", error))
     }
 }
+
 impl From<r2d2::Error> for ServiceError {
-    fn from(error: r2d2::Error) -> ServiceError {
+    fn from(error: r2d2::Error) -> Self {
         ServiceError::InternalServerError("r2d2 error", format!("{}", error))
     }
 }
+
 impl From<uuid::parser::ParseError> for ServiceError {
-    fn from(error: uuid::parser::ParseError) -> ServiceError {
+    fn from(error: uuid::parser::ParseError) -> Self {
         ServiceError::BadRequest("Invalid UUID", format!("{}", error))
     }
 }
+
 impl From<serde_json::Error> for ServiceError {
-    fn from(error: serde_json::Error) -> ServiceError {
+    fn from(error: serde_json::Error) -> Self {
         ServiceError::InternalServerError("Serialization error", format!("{}", error))
     }
 }
@@ -77,23 +84,23 @@ impl ResponseError for ServiceError {
         match self {
             ServiceError::InternalServerError(ref source, ref cause) => {
                 HttpResponse::InternalServerError().json(json!({
-                    "message": "Internal Server Error, Please try later",
+                    "message": "Internal Server Error, Please try again later",
                     "source": source,
                     "cause": cause
                 }))
             }
             ServiceError::BadRequest(ref source, ref cause) => {
                 HttpResponse::BadRequest().json(json!({
-                    "message": "Internal Server Error, Please try later",
+                    "message": "Internal Server Error, Please try again later",
                     "source": source,
                     "cause": cause
                 }))
             }
             ServiceError::NotFound => HttpResponse::NotFound().json("NotFound"),
-            ServiceError::Unauthorized => HttpResponse::Unauthorized().json("Unauthorized"),
-            ServiceError::Expired => {
-                HttpResponse::Unauthorized().json("Session has expired, login again")
-            }
+            ServiceError::Unauthorized | ServiceError::Expired => HttpResponse::Found()
+                .header(http::header::LOCATION, "/login")
+                .finish(),
+            ServiceError::InsufficientPrivileges => HttpResponse::Unauthorized().json("Insufficient Privileges"),
         }
     }
 }

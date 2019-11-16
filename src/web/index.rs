@@ -11,23 +11,8 @@ pub struct LoginForm {
     password: String,
 }
 
-/// GET route for `/`
-///
-/// Show login form or dashboard
-pub fn get_index(
-    pool: web::Data<Pool>,
-    hb: web::Data<Handlebars>,
-    logged_account: Option<LoggedAccount>,
-    req: HttpRequest,
-) -> ServiceResult<HttpResponse> {
-    match logged_account {
-        None => get_index_login(hb, req),
-        Some(account) => get_index_dashboard(pool, hb, account),
-    }
-}
-
 /// GET route for `/` if user is not logged in
-fn get_index_login(hb: web::Data<Handlebars>, req: HttpRequest) -> ServiceResult<HttpResponse> {
+pub fn get_index_login(hb: web::Data<Handlebars>, req: HttpRequest) -> ServiceResult<HttpResponse> {
     let data = json!({
         "error": req.query_string().contains("error")
     });
@@ -37,7 +22,7 @@ fn get_index_login(hb: web::Data<Handlebars>, req: HttpRequest) -> ServiceResult
 }
 
 /// GET route for `/` if user is logged in
-fn get_index_dashboard(
+pub fn get_index_dashboard(
     _pool: web::Data<Pool>,
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,

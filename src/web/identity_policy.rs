@@ -6,7 +6,7 @@ use actix_identity::IdentityPolicy;
 use actix_web::dev::{Payload, ServiceRequest, ServiceResponse};
 use actix_web::{web, Error, FromRequest, HttpRequest};
 
-use crate::core::{Account, DbConnection, Pool, ServiceError, ServiceResult, Session};
+use crate::core::{Account, DbConnection, Permission, Pool, ServiceError, ServiceResult, Session};
 
 // Encryption key for cookies
 lazy_static::lazy_static! {
@@ -75,9 +75,9 @@ impl IdentityPolicy for DbIdentityPolicy {
 
         match cookie_data {
             // Some(session_id) => self.load_logged_account(req, session_id).map_err(|err| err.actix()),
-            Some(session_id) => match self.load_logged_account(req, session_id).ok() {
-                Some(s) => Ok(s),
-                None => Ok(None),
+            Some(session_id) => match self.load_logged_account(req, session_id) {
+                Ok(s) => Ok(s),
+                Err(e) => Err(e.into()),
             },
             None => Ok(None),
         }
@@ -157,19 +157,18 @@ impl LoggedAccount {
 
     /// Check if the account has member or admin rights. Otherwise return `ServiceError`
     pub fn require_member(&self) -> ServiceResult<()> {
-        if self.account.permission.is_member() || self.account.permission.is_admin() {
-            Ok(())
-        } else {
-            Err(ServiceError::Unauthorized)
+        match self.account.permission {
+            Permission::ADMIN | Permission::MEMBER => Ok(()),
+            _ => Err(ServiceError::Unauthorized),
         }
     }
 
     /// Check if the account has admin rights. Otherwise return `ServiceError`
     pub fn require_admin(&self) -> ServiceResult<()> {
-        if self.account.permission.is_admin() {
-            Ok(())
-        } else {
-            Err(ServiceError::Unauthorized)
+        match self.account.permission {
+            Permission::ADMIN => Ok(()),
+            Permission::MEMBER => Err(ServiceError::InsufficientPrivileges),
+            _ => Err(ServiceError::Unauthorized),
         }
     }
 }
