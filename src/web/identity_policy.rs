@@ -6,7 +6,7 @@ use actix_identity::IdentityPolicy;
 use actix_web::dev::{Payload, ServiceRequest, ServiceResponse};
 use actix_web::{web, Error, FromRequest, HttpRequest};
 
-use crate::core::{Account, DbConnection, Permission, Pool, ServiceError, ServiceResult, Session};
+use crate::core::{Account, DbConnection, Permission, Pool, ServiceError, ServiceResult, Session, AUTH_COOKIE_NAME};
 
 // Encryption key for cookies
 lazy_static::lazy_static! {
@@ -25,7 +25,7 @@ impl DbIdentityPolicy {
 
         DbIdentityPolicy {
             cookie_policy: CookieIdentityPolicy::new(SECRET_KEY.as_bytes())
-                .name("auth")
+                .name(AUTH_COOKIE_NAME)
                 .path("/")
                 .domain(&domain)
                 .max_age_time(chrono::Duration::days(1))

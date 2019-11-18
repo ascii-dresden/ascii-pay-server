@@ -1,6 +1,8 @@
 use actix_web::{error::ResponseError, http, Error as ActixError, HttpResponse};
 use derive_more::Display;
 
+pub const AUTH_COOKIE_NAME: &str = "auth";
+
 /// Represent errors in the application
 ///
 /// All `ServiceError`s can be transformed to http errors.
@@ -99,6 +101,7 @@ impl ResponseError for ServiceError {
             ServiceError::NotFound => HttpResponse::NotFound().json("NotFound"),
             ServiceError::Unauthorized | ServiceError::Expired => HttpResponse::Found()
                 .header(http::header::LOCATION, "/login")
+                .del_cookie(&http::Cookie::named(AUTH_COOKIE_NAME))
                 .finish(),
             ServiceError::InsufficientPrivileges => HttpResponse::Unauthorized().json("Insufficient Privileges"),
         }
