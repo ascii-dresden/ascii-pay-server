@@ -11,18 +11,8 @@ pub struct LoginForm {
     password: String,
 }
 
-/// GET route for `/` if user is not logged in
-pub fn get_index_login(hb: web::Data<Handlebars>, req: HttpRequest) -> ServiceResult<HttpResponse> {
-    let data = json!({
-        "error": req.query_string().contains("error")
-    });
-    let body = hb.render("index", &data)?;
-
-    Ok(HttpResponse::Ok().body(body))
-}
-
 /// GET route for `/` if user is logged in
-pub fn get_index_dashboard(
+pub fn get_index(
     _pool: web::Data<Pool>,
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
@@ -33,8 +23,18 @@ pub fn get_index_dashboard(
     Ok(HttpResponse::Ok().body(body))
 }
 
-/// POST route for `/`
-pub fn post_index_login(
+/// GET route for `/login` if user is not logged in
+pub fn get_login(hb: web::Data<Handlebars>, req: HttpRequest) -> ServiceResult<HttpResponse> {
+    let data = json!({
+        "error": req.query_string().contains("error")
+    });
+    let body = hb.render("index", &data)?;
+
+    Ok(HttpResponse::Ok().body(body))
+}
+
+/// POST route for `/login`
+pub fn post_login(
     pool: web::Data<Pool>,
     id: Identity,
     params: web::Form<LoginForm>,
@@ -51,7 +51,7 @@ pub fn post_index_login(
                 .finish())
         }
         Err(_) => Ok(HttpResponse::Found()
-            .header(http::header::LOCATION, "/?error")
+            .header(http::header::LOCATION, "/login?error")
             .finish()),
     }
 }
