@@ -77,6 +77,7 @@ impl IdentityPolicy for DbIdentityPolicy {
             // Some(session_id) => self.load_logged_account(req, session_id).map_err(|err| err.actix()),
             Some(session_id) => match self.load_logged_account(req, session_id) {
                 Ok(s) => Ok(s),
+                Err(ServiceError::Unauthorized) => Ok(None),
                 Err(e) => Err(e.into()),
             },
             None => Ok(None),
