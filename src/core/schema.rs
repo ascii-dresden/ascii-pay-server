@@ -1,84 +1,84 @@
 table! {
     account (id) {
-        id -> Text,
-        credit -> Integer,
-        limit -> Integer,
-        name -> Nullable<Text>,
-        mail -> Nullable<Text>,
-        permission -> SmallInt,
+        id -> Varchar,
+        credit -> Int4,
+        minimum_credit -> Int4,
+        name -> Nullable<Varchar>,
+        mail -> Nullable<Varchar>,
+        permission -> Int2,
     }
 }
 
 table! {
     authentication_barcode (account, code) {
-        account -> Text,
-        code -> Text,
+        account -> Varchar,
+        code -> Varchar,
     }
 }
 
 table! {
     authentication_password (account, username) {
-        account -> Text,
-        username -> Text,
-        password -> Text,
+        account -> Varchar,
+        username -> Varchar,
+        password -> Varchar,
     }
 }
 
 table! {
     category (id) {
-        id -> Text,
-        name -> Text,
+        id -> Varchar,
+        name -> Varchar,
     }
 }
 
 table! {
     category_price (category, validity_start) {
-        category -> Text,
+        category -> Varchar,
         validity_start -> Timestamp,
-        value -> Integer,
+        value -> Int4,
     }
 }
 
 table! {
     product (id) {
-        id -> Text,
-        name -> Text,
-        category -> Nullable<Text>,
-        image -> Nullable<Text>,
+        id -> Varchar,
+        name -> Varchar,
+        category -> Nullable<Varchar>,
+        image -> Nullable<Varchar>,
     }
 }
 
 table! {
     product_price (product, validity_start) {
-        product -> Text,
+        product -> Varchar,
         validity_start -> Timestamp,
-        value -> Integer,
+        value -> Int4,
     }
 }
 
 table! {
     session (id) {
-        id -> Text,
-        account_id -> Text,
+        id -> Varchar,
+        account_id -> Varchar,
         valid_until -> Timestamp,
     }
 }
 
 table! {
     transaction (id) {
-        id -> Text,
-        account -> Text,
-        cashier -> Nullable<Text>,
-        total -> Integer,
+        id -> Varchar,
+        account -> Varchar,
+        cashier -> Nullable<Varchar>,
+        total -> Int4,
         date -> Timestamp,
     }
 }
 
 table! {
     transaction_product (transaction, product) {
-        transaction -> Text,
-        product -> Text,
-        amount -> Integer,
+        transaction -> Varchar,
+        product -> Varchar,
+        amount -> Int4,
     }
 }
 

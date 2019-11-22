@@ -25,7 +25,7 @@ pub struct Transaction {
 /// * 1 Start a sql transaction
 /// * 2 Requery the account credit
 /// * 3 Calculate the new credit
-/// * 4 Check if the account limit allows the new credit
+/// * 4 Check if the account minimum_credit allows the new credit
 /// * 5 Create and save the transaction (with optional cashier refernece)
 /// * 6 Save the new credit to the account
 pub fn execute(
@@ -48,14 +48,14 @@ pub fn execute(
 
     let mut new_credit = account.credit;
 
-    let result = conn.exclusive_transaction(|| {
+    let result = conn.build_transaction().serializable().run(|| {
         let mut account = Account::get(conn, &account.id)?;
         new_credit = account.credit + total;
 
-        if new_credit < account.limit && new_credit < account.credit {
+        if new_credit < account.minimum_credit && new_credit < account.credit {
             return Err(ServiceError::InternalServerError(
                 "Transaction error",
-                "The transaction can not be performed. Check the account credit and limit"
+                "The transaction can not be performed. Check the account credit and minimum_credit"
                     .to_owned(),
             ));
         }
@@ -120,7 +120,7 @@ fn validate_account(
 ) -> ServiceResult<Option<ValidationError>> {
     use crate::core::schema::transaction::dsl;
 
-    conn.exclusive_transaction(|| {
+    conn.build_transaction().serializable().run(|| {
         let account = Account::get(conn, &account.id)?;
 
         let result = dsl::transaction

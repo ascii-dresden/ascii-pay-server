@@ -26,7 +26,7 @@ use crate::core::{generate_uuid, DbConnection, Money, Searchable, ServiceError, 
 pub struct Account {
     pub id: String,
     pub credit: Money,
-    pub limit: Money,
+    pub minimum_credit: Money,
     pub name: Option<String>,
     pub mail: Option<String>,
     pub permission: Permission,
@@ -105,7 +105,7 @@ impl Account {
         let a = Account {
             id: generate_uuid(),
             credit: 0,
-            limit: 0,
+            minimum_credit: 0,
             name: None,
             mail: None,
             permission,

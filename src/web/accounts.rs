@@ -10,7 +10,7 @@ pub struct FormAccount {
     pub id: String,
     pub name: String,
     pub mail: String,
-    pub limit: f32,
+    pub minimum_credit: f32,
     pub permission: Permission,
 }
 
@@ -89,7 +89,7 @@ pub fn post_account_edit(
     server_account.name = account.name.empty_to_none();
     server_account.mail = account.mail.empty_to_none();
     server_account.permission = account.permission;
-    server_account.limit = (account.limit * 100.0) as Money;
+    server_account.minimum_credit = (account.minimum_credit * 100.0) as Money;
 
     server_account.update(&conn)?;
 
@@ -124,7 +124,7 @@ pub fn post_account_create(
 
     server_account.name = account.name.empty_to_none();
     server_account.mail = account.mail.empty_to_none();
-    server_account.limit = (account.limit * 100.0) as Money;
+    server_account.minimum_credit = (account.minimum_credit * 100.0) as Money;
 
     server_account.update(&conn)?;
 

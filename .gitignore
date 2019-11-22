@@ -6,3 +6,4 @@
 /img
 .vscode/
 static/templates/**/*.css
+.postgres/

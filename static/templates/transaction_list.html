@@ -19,8 +19,8 @@
                 <h3 class="d-block{{#if (lt account.credit 0)}} text-error{{/if}}{{#if (gt account.credit 0)}} text-success{{/if}}">{{currency account.credit}}€</h1>
             </div>
             <div class="column col-4 col-sm-6">
-                <div>Limit</div>
-                <h3 class="d-block">{{currency account.limit}}€</h1>
+                <div>Minimum credit</div>
+                <h3 class="d-block">{{currency account.minimum_credit}}€</h1>
             </div>
             <div class="column col-ml-auto col-4 col-sm-12" style="margin-top: auto; margin-bottom: auto;">
                 <form action="/transaction/execute/{{account.id}}" method="POST">

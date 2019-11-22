@@ -6,10 +6,10 @@ use uuid::Uuid;
 pub type Money = i32;
 
 /// Reference type to the current database implementation
-pub type DB = diesel::sqlite::Sqlite;
+pub type DB = diesel::pg::Pg;
 
 /// Reference type to the current database connection
-pub type DbConnection = SqliteConnection;
+pub type DbConnection = PgConnection;
 
 /// Reference type to the threaded pool of the current database connection
 pub type Pool = r2d2::Pool<ConnectionManager<DbConnection>>;
@@ -20,4 +20,8 @@ pub fn generate_uuid() -> String {
         .to_hyphenated()
         .encode_upper(&mut Uuid::encode_buffer())
         .to_string()
+}
+
+pub trait Searchable {
+    fn contains(&self, search: &str) -> bool;
 }
