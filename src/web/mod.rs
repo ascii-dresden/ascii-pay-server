@@ -1,4 +1,5 @@
 mod accounts;
+mod categories;
 mod identity_policy;
 mod index;
 mod products;
@@ -25,7 +26,7 @@ pub fn init(config: &mut web::ServiceConfig) {
             .service(
                 web::resource("/login")
                     .route(web::post().to(index::post_login))
-                    .route(web::get().to(index::get_login))
+                    .route(web::get().to(index::get_login)),
             )
             .service(web::resource("/logout").route(web::get().to(index::get_logout)))
             // Setup account mangement related routes
@@ -67,6 +68,22 @@ pub fn init(config: &mut web::ServiceConfig) {
                 web::resource("/product/{product_id}")
                     .route(web::post().to(products::post_product_edit))
                     .route(web::get().to(products::get_product_edit)),
+            )
+            // Setup categories mangement related routes
+            .service(web::resource("/categories").route(web::get().to(categories::get_categories)))
+            .service(
+                web::resource("/category/create")
+                    .route(web::post().to(categories::post_category_create))
+                    .route(web::get().to(categories::get_category_create)),
+            )
+            .service(
+                web::resource("/category/delete/{category_id}")
+                    .route(web::get().to(categories::get_category_delete)),
+            )
+            .service(
+                web::resource("/category/{category_id}")
+                    .route(web::post().to(categories::post_category_edit))
+                    .route(web::get().to(categories::get_category_edit)),
             )
             // Setup transaction mangement related routes
             .service(

@@ -103,7 +103,9 @@ impl ResponseError for ServiceError {
                 .header(http::header::LOCATION, "/login")
                 .del_cookie(&http::Cookie::named(AUTH_COOKIE_NAME))
                 .finish(),
-            ServiceError::InsufficientPrivileges => HttpResponse::Unauthorized().json("Insufficient Privileges"),
+            ServiceError::InsufficientPrivileges => {
+                HttpResponse::Unauthorized().json("Insufficient Privileges")
+            }
         }
     }
 }

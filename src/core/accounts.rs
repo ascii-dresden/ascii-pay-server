@@ -6,7 +6,7 @@ use diesel::sql_types::*;
 use std::io;
 
 use crate::core::schema::account;
-use crate::core::{generate_uuid, DbConnection, Money, ServiceError, ServiceResult};
+use crate::core::{generate_uuid, DbConnection, Money, Searchable, ServiceError, ServiceResult};
 
 /// Represent a account
 #[derive(
@@ -48,18 +48,18 @@ pub enum Permission {
 
 impl Permission {
     /// Check if the permission level is `Permission::DEFAULT`
-    pub fn is_default(&self) -> bool {
-        Permission::DEFAULT == *self
+    pub fn is_default(self) -> bool {
+        Permission::DEFAULT == self
     }
 
     /// Check if the permission level is `Permission::MEMBER`
-    pub fn is_member(&self) -> bool {
-        Permission::MEMBER == *self
+    pub fn is_member(self) -> bool {
+        Permission::MEMBER == self
     }
 
     /// Check if the permission level is `Permission::ADMIN`
-    pub fn is_admin(&self) -> bool {
-        Permission::ADMIN == *self
+    pub fn is_admin(self) -> bool {
+        Permission::ADMIN == self
     }
 }
 
@@ -145,5 +145,33 @@ impl Account {
         let a = results.pop().ok_or_else(|| ServiceError::NotFound)?;
 
         Ok(a)
+    }
+}
+
+impl Searchable for Account {
+    fn contains(&self, search: &str) -> bool {
+        if let Some(name) = &self.name {
+            if name.to_ascii_lowercase().contains(&search) {
+                return true;
+            }
+        }
+
+        if let Some(mail) = &self.mail {
+            if mail.to_ascii_lowercase().contains(&search) {
+                return true;
+            }
+        }
+
+        let permission = match self.permission {
+            Permission::DEFAULT => "default",
+            Permission::MEMBER => "member",
+            Permission::ADMIN => "admin",
+        };
+
+        if permission.contains(&search) {
+            return true;
+        }
+
+        false
     }
 }

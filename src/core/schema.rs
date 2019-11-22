@@ -25,8 +25,15 @@ table! {
 }
 
 table! {
-    price (product, validity_start) {
-        product -> Text,
+    category (id) {
+        id -> Text,
+        name -> Text,
+    }
+}
+
+table! {
+    category_price (category, validity_start) {
+        category -> Text,
         validity_start -> Timestamp,
         value -> Integer,
     }
@@ -36,8 +43,16 @@ table! {
     product (id) {
         id -> Text,
         name -> Text,
-        category -> Text,
+        category -> Nullable<Text>,
         image -> Nullable<Text>,
+    }
+}
+
+table! {
+    product_price (product, validity_start) {
+        product -> Text,
+        validity_start -> Timestamp,
+        value -> Integer,
     }
 }
 
@@ -71,8 +86,10 @@ allow_tables_to_appear_in_same_query!(
     account,
     authentication_barcode,
     authentication_password,
-    price,
+    category,
+    category_price,
     product,
+    product_price,
     session,
     transaction,
     transaction_product,

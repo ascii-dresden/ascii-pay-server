@@ -2,7 +2,9 @@ use actix_web::{error, http, web, HttpResponse};
 use handlebars::Handlebars;
 use std::collections::HashMap;
 
-use crate::core::{DbConnection, Money, Pool, Product, ServiceError, ServiceResult};
+use crate::core::{
+    Category, DbConnection, Money, Pool, Product, Searchable, ServiceError, ServiceResult,
+};
 use crate::web::identity_policy::LoggedAccount;
 use crate::web::utils::Search;
 use actix_multipart::{Field, Multipart, MultipartError};
@@ -38,10 +40,10 @@ pub fn get_products(
     let mut all_products = Product::all(&conn)?;
 
     let search = if let Some(search) = &query.search {
-        let lower_search = search.to_ascii_lowercase();
+        let lower_search = search.trim().to_ascii_lowercase();
         all_products = all_products
             .into_iter()
-            .filter(|a| a.name.to_ascii_lowercase().contains(&lower_search))
+            .filter(|a| a.contains(&lower_search))
             .collect();
         search.clone()
     } else {
@@ -71,7 +73,14 @@ pub fn get_product_edit(
 
     let product = Product::get(&conn, &product_id)?;
 
-    let body = hb.render("product_edit", &product)?;
+    let all_categories = Category::all(&conn)?;
+    let body = hb.render(
+        "product_edit",
+        &json!({
+            "product": &product,
+            "categories": &all_categories
+        }),
+    )?;
 
     Ok(HttpResponse::Ok().body(body))
 }
@@ -96,8 +105,14 @@ pub fn post_product_edit(
 
     let mut server_product = Product::get(&conn, &product_id)?;
 
+    let category = if product.category == "" {
+        None
+    } else {
+        Some(Category::get(&conn, &product.category)?)
+    };
+
     server_product.name = product.name.clone();
-    server_product.category = product.category.clone();
+    server_product.category = category;
 
     server_product.update(&conn)?;
 
@@ -130,10 +145,13 @@ pub fn post_product_edit(
 pub fn get_product_create(
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
+    pool: web::Data<Pool>,
 ) -> ServiceResult<HttpResponse> {
     logged_account.require_member()?;
+    let conn = &pool.get()?;
 
-    let body = hb.render("product_create", &false)?;
+    let all_categories = Category::all(&conn)?;
+    let body = hb.render("product_create", &json!({ "categories": &all_categories }))?;
 
     Ok(HttpResponse::Ok().body(body))
 }
@@ -148,7 +166,13 @@ pub fn post_product_create(
 
     let conn = &pool.get()?;
 
-    let mut server_product = Product::create(&conn, &product.name, &product.category)?;
+    let category = if product.category == "" {
+        None
+    } else {
+        Some(Category::get(&conn, &product.category)?)
+    };
+
+    let mut server_product = Product::create(&conn, &product.name, category)?;
 
     if product.value != 0.0 {
         server_product.add_price(

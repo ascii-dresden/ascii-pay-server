@@ -1,7 +1,7 @@
 use actix_web::{http, web, HttpResponse};
 use handlebars::Handlebars;
 
-use crate::core::{Account, Money, Permission, Pool, ServiceError, ServiceResult};
+use crate::core::{Account, Money, Permission, Pool, Searchable, ServiceError, ServiceResult};
 use crate::web::identity_policy::LoggedAccount;
 use crate::web::utils::{EmptyToNone, Search};
 
@@ -28,16 +28,10 @@ pub fn get_accounts(
     let mut all_accounts = Account::all(&conn)?;
 
     let search = if let Some(search) = &query.search {
-        let lower_search = search.to_ascii_lowercase();
+        let lower_search = search.trim().to_ascii_lowercase();
         all_accounts = all_accounts
             .into_iter()
-            .filter(|a| {
-                if let Some(name) = &a.name {
-                    name.to_ascii_lowercase().contains(&lower_search)
-                } else {
-                    true
-                }
-            })
+            .filter(|a| a.contains(&lower_search))
             .collect();
         search.clone()
     } else {

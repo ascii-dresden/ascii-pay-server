@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html>
 
-{{> _head title="Products" }}
+{{> _head title="Categories" }}
 
 <body>
     <div class="container grid-lg">
-        {{> _navigation active="products" }}
+        {{> _navigation active="categories" }}
 
-        <h1>Manage products</h1>
+        <h1>Manage categories</h1>
 
         <div class="columns">
             <div class="column col-6 col-sm-12">
@@ -19,7 +19,7 @@
                 </form>
             </div>
             <div class="column col-auto col-ml-auto">
-                <a class="btn" href="/product/create">Create product</a>
+                <a class="btn" href="/category/create">Create category</a>
             </div>
         </div>
 
@@ -28,24 +28,22 @@
                 <tr>
                     <th style="width: 1.8rem;"></th>
                     <th>Name</th>
-                    <th>Category</th>
                     <th>Price</th>
                     <th>Action</th>
                 </tr>
             </thead>
             <tbody>
-                {{#each products}}
+                {{#each categories}}
                 <tr>
                     <td>
                         {{#if image}}
-                        <img class="img-responsive" src="/product/image/{{image}}" />
+                        <img class="img-responsive" src="/category/image/{{image}}" />
                         {{/if}}
                     </td>
                     <td>{{name}}</td>
-                    <td>{{#if category}}{{category.name}}{{/if}}</td>
                     <td>{{currency current_price}}{{#if current_price}}€{{/if}}</td>
                     <td>
-                        <a href="/product/{{id}}">Edit</a>
+                        <a href="/category/{{id}}">Edit</a>
                     </td>
                 </tr>
                 {{/each}}

@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html>
 
-{{> _head title="Create product" }}
+{{> _head title="Create category" }}
 
 <body>
     <div class="container grid-lg">
-        {{> _navigation active="products" }}
+        {{> _navigation active="categorys" }}
 
-        <h1>Edit product</h1>
+        <h1>Edit category</h1>
 
         <form class="form-horizontal" method="POST">
             <input type="hidden" name="id" value="" readonly/>
@@ -18,19 +18,6 @@
                 </div>
                 <div class="col-9 col-sm-12">
                     <input class="form-input" type="text" name="name" value=""/>
-                </div>
-            </div>
-            <div class="form-group">
-                <div class="col-3 col-sm-12">
-                    <label class="form-label" for="category">Category</label>
-                </div>
-                <div class="col-9 col-sm-12">
-                    <select class="form-select" name="category">
-                        <option value="" selected>---</option>
-                        {{#each categories}}
-                            <option value="{{id}}">{{name}}</option>
-                        {{/each}}
-                    </select>
                 </div>
             </div>
 
@@ -68,7 +55,7 @@
                 </div>
             </div>
             <input class="btn btn-primary" type="submit" value="Create" />
-            <a class="btn" href="/products">Cancel</a>
+            <a class="btn" href="/categorys">Cancel</a>
         </form>
     </div>
 </body>

@@ -3,7 +3,10 @@ use diesel::prelude::*;
 use std::fs::{self, File};
 use std::path::Path;
 
-use crate::core::{generate_uuid, DbConnection, Money, ServiceError, ServiceResult, DB};
+use crate::core::{
+    generate_uuid, Category, DbConnection, Money, Price, Searchable, ServiceError, ServiceResult,
+    DB,
+};
 
 // Encryption key for cookies
 lazy_static::lazy_static! {
@@ -16,60 +19,11 @@ pub static ref IMAGE_PATH: String = std::env::var("IMAGE_PATH")
 pub struct Product {
     pub id: String,
     pub name: String,
-    pub category: String,
+    pub category: Option<Category>,
     pub image: Option<String>,
     #[serde(default = "std::vec::Vec::new")]
     pub prices: Vec<Price>,
     pub current_price: Option<Money>,
-}
-
-/// Represent a price of a product with a validity
-///
-/// The price with the newest `validity_start` lower than the current datetime is the current valid price.
-#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Price {
-    #[serde(with = "naive_date_time_serializer")]
-    pub validity_start: NaiveDateTime,
-    pub value: Money,
-}
-
-/// Serialize/Deserialize a datetime to/from only a date
-pub mod naive_date_time_serializer {
-    use chrono::{NaiveDate, NaiveDateTime};
-    use serde::{de::Error, de::Unexpected, de::Visitor, Deserializer, Serializer};
-    use std::fmt;
-
-    pub fn serialize<S>(date: &NaiveDateTime, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&date.format("%Y-%m-%d").to_string())
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct NaiveVisitor;
-
-        impl<'de> Visitor<'de> for NaiveVisitor {
-            type Value = NaiveDateTime;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("yyyy-mm-dd")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<NaiveDateTime, E>
-            where
-                E: Error,
-            {
-                NaiveDate::parse_from_str(value, "%Y-%m-%d")
-                    .map_err(|_| Error::invalid_value(Unexpected::Str(value), &"yyyy-mm-dd"))
-                    .map(|d| d.and_hms(0, 0, 0))
-            }
-        }
-        deserializer.deserialize_string(NaiveVisitor)
-    }
 }
 
 /// Custom db loader for `Product`
@@ -80,19 +34,29 @@ impl
         (
             diesel::sql_types::Text,
             diesel::sql_types::Text,
-            diesel::sql_types::Text,
+            diesel::sql_types::Nullable<diesel::sql_types::Text>,
             diesel::sql_types::Nullable<diesel::sql_types::Text>,
         ),
         DB,
     > for Product
 {
-    type Row = (String, String, String, Option<String>);
+    type Row = (String, String, Option<String>, Option<String>);
 
     fn build(row: Self::Row) -> Self {
+        let category = match row.2 {
+            Some(id) => Some(Category {
+                id,
+                name: String::new(),
+                prices: vec![],
+                current_price: None,
+            }),
+            None => None,
+        };
+
         Product {
             id: row.0,
             name: row.1,
-            category: row.2,
+            category,
             image: row.3,
             prices: vec![],
             current_price: None,
@@ -100,38 +64,24 @@ impl
     }
 }
 
-/// Custom db loader for `Price`
-///
-/// Skip product id
-impl
-    diesel::Queryable<
-        (
-            diesel::sql_types::Text,
-            diesel::sql_types::Timestamp,
-            diesel::sql_types::Integer,
-        ),
-        DB,
-    > for Price
-{
-    type Row = (String, NaiveDateTime, Money);
-
-    fn build(row: Self::Row) -> Self {
-        Price {
-            validity_start: row.1,
-            value: row.2,
-        }
-    }
-}
-
 impl Product {
     /// Create a new product with the given name and category
-    pub fn create(conn: &DbConnection, name: &str, category: &str) -> ServiceResult<Product> {
+    pub fn create(
+        conn: &DbConnection,
+        name: &str,
+        category: Option<Category>,
+    ) -> ServiceResult<Product> {
         use crate::core::schema::product::dsl;
+
+        let category_id = match category.as_ref() {
+            Some(category) => Some(category.id.to_owned()),
+            None => None,
+        };
 
         let p = Product {
             id: generate_uuid(),
-            name: name.to_string(),
-            category: category.to_string(),
+            name: name.to_owned(),
+            category,
             image: None,
             prices: vec![],
             current_price: None,
@@ -141,7 +91,7 @@ impl Product {
             .values((
                 dsl::id.eq(&p.id),
                 dsl::name.eq(&p.name),
-                dsl::category.eq(&p.category),
+                dsl::category.eq(&category_id),
             ))
             .execute(conn)?;
 
@@ -154,8 +104,13 @@ impl Product {
     pub fn update(&self, conn: &DbConnection) -> ServiceResult<()> {
         use crate::core::schema::product::dsl;
 
+        let category = match &self.category {
+            Some(category) => Some(category.id.to_owned()),
+            None => None,
+        };
+
         diesel::update(dsl::product.find(&self.id))
-            .set((dsl::name.eq(&self.name), dsl::category.eq(&self.category)))
+            .set((dsl::name.eq(&self.name), dsl::category.eq(&category)))
             .execute(conn)?;
 
         Ok(())
@@ -170,14 +125,14 @@ impl Product {
         validity_start: NaiveDateTime,
         value: Money,
     ) -> ServiceResult<()> {
-        use crate::core::schema::price::dsl;
+        use crate::core::schema::product_price::dsl;
 
         let p = Price {
             validity_start,
             value,
         };
 
-        diesel::insert_into(dsl::price)
+        diesel::insert_into(dsl::product_price)
             .values((
                 dsl::product.eq(&self.id),
                 dsl::validity_start.eq(&p.validity_start),
@@ -200,7 +155,7 @@ impl Product {
         conn: &DbConnection,
         validity_start: NaiveDateTime,
     ) -> ServiceResult<()> {
-        use crate::core::schema::price::dsl;
+        use crate::core::schema::product_price::dsl;
 
         let mut index = 0;
         for price in self.prices.iter() {
@@ -211,7 +166,7 @@ impl Product {
         }
 
         diesel::delete(
-            dsl::price.filter(
+            dsl::product_price.filter(
                 dsl::product
                     .eq(&self.id)
                     .and(dsl::validity_start.eq(validity_start)),
@@ -226,13 +181,22 @@ impl Product {
         Ok(())
     }
 
+    fn load_category(&mut self, conn: &DbConnection) -> ServiceResult<()> {
+        self.category = match &self.category {
+            Some(category) => Some(Category::get(&conn, &category.id)?),
+            None => None,
+        };
+
+        Ok(())
+    }
+
     /// Load the prices for this product
     ///
     /// This updates the `prices` vec and the `current_price`
     fn load_prices(&mut self, conn: &DbConnection) -> ServiceResult<()> {
-        use crate::core::schema::price::dsl;
+        use crate::core::schema::product_price::dsl;
 
-        let results = dsl::price
+        let results = dsl::product_price
             .filter(dsl::product.eq(&self.id))
             .load::<Price>(conn)?;
 
@@ -245,18 +209,23 @@ impl Product {
 
     /// Calculate the `current_price` based on the `prices` vec
     fn calc_current_price(&mut self) {
-        let now = Utc::now().naive_utc();
+        self.current_price = self.get_price_at(&Utc::now().naive_utc());
+    }
 
+    pub fn get_price_at(&self, datetime: &NaiveDateTime) -> Option<Money> {
         let current = self
             .prices
             .iter()
-            .filter(|p| p.validity_start <= now)
+            .filter(|p| p.validity_start <= *datetime)
             .max_by(|p1, p2| p1.validity_start.cmp(&p2.validity_start));
 
-        self.current_price = match current {
+        match current {
             Some(price) => Some(price.value),
-            None => None,
-        };
+            None => match &self.category {
+                Some(category) => category.get_price_at(datetime),
+                None => None,
+            },
+        }
     }
 
     pub fn set_image(&mut self, conn: &DbConnection, file_extension: &str) -> ServiceResult<File> {
@@ -303,6 +272,7 @@ impl Product {
         let mut results = dsl::product.load::<Product>(conn)?;
 
         for p in &mut results {
+            p.load_category(conn)?;
             p.load_prices(conn)?;
         }
 
@@ -315,10 +285,33 @@ impl Product {
 
         let mut results = dsl::product.filter(dsl::id.eq(id)).load::<Product>(conn)?;
 
-        let mut a = results.pop().ok_or_else(|| ServiceError::NotFound)?;
+        let mut p = results.pop().ok_or_else(|| ServiceError::NotFound)?;
 
-        a.load_prices(conn)?;
+        p.load_category(conn)?;
+        p.load_prices(conn)?;
 
-        Ok(a)
+        Ok(p)
+    }
+}
+
+impl Searchable for Product {
+    fn contains(&self, search: &str) -> bool {
+        if self.name.to_ascii_lowercase().contains(&search) {
+            return true;
+        }
+
+        if let Some(category) = &self.category {
+            if category.contains(&search) {
+                return true;
+            }
+        }
+
+        if let Some(current_price) = &self.current_price {
+            if current_price.to_string().contains(&search) {
+                return true;
+            }
+        }
+
+        false
     }
 }

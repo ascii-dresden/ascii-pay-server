@@ -28,14 +28,26 @@ CREATE TABLE `transaction` (
   `date` DATETIME NOT NULL
 );
 
+CREATE TABLE `category` (
+  `id` VARCHAR(100) PRIMARY KEY NOT NULL,
+  `name` VARCHAR(64) NOT NULL
+);
+
+CREATE TABLE `category_price` (
+  `category` VARCHAR(100) NOT NULL,
+  `validity_start` DATETIME NOT NULL,
+  `value` INT NOT NULL,
+  PRIMARY KEY (`category`, `validity_start`)
+);
+
 CREATE TABLE `product` (
   `id` VARCHAR(100) PRIMARY KEY NOT NULL,
   `name` VARCHAR(64) NOT NULL,
-  `category` VARCHAR(64) NOT NULL,
+  `category` VARCHAR(100),
   `image` VARCHAR(100)
 );
 
-CREATE TABLE `price` (
+CREATE TABLE `product_price` (
   `product` VARCHAR(100) NOT NULL,
   `validity_start` DATETIME NOT NULL,
   `value` INT NOT NULL,
