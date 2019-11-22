@@ -1,4 +1,4 @@
-use actix_web::{error::ResponseError, http, Error as ActixError, HttpResponse};
+use actix_web::{error::ResponseError, Error as ActixError, HttpResponse};
 use derive_more::Display;
 
 pub const AUTH_COOKIE_NAME: &str = "auth";
@@ -19,9 +19,6 @@ pub enum ServiceError {
 
     #[display(fmt = "Unauthorized")]
     Unauthorized,
-
-    #[display(fmt = "Session is expired")]
-    Expired,
 
     #[display(fmt = "You have insufficient privileges to view this site")]
     InsufficientPrivileges,
@@ -99,10 +96,9 @@ impl ResponseError for ServiceError {
                 }))
             }
             ServiceError::NotFound => HttpResponse::NotFound().json("NotFound"),
-            ServiceError::Unauthorized | ServiceError::Expired => HttpResponse::Found()
-                .header(http::header::LOCATION, "/login")
-                .del_cookie(&http::Cookie::named(AUTH_COOKIE_NAME))
-                .finish(),
+            ServiceError::Unauthorized => {
+                HttpResponse::Unauthorized().json("Unauthorized")
+            }
             ServiceError::InsufficientPrivileges => {
                 HttpResponse::Unauthorized().json("Insufficient Privileges")
             }
