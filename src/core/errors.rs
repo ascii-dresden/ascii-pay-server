@@ -96,9 +96,7 @@ impl ResponseError for ServiceError {
                 }))
             }
             ServiceError::NotFound => HttpResponse::NotFound().json("NotFound"),
-            ServiceError::Unauthorized => {
-                HttpResponse::Unauthorized().json("Unauthorized")
-            }
+            ServiceError::Unauthorized => HttpResponse::Unauthorized().json("Unauthorized"),
             ServiceError::InsufficientPrivileges => {
                 HttpResponse::Unauthorized().json("Insufficient Privileges")
             }

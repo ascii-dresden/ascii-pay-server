@@ -1,9 +1,10 @@
-use actix_web::{http, web, HttpResponse};
+use actix_web::{http, web, HttpResponse, HttpRequest};
 use chrono::{Duration, Local, NaiveDateTime};
 use handlebars::Handlebars;
 
 use crate::core::{transactions, Account, Money, Pool, ServiceResult};
 use crate::web::identity_policy::LoggedAccount;
+use crate::web::utils::HbData;
 
 /// Helper to deserialize from-to queries
 #[derive(Deserialize, Serialize)]
@@ -33,6 +34,7 @@ pub fn get_transactions(
     logged_account: LoggedAccount,
     account_id: web::Path<String>,
     query: web::Query<FromToQuery>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
     logged_account.require_member()?;
 
@@ -51,16 +53,15 @@ pub fn get_transactions(
 
     let list = transactions::get_by_account(&conn, &account, &from, &to)?;
 
-    let data = json!({
-        "date": FromToQuery {
+    let body = HbData::new(&request)
+        .with_account(logged_account)
+        .with_data("date", &FromToQuery {
             from: Some(from),
             to: Some(to)
-        },
-        "account": account,
-        "transactions": list
-    });
-
-    let body = hb.render("transaction_list", &data)?;
+        })
+        .with_data("account", &account)
+        .with_data("transactions", &list)
+        .render(&hb, "transaction_list")?;
 
     Ok(HttpResponse::Ok().body(body))
 }

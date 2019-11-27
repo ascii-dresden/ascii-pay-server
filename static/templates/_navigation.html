@@ -10,7 +10,10 @@
         <a class="navbar-brand mr-2">asciipay</a>
     </section>
     -->
+    {{#if logged_account}}
     <section class="navbar-section">
+        <span>{{logged_account.name}}</span>
         <a href="/logout" class="btn btn-link">Logout</a>
     </section>
+    {{/if}}
 </header>

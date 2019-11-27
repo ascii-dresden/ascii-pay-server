@@ -15,7 +15,7 @@ pub static ref IMAGE_PATH: String = std::env::var("IMAGE_PATH")
 }
 
 /// Represent a product
-#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone)]
 pub struct Product {
     pub id: String,
     pub name: String,

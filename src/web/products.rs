@@ -1,4 +1,4 @@
-use actix_web::{error, http, web, HttpResponse};
+use actix_web::{error, http, web, HttpResponse, HttpRequest};
 use handlebars::Handlebars;
 use std::collections::HashMap;
 
@@ -6,7 +6,7 @@ use crate::core::{
     Category, DbConnection, Money, Pool, Product, Searchable, ServiceError, ServiceResult,
 };
 use crate::web::identity_policy::LoggedAccount;
-use crate::web::utils::Search;
+use crate::web::utils::{Search, HbData};
 use actix_multipart::{Field, Multipart, MultipartError};
 use futures::future::{err, Either};
 use futures::{Future, Stream};
@@ -32,6 +32,7 @@ pub fn get_products(
     logged_account: LoggedAccount,
     pool: web::Data<Pool>,
     query: web::Query<Search>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
     logged_account.require_member()?;
 
@@ -50,12 +51,11 @@ pub fn get_products(
         "".to_owned()
     };
 
-    let data = json!({
-        "search": search,
-        "products": all_products
-    });
-
-    let body = hb.render("product_list", &data)?;
+    let body = HbData::new(&request)
+        .with_account(logged_account)
+        .with_data("search", &search)
+        .with_data("products", &all_products)
+        .render(&hb, "product_list")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
@@ -66,6 +66,7 @@ pub fn get_product_edit(
     logged_account: LoggedAccount,
     pool: web::Data<Pool>,
     product_id: web::Path<String>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
     logged_account.require_member()?;
 
@@ -74,13 +75,12 @@ pub fn get_product_edit(
     let product = Product::get(&conn, &product_id)?;
 
     let all_categories = Category::all(&conn)?;
-    let body = hb.render(
-        "product_edit",
-        &json!({
-            "product": &product,
-            "categories": &all_categories
-        }),
-    )?;
+
+    let body = HbData::new(&request)
+        .with_account(logged_account)
+        .with_data("product", &product)
+        .with_data("categories", &all_categories)
+        .render(&hb, "product_edit")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
@@ -146,12 +146,17 @@ pub fn get_product_create(
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
     pool: web::Data<Pool>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
     logged_account.require_member()?;
     let conn = &pool.get()?;
 
     let all_categories = Category::all(&conn)?;
-    let body = hb.render("product_create", &json!({ "categories": &all_categories }))?;
+
+    let body = HbData::new(&request)
+        .with_account(logged_account)
+        .with_data("categories", &all_categories)
+        .render(&hb, "product_create")?;
 
     Ok(HttpResponse::Ok().body(body))
 }

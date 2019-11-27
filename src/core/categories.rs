@@ -12,7 +12,7 @@ pub static ref IMAGE_PATH: String = std::env::var("IMAGE_PATH")
 }
 
 /// Represent a category
-#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone)]
 pub struct Category {
     pub id: String,
     #[serde(default = "std::string::String::new")]
