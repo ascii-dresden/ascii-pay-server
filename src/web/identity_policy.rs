@@ -76,7 +76,7 @@ impl IdentityPolicy for DbIdentityPolicy {
 
     fn from_request(&self, req: &mut ServiceRequest) -> Self::Future {
         // it's safe to unwrap this future here as it should be immediately ready
-        let cookie_data = match self.cookie_policy.from_request(req).now_or_never().unwrap() {
+        let cookie_data = match self.cookie_policy.from_request(req).now_or_never().expect("ReadyFututre was not ready") {
             Ok(val) => val,
             Err(e) => return err(e),
         };
