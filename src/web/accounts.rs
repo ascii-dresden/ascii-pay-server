@@ -1,9 +1,9 @@
-use actix_web::{http, web, HttpResponse};
+use actix_web::{http, web, HttpResponse, HttpRequest};
 use handlebars::Handlebars;
 
 use crate::core::{Account, Money, Permission, Pool, Searchable, ServiceError, ServiceResult};
 use crate::web::identity_policy::LoggedAccount;
-use crate::web::utils::{EmptyToNone, Search};
+use crate::web::utils::{EmptyToNone, Search, HbData};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FormAccount {
@@ -20,6 +20,7 @@ pub async fn get_accounts(
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
     query: web::Query<Search>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
     logged_account.require_member()?;
 
@@ -38,12 +39,11 @@ pub async fn get_accounts(
         "".to_owned()
     };
 
-    let data = json!({
-        "search": search,
-        "accounts": all_accounts
-    });
-
-    let body = hb.render("account_list", &data)?;
+    let body = HbData::new(&request)
+        .with_account(logged_account)
+        .with_data("search", &search)
+        .with_data("accounts", &all_accounts)
+        .render(&hb, "account_list")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
@@ -54,6 +54,7 @@ pub async fn get_account_edit(
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
     account_id: web::Path<String>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
     logged_account.require_member()?;
 
@@ -61,7 +62,10 @@ pub async fn get_account_edit(
 
     let account = Account::get(&conn, &account_id)?;
 
-    let body = hb.render("account_edit", &account)?;
+    let body = HbData::new(&request)
+        .with_account(logged_account)
+        .with_data("account", &account)
+        .render(&hb, "account_edit")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
@@ -102,10 +106,13 @@ pub async fn post_account_edit(
 pub async fn get_account_create(
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
     logged_account.require_member()?;
 
-    let body = hb.render("account_create", &false)?;
+    let body = HbData::new(&request)
+        .with_account(logged_account)
+        .render(&hb, "account_create")?;
 
     Ok(HttpResponse::Ok().body(body))
 }

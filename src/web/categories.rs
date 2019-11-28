@@ -1,10 +1,10 @@
-use actix_web::{http, web, HttpResponse};
+use actix_web::{http, web, HttpResponse, HttpRequest};
 use handlebars::Handlebars;
 use std::collections::HashMap;
 
 use crate::core::{Category, Money, Pool, Searchable, ServiceError, ServiceResult};
 use crate::web::identity_policy::LoggedAccount;
-use crate::web::utils::Search;
+use crate::web::utils::{Search, HbData};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FormCategory {
@@ -25,6 +25,7 @@ pub async fn get_categories(
     logged_account: LoggedAccount,
     pool: web::Data<Pool>,
     query: web::Query<Search>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
     logged_account.require_member()?;
 
@@ -43,12 +44,11 @@ pub async fn get_categories(
         "".to_owned()
     };
 
-    let data = json!({
-        "search": search,
-        "categories": all_categories
-    });
-
-    let body = hb.render("category_list", &data)?;
+    let body = HbData::new(&request)
+        .with_account(logged_account)
+        .with_data("search", &search)
+        .with_data("categories", &all_categories)
+        .render(&hb, "category_list")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
@@ -59,6 +59,7 @@ pub async fn get_category_edit(
     logged_account: LoggedAccount,
     pool: web::Data<Pool>,
     category_id: web::Path<String>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
     logged_account.require_member()?;
 
@@ -66,7 +67,10 @@ pub async fn get_category_edit(
 
     let category = Category::get(&conn, &category_id)?;
 
-    let body = hb.render("category_edit", &category)?;
+    let body = HbData::new(&request)
+        .with_account(logged_account)
+        .with_data("category", &category)
+        .render(&hb, "category_edit")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
@@ -124,10 +128,13 @@ pub async fn post_category_edit(
 pub async fn get_category_create(
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
     logged_account.require_member()?;
 
-    let body = hb.render("category_create", &false)?;
+    let body = HbData::new(&request)
+        .with_account(logged_account)
+        .render(&hb, "category_create")?;
 
     Ok(HttpResponse::Ok().body(body))
 }

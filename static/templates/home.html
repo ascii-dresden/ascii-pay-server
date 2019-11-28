@@ -7,7 +7,35 @@
     <div class="container grid-lg">
         {{> _navigation active="home" }}
     
-        <h2>Welcome {{name}}!</h2>
+        <h1>Dashboard</h1>
+
+        <div class="divider text-center" data-content=""></div>
+
+        <h2>Your balance</h2>
+        <div class="columns">
+            <div class="column col-12">
+                <div>Name</div>
+                <h3 class="d-block">{{logged_account.name}}</h1>
+            </div>
+            <div class="column col-4 col-sm-6">
+                <div>Credit</div>
+                <h3 class="d-block{{#if (lt logged_account.credit 0)}} text-error{{/if}}{{#if (gt logged_account.credit 0)}} text-success{{/if}}">{{currency logged_account.credit}}€</h1>
+            </div>
+            <div class="column col-4 col-sm-6">
+                <div>Minimum credit</div>
+                <h3 class="d-block">{{currency logged_account.minimum_credit}}€</h1>
+            </div>
+        </div>
+
+        <div class="divider text-center" data-content=""></div>
+
+        <h2>Total</h2>
+        <div class="columns">
+            <div class="column col-4 col-sm-6">
+                <div>Credit</div>
+                <h3 class="d-block{{#if (lt total 0)}} text-error{{/if}}{{#if (gt total 0)}} text-success{{/if}}">{{currency total}}€</h1>
+            </div>
+        </div>
     </div>
 </body>
 </html>

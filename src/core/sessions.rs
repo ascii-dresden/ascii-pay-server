@@ -19,6 +19,7 @@ const VALIDITY_MINUTES: i64 = 10;
     Hash,
     Serialize,
     Deserialize,
+    Clone,
 )]
 #[table_name = "session"]
 pub struct Session {

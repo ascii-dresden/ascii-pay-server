@@ -91,7 +91,7 @@
                     <a class="btn" href="/products">Cancel</a>
                 </div>
                 <div class="column col-ml-auto col-auto">
-                    <a class="btn btn-error" href="/product/delete/{{product.id}}">Delete</a>
+                    <!-- <a class="btn btn-error" href="/product/delete/{{product.id}}">Delete</a> -->
                 </div>
             </div>
         </form>
@@ -104,7 +104,7 @@
                     <label class="form-label" for="image" >Image</label>
                 </div>
                 <div class="col-3 col-sm-12">
-                    {{#if image}}
+                    {{#if product.image}}
                     <img class="img-responsive" src="/product/image/{{product.image}}" />
                     {{/if}}
                 </div>

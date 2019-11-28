@@ -28,7 +28,7 @@
                     <select class="form-select" name="category">
                         <option value="" selected>---</option>
                         {{#each categories}}
-                            <option value="{{id}}">{{name}}</option>
+                            <option value="{{id}}">{{name}}{{#if current_price}} - ({{currency current_price}}€){{/if}}</option>
                         {{/each}}
                     </select>
                 </div>

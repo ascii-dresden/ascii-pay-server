@@ -10,13 +10,13 @@
         <h1>Edit account</h1>
 
         <form class="form-horizontal" method="POST">
-            <input type="hidden" name="id" value="{{id}}" readonly/>
+            <input type="hidden" name="id" value="{{account.id}}" readonly/>
             <div class="form-group">
                 <div class="col-3 col-sm-12">
                     <label class="form-label" for="name">Name</label>
                 </div>
                 <div class="col-9 col-sm-12">
-                    <input class="form-input" type="text" name="name" value="{{name}}"/>
+                    <input class="form-input" type="text" name="name" value="{{account.name}}"/>
                 </div>
             </div>
             <div class="form-group">
@@ -24,7 +24,7 @@
                     <label class="form-label" for="mail">Mail</label>
                 </div>
                 <div class="col-9 col-sm-12">
-                    <input class="form-input" type="text" name="mail" value="{{mail}}"/>
+                    <input class="form-input" type="text" name="mail" value="{{account.mail}}"/>
                 </div>
             </div>
             <div class="form-group">
@@ -33,7 +33,7 @@
                 </div>
                 <div class="col-9 col-sm-12">
                     <div class="input-group">
-                        <input class="form-input" type="text" name="credit" value="{{currency credit}}" readonly />
+                        <input class="form-input" type="text" name="credit" value="{{currency account.credit}}" readonly />
                         <span class="input-group-addon">€</span>
                     </div>
                 </div>
@@ -44,7 +44,7 @@
                 </div>
                 <div class="col-9 col-sm-12">
                     <div class="input-group">
-                        <input class="form-input" type="text" name="minimum_credit" value="{{currency minimum_credit}}" />
+                        <input class="form-input" type="text" name="minimum_credit" value="{{currency account.minimum_credit}}" />
                         <span class="input-group-addon">€</span>
                     </div>
                 </div>
@@ -55,9 +55,9 @@
                 </div>
                 <div class="col-9 col-sm-12">
                     <select class="form-select" name="permission">
-                        <option value="DEFAULT" {{#if (eq permission "DEFAULT")}}selected="selected"{{/if}}>Default</option>
-                        <option value="MEMBER" {{#if (eq permission "MEMBER")}}selected="selected"{{/if}}>Member</option>
-                        <option value="ADMIN" {{#if (eq permission "ADMIN")}}selected="selected"{{/if}}>Admin</option>
+                        <option value="DEFAULT" {{#if (eq account.permission "DEFAULT")}}selected="selected"{{/if}}>Default</option>
+                        <option value="MEMBER" {{#if (eq account.permission "MEMBER")}}selected="selected"{{/if}}>Member</option>
+                        <option value="ADMIN" {{#if (eq account.permission "ADMIN")}}selected="selected"{{/if}}>Admin</option>
                     </select>
                 </div>
             </div>
@@ -67,7 +67,7 @@
                     <a class="btn" href="/accounts">Cancel</a>
                 </div>
                 <div class="column col-ml-auto col-auto">
-                    <a class="btn btn-error" href="/account/delete/{{id}}">Delete</a>
+                    <!-- <a class="btn btn-error" href="/account/delete/{{account.id}}">Delete</a> -->
                 </div>
             </div>
         </form>

@@ -9,7 +9,7 @@ use crate::core::{
 };
 
 /// Represent a transaction
-#[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset, Serialize, Deserialize)]
+#[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset, Serialize, Deserialize, Clone)]
 #[table_name = "transaction"]
 pub struct Transaction {
     pub id: String,

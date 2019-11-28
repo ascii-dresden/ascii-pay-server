@@ -2,8 +2,9 @@ use actix_identity::Identity;
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
 
-use crate::core::{authentication_password, Pool, ServiceResult};
+use crate::core::{authentication_password, stats, Pool, ServiceResult};
 use crate::web::identity_policy::LoggedAccount;
+use crate::web::utils::HbData;
 
 #[derive(Serialize, Deserialize)]
 pub struct LoginForm {
@@ -13,22 +14,28 @@ pub struct LoginForm {
 
 /// GET route for `/` if user is logged in
 pub async fn get_index(
-    _pool: web::Data<Pool>,
+    pool: web::Data<Pool>,
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
+    request: HttpRequest
 ) -> ServiceResult<HttpResponse> {
-    let data = json!({ "name": logged_account.account.name.unwrap_or(logged_account.account.id) });
-    let body = hb.render("home", &data)?;
+    let conn = &pool.get()?;
+
+    let total = stats::get_total_balance(&conn)?;
+
+    let body = HbData::new(&request)
+        .with_account(logged_account)
+        .with_data("total", &total)
+        .render(&hb, "home")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
 
 /// GET route for `/login` if user is not logged in
-pub async fn get_login(hb: web::Data<Handlebars>, req: HttpRequest) -> ServiceResult<HttpResponse> {
-    let data = json!({
-        "error": req.query_string().contains("error")
-    });
-    let body = hb.render("index", &data)?;
+pub async fn get_login(hb: web::Data<Handlebars>, request: HttpRequest) -> ServiceResult<HttpResponse> {
+    let body = HbData::new(&request)
+        .with_data("error", &request.query_string().contains("error"))
+        .render(&hb, "index")?;
 
     Ok(HttpResponse::Ok().body(body))
 }

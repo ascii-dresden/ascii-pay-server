@@ -8,6 +8,7 @@ mod prices;
 mod products;
 mod schema;
 mod sessions;
+pub mod stats;
 pub mod transactions;
 mod utils;
 

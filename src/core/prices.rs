@@ -5,7 +5,7 @@ use crate::core::{Money, DB};
 /// Represent a price of a product or category with a validity
 ///
 /// The price with the newest `validity_start` lower than the current datetime is the current valid price.
-#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone)]
 pub struct Price {
     #[serde(with = "naive_date_time_serializer")]
     pub validity_start: NaiveDateTime,
