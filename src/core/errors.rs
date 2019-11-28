@@ -1,4 +1,5 @@
 use actix_web::{error::ResponseError, Error as ActixError, HttpResponse};
+use actix_multipart::MultipartError;
 use derive_more::Display;
 
 pub const AUTH_COOKIE_NAME: &str = "auth";
@@ -66,6 +67,12 @@ impl From<uuid::parser::ParseError> for ServiceError {
 impl From<serde_json::Error> for ServiceError {
     fn from(error: serde_json::Error) -> Self {
         ServiceError::InternalServerError("Serialization error", format!("{}", error))
+    }
+}
+
+impl From<MultipartError> for ServiceError {
+    fn from(error: MultipartError) -> Self {
+        ServiceError::InternalServerError("Error in Multipart stream", format!("{}", error))
     }
 }
 /*

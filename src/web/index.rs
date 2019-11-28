@@ -12,7 +12,7 @@ pub struct LoginForm {
 }
 
 /// GET route for `/` if user is logged in
-pub fn get_index(
+pub async fn get_index(
     _pool: web::Data<Pool>,
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
@@ -24,7 +24,7 @@ pub fn get_index(
 }
 
 /// GET route for `/login` if user is not logged in
-pub fn get_login(hb: web::Data<Handlebars>, req: HttpRequest) -> ServiceResult<HttpResponse> {
+pub async fn get_login(hb: web::Data<Handlebars>, req: HttpRequest) -> ServiceResult<HttpResponse> {
     let data = json!({
         "error": req.query_string().contains("error")
     });
@@ -34,7 +34,7 @@ pub fn get_login(hb: web::Data<Handlebars>, req: HttpRequest) -> ServiceResult<H
 }
 
 /// POST route for `/login`
-pub fn post_login(
+pub async fn post_login(
     pool: web::Data<Pool>,
     id: Identity,
     params: web::Form<LoginForm>,
@@ -57,7 +57,7 @@ pub fn post_login(
 }
 
 /// GET route for `/logout`
-pub fn get_logout(
+pub async fn get_logout(
     pool: web::Data<Pool>,
     logged_account: LoggedAccount,
     id: Identity,

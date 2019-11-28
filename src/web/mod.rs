@@ -62,7 +62,7 @@ pub fn init(config: &mut web::ServiceConfig) {
             )
             .service(
                 web::resource("/product/upload-image/{product_id}")
-                    .route(web::post().to_async(products::post_product_upload_image)),
+                    .route(web::post().to(products::post_product_upload_image)),
             )
             .service(
                 web::resource("/product/{product_id}")
