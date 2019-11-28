@@ -5,6 +5,8 @@ use actix_identity::Identity;
 use actix_identity::IdentityPolicy;
 use actix_web::dev::{Payload, ServiceRequest, ServiceResponse};
 use actix_web::{web, Error, FromRequest, HttpRequest};
+use futures::future::{err, ok, Ready};
+use futures::prelude::*;
 
 use crate::core::{
     Account, DbConnection, Permission, Pool, ServiceError, ServiceResult, Session, AUTH_COOKIE_NAME,
@@ -69,20 +71,23 @@ impl DbIdentityPolicy {
 }
 
 impl IdentityPolicy for DbIdentityPolicy {
-    type Future = Result<Option<String>, Error>;
-    type ResponseFuture = Result<(), Error>;
+    type Future = Ready<Result<Option<String>, Error>>;
+    type ResponseFuture = Ready<Result<(), Error>>;
 
     fn from_request(&self, req: &mut ServiceRequest) -> Self::Future {
-        let cookie_data = self.cookie_policy.from_request(req)?;
-
+        // it's safe to unwrap this future here as it should be immediately ready
+        let cookie_data = match self.cookie_policy.from_request(req).now_or_never().expect("ReadyFututre was not ready") {
+            Ok(val) => val,
+            Err(e) => return err(e),
+        };
         match cookie_data {
             // Some(session_id) => self.load_logged_account(req, session_id).map_err(|err| err.actix()),
             Some(session_id) => match self.load_logged_account(req, session_id) {
-                Ok(s) => Ok(s),
-                Err(ServiceError::Unauthorized) => Ok(None),
-                Err(e) => Err(e.into()),
+                Ok(s) => ok(s),
+                Err(ServiceError::Unauthorized) => ok(None),
+                Err(e) => err(e.into()),
             },
-            None => Ok(None),
+            None => ok(None),
         }
     }
 
@@ -94,11 +99,13 @@ impl IdentityPolicy for DbIdentityPolicy {
     ) -> Self::ResponseFuture {
         let id = match id {
             Some(account_str) => {
-                let logged_account: LoggedAccount =
-                    serde_json::from_str(&account_str).map_err(|err| {
-                        let e: ServiceError = err.into();
-                        e.actix()
-                    })?;
+                let logged_account: LoggedAccount = match serde_json::from_str(&account_str) {
+                    Ok(val) => val,
+                    Err(e) => {
+                        let srv_err: ServiceError = e.into();
+                        return err(srv_err.actix());
+                    }
+                };
 
                 Some(logged_account.session_id)
             }
@@ -117,15 +124,26 @@ pub struct LoggedAccount {
 /// Extract `LoggedAccount` from http request
 impl FromRequest for LoggedAccount {
     type Error = Error;
-    type Future = Result<LoggedAccount, Error>;
+    type Future = Ready<Result<Self, Error>>;
     type Config = ();
 
     fn from_request(req: &HttpRequest, pl: &mut Payload) -> Self::Future {
-        if let Some(identity) = Identity::from_request(req, pl)?.identity() {
-            let account: LoggedAccount = serde_json::from_str(&identity)?;
-            return Ok(account);
+        let request_identity = match Identity::from_request(req, pl).now_or_never().unwrap() {
+            Ok(val) => val,
+            Err(e) => return err(e),
+        };
+
+        if let Some(identity) = request_identity.identity() {
+            let account: LoggedAccount = match serde_json::from_str(&identity) {
+                Ok(val) => val,
+                Err(e) => {
+                    let srv_err: ServiceError = e.into();
+                    return err(srv_err.actix());
+                }
+            };
+            return ok(account);
         }
-        Err(ServiceError::Unauthorized.into())
+        err(ServiceError::Unauthorized.into())
     }
 }
 

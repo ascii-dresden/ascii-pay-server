@@ -15,7 +15,7 @@ pub struct FormAccount {
 }
 
 /// GET route for `/accounts`
-pub fn get_accounts(
+pub async fn get_accounts(
     pool: web::Data<Pool>,
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
@@ -49,7 +49,7 @@ pub fn get_accounts(
 }
 
 /// GET route for `/account/{account_id}`
-pub fn get_account_edit(
+pub async fn get_account_edit(
     pool: web::Data<Pool>,
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
@@ -71,7 +71,7 @@ pub fn get_account_edit(
 }
 
 /// POST route for `/account/{account_id}`
-pub fn post_account_edit(
+pub async fn post_account_edit(
     pool: web::Data<Pool>,
     logged_account: LoggedAccount,
     account: web::Form<FormAccount>,
@@ -103,7 +103,7 @@ pub fn post_account_edit(
 }
 
 /// GET route for `/account/create`
-pub fn get_account_create(
+pub async fn get_account_create(
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
     request: HttpRequest,
@@ -118,7 +118,7 @@ pub fn get_account_create(
 }
 
 /// POST route for `/account/create`
-pub fn post_account_create(
+pub async fn post_account_create(
     pool: web::Data<Pool>,
     logged_account: LoggedAccount,
     account: web::Form<FormAccount>,
@@ -141,7 +141,7 @@ pub fn post_account_create(
 }
 
 /// GET route for `/account/delete/{account_id}`
-pub fn delete_get(
+pub async fn delete_get(
     _hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
     _account_id: web::Path<String>,

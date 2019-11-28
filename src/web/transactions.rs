@@ -28,7 +28,7 @@ pub struct Execute {
 }
 
 /// GET route for `/transactions/{account_id}`
-pub fn get_transactions(
+pub async fn get_transactions(
     pool: web::Data<Pool>,
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
@@ -67,7 +67,7 @@ pub fn get_transactions(
 }
 
 /// GET route for `/transaction/execute/{account_id}`
-pub fn post_execute_transaction(
+pub async fn post_execute_transaction(
     pool: web::Data<Pool>,
     logged_account: LoggedAccount,
     account_id: web::Path<String>,

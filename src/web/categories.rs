@@ -20,7 +20,7 @@ pub struct FormCategory {
 }
 
 /// GET route for `/categories`
-pub fn get_categories(
+pub async fn get_categories(
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
     pool: web::Data<Pool>,
@@ -54,7 +54,7 @@ pub fn get_categories(
 }
 
 /// GET route for `/category/{category_id}`
-pub fn get_category_edit(
+pub async fn get_category_edit(
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
     pool: web::Data<Pool>,
@@ -76,7 +76,7 @@ pub fn get_category_edit(
 }
 
 /// POST route for `/category/{category_id}`
-pub fn post_category_edit(
+pub async fn post_category_edit(
     logged_account: LoggedAccount,
     pool: web::Data<Pool>,
     category: web::Form<FormCategory>,
@@ -125,7 +125,7 @@ pub fn post_category_edit(
 }
 
 /// GET route for `/category/create`
-pub fn get_category_create(
+pub async fn get_category_create(
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
     request: HttpRequest,
@@ -140,7 +140,7 @@ pub fn get_category_create(
 }
 
 /// POST route for `/category/create`
-pub fn post_category_create(
+pub async fn post_category_create(
     logged_account: LoggedAccount,
     pool: web::Data<Pool>,
     category: web::Form<FormCategory>,
@@ -168,7 +168,7 @@ pub fn post_category_create(
 }
 
 /// GET route for `/category/delete/{category_id}`
-pub fn get_category_delete(
+pub async fn get_category_delete(
     _hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
     _category_id: web::Path<String>,

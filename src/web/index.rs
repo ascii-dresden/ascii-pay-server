@@ -13,7 +13,7 @@ pub struct LoginForm {
 }
 
 /// GET route for `/` if user is logged in
-pub fn get_index(
+pub async fn get_index(
     pool: web::Data<Pool>,
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
@@ -32,7 +32,7 @@ pub fn get_index(
 }
 
 /// GET route for `/login` if user is not logged in
-pub fn get_login(hb: web::Data<Handlebars>, request: HttpRequest) -> ServiceResult<HttpResponse> {
+pub async fn get_login(hb: web::Data<Handlebars>, request: HttpRequest) -> ServiceResult<HttpResponse> {
     let body = HbData::new(&request)
         .with_data("error", &request.query_string().contains("error"))
         .render(&hb, "index")?;
@@ -41,7 +41,7 @@ pub fn get_login(hb: web::Data<Handlebars>, request: HttpRequest) -> ServiceResu
 }
 
 /// POST route for `/login`
-pub fn post_login(
+pub async fn post_login(
     pool: web::Data<Pool>,
     id: Identity,
     params: web::Form<LoginForm>,
@@ -64,7 +64,7 @@ pub fn post_login(
 }
 
 /// GET route for `/logout`
-pub fn get_logout(
+pub async fn get_logout(
     pool: web::Data<Pool>,
     logged_account: LoggedAccount,
     id: Identity,
