@@ -1,11 +1,10 @@
+use crate::core::{Category, Money, Pool, Searchable, ServiceError, ServiceResult};
+use crate::login_required;
+use crate::web::identity_policy::LoggedAccount;
+use crate::web::utils::{HbData, Search};
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
 use std::collections::HashMap;
-
-use crate::core::{Category, Money, Pool, Searchable, ServiceError, ServiceResult};
-use crate::web::identity_policy::LoggedAccount;
-use crate::web::utils::{HbData, Search};
-
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -29,7 +28,7 @@ pub async fn get_categories(
     query: web::Query<Search>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -63,7 +62,7 @@ pub async fn get_category_edit(
     category_id: web::Path<String>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -84,7 +83,7 @@ pub async fn post_category_edit(
     category: web::Form<FormCategory>,
     category_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     if *category_id != category.id {
         return Err(ServiceError::BadRequest(
@@ -132,7 +131,7 @@ pub async fn get_category_create(
     logged_account: LoggedAccount,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     let body = HbData::new(&request)
         .with_account(logged_account)
@@ -147,7 +146,7 @@ pub async fn post_category_create(
     pool: web::Data<Pool>,
     category: web::Form<FormCategory>,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -175,7 +174,7 @@ pub async fn get_category_delete(
     logged_account: LoggedAccount,
     _category_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     println!("Delete is not supported!");
 

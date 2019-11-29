@@ -19,6 +19,18 @@ lazy_static::lazy_static! {
 static ref SECRET_KEY: String = std::env::var("SECRET_KEY").unwrap_or_else(|_| "0123".repeat(8));
 }
 
+#[macro_export]
+macro_rules! login_required {
+    ($account:ident) => {
+        match $account.account.permission {
+            crate::core::Permission::ADMIN | crate::core::Permission::MEMBER => (),
+            _ => return Ok(HttpResponse::Found()
+            .header(http::header::LOCATION, "/login")
+            .finish()),
+        }
+    };
+}
+
 /// IdentitiyPolicy that wraps the `CookieIdentityPolicy`
 pub struct DbIdentityPolicy {
     cookie_policy: CookieIdentityPolicy,
@@ -187,14 +199,7 @@ impl LoggedAccount {
         Ok(())
     }
 
-    /// Check if the account has member or admin rights. Otherwise return `ServiceError`
-    pub fn require_member(&self) -> ServiceResult<()> {
-        match self.account.permission {
-            Permission::ADMIN | Permission::MEMBER => Ok(()),
-            _ => Err(ServiceError::Unauthorized),
-        }
-    }
-
+    // TODO: Port as macro
     /// Check if the account has admin rights. Otherwise return `ServiceError`
     pub fn require_admin(&self) -> ServiceResult<()> {
         match self.account.permission {

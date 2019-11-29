@@ -1,6 +1,7 @@
 use crate::core::{
     Category, DbConnection, Money, Pool, Product, Searchable, ServiceError, ServiceResult,
 };
+use crate::login_required;
 use crate::web::identity_policy::LoggedAccount;
 use crate::web::utils::{HbData, Search};
 use actix_multipart::Multipart;
@@ -34,7 +35,7 @@ pub async fn get_products(
     query: web::Query<Search>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -68,7 +69,7 @@ pub async fn get_product_edit(
     product_id: web::Path<String>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -92,7 +93,7 @@ pub async fn post_product_edit(
     product: web::Form<FormProduct>,
     product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     if *product_id != product.id {
         return Err(ServiceError::BadRequest(
@@ -148,7 +149,7 @@ pub async fn get_product_create(
     pool: web::Data<Pool>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
     let conn = &pool.get()?;
 
     let all_categories = Category::all(&conn)?;
@@ -167,7 +168,7 @@ pub async fn post_product_create(
     pool: web::Data<Pool>,
     product: web::Form<FormProduct>,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -201,7 +202,7 @@ pub async fn get_product_delete(
     logged_account: LoggedAccount,
     _product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     println!("Delete is not supported!");
 
@@ -216,7 +217,7 @@ pub async fn get_product_remove_image(
     logged_account: LoggedAccount,
     product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -236,7 +237,7 @@ pub async fn post_product_upload_image(
     product_id: web::Path<String>,
     multipart: Multipart,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     let conn = &pool.get()?;
     let mut product = Product::get(&conn, &Uuid::parse_str(&product_id)?)?;

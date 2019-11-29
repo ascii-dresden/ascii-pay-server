@@ -1,13 +1,9 @@
-use actix_web::{http, web, HttpRequest, HttpResponse};
-use handlebars::Handlebars;
-
-use crate::core::{
-    authentication_password, Account, Money, Permission, Pool, Searchable, ServiceError,
-    ServiceResult,
-};
+use crate::core::{Account, Money, Permission, Pool, Searchable, ServiceError, ServiceResult, authentication_password};
+use crate::login_required;
 use crate::web::identity_policy::LoggedAccount;
 use crate::web::utils::{EmptyToNone, HbData, Search};
-
+use actix_web::{http, web, HttpRequest, HttpResponse};
+use handlebars::Handlebars;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -40,7 +36,7 @@ pub async fn get_accounts(
     query: web::Query<Search>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -74,7 +70,7 @@ pub async fn get_account_edit(
     account_id: web::Path<String>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -129,7 +125,7 @@ pub async fn post_account_edit(
     account: web::Form<FormAccount>,
     account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     if *account_id != account.id {
         return Err(ServiceError::BadRequest(
@@ -160,7 +156,7 @@ pub async fn get_account_create(
     logged_account: LoggedAccount,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     let body = HbData::new(&request)
         .with_account(logged_account)
@@ -175,7 +171,7 @@ pub async fn post_account_create(
     logged_account: LoggedAccount,
     account: web::Form<FormAccount>,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -201,7 +197,7 @@ pub async fn invite_get(
     logged_account: LoggedAccount,
     account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -219,7 +215,7 @@ pub async fn revoke_get(
     logged_account: LoggedAccount,
     account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -238,7 +234,7 @@ pub async fn delete_get(
     logged_account: LoggedAccount,
     _account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    logged_account.require_member()?;
+    login_required!(logged_account);
 
     println!("Delete is not supported!");
 

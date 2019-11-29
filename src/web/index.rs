@@ -1,7 +1,7 @@
 use actix_identity::Identity;
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
-
+use crate::login_required;
 use crate::core::{authentication_password, stats, Pool, ServiceResult};
 use crate::web::identity_policy::LoggedAccount;
 use crate::web::utils::HbData;
@@ -26,6 +26,8 @@ pub async fn get_index(
     logged_account: LoggedAccount,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
+    login_required!(logged_account);
+
     let conn = &pool.get()?;
 
     let total = stats::get_total_balance(&conn)?;
