@@ -4,6 +4,7 @@ use diesel::prelude::*;
 use diesel::serialize::{self, Output, ToSql};
 use diesel::sql_types::*;
 use std::io;
+use uuid::Uuid;
 
 use crate::core::schema::account;
 use crate::core::{generate_uuid, DbConnection, Money, Searchable, ServiceError, ServiceResult};
@@ -25,7 +26,7 @@ use crate::core::{generate_uuid, DbConnection, Money, Searchable, ServiceError, 
 #[changeset_options(treat_none_as_null = "true")]
 #[table_name = "account"]
 pub struct Account {
-    pub id: String,
+    pub id: Uuid,
     pub credit: Money,
     pub minimum_credit: Money,
     pub name: Option<String>,
@@ -138,7 +139,7 @@ impl Account {
     }
 
     /// Get an account by the `id`
-    pub fn get(conn: &DbConnection, id: &str) -> ServiceResult<Account> {
+    pub fn get(conn: &DbConnection, id: &Uuid) -> ServiceResult<Account> {
         use crate::core::schema::account::dsl;
 
         let mut results = dsl::account.filter(dsl::id.eq(id)).load::<Account>(conn)?;

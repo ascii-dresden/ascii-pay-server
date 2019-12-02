@@ -12,12 +12,19 @@ pub struct LoginForm {
     password: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct RegisterForm {
+    username: String,
+    password: String,
+    password2: String,
+}
+
 /// GET route for `/` if user is logged in
 pub async fn get_index(
     pool: web::Data<Pool>,
     hb: web::Data<Handlebars>,
     logged_account: LoggedAccount,
-    request: HttpRequest
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
 
@@ -32,10 +39,13 @@ pub async fn get_index(
 }
 
 /// GET route for `/login` if user is not logged in
-pub async fn get_login(hb: web::Data<Handlebars>, request: HttpRequest) -> ServiceResult<HttpResponse> {
+pub async fn get_login(
+    hb: web::Data<Handlebars>,
+    request: HttpRequest,
+) -> ServiceResult<HttpResponse> {
     let body = HbData::new(&request)
         .with_data("error", &request.query_string().contains("error"))
-        .render(&hb, "index")?;
+        .render(&hb, "login")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
@@ -75,5 +85,49 @@ pub async fn get_logout(
 
     Ok(HttpResponse::Found()
         .header(http::header::LOCATION, "/")
+        .finish())
+}
+
+/// GET route for `/register/{invitation_id}` if user is not logged in
+pub async fn get_register(
+    hb: web::Data<Handlebars>,
+    request: HttpRequest,
+    pool: web::Data<Pool>,
+    invitation_id: web::Path<String>,
+) -> ServiceResult<HttpResponse> {
+    let conn = pool.get()?;
+
+    let _account = authentication_password::get_account_by_invitation_link(&conn, &invitation_id)?;
+
+    let body = HbData::new(&request)
+        .with_data("error", &request.query_string().contains("error"))
+        .render(&hb, "register")?;
+
+    Ok(HttpResponse::Ok().body(body))
+}
+
+/// POST route for `/register/{invitation_id}`
+pub async fn post_register(
+    pool: web::Data<Pool>,
+    params: web::Form<RegisterForm>,
+    invitation_id: web::Path<String>,
+) -> ServiceResult<HttpResponse> {
+    let conn = &pool.get()?;
+
+    let account = authentication_password::get_account_by_invitation_link(&conn, &invitation_id)?;
+
+    if params.password != params.password2 {
+        return Ok(HttpResponse::Found()
+            .header(
+                http::header::LOCATION,
+                format!("/register/{}?error", &account.id),
+            )
+            .finish());
+    }
+
+    authentication_password::register(&conn, &account, &params.username, &params.password)?;
+
+    Ok(HttpResponse::Found()
+        .header(http::header::LOCATION, "/login")
         .finish())
 }

@@ -1,6 +1,6 @@
 table! {
     account (id) {
-        id -> Varchar,
+        id -> Uuid,
         credit -> Int4,
         minimum_credit -> Int4,
         name -> Nullable<Varchar>,
@@ -10,30 +10,38 @@ table! {
 }
 
 table! {
-    authentication_barcode (account, code) {
-        account -> Varchar,
+    authentication_barcode (account_id, code) {
+        account_id -> Uuid,
         code -> Varchar,
     }
 }
 
 table! {
-    authentication_password (account, username) {
-        account -> Varchar,
+    authentication_password (account_id) {
+        account_id -> Uuid,
         username -> Varchar,
         password -> Varchar,
     }
 }
 
 table! {
+    authentication_password_invitation (account_id) {
+        account_id -> Uuid,
+        link -> Varchar,
+        valid_until -> Timestamp,
+    }
+}
+
+table! {
     category (id) {
-        id -> Varchar,
+        id -> Uuid,
         name -> Varchar,
     }
 }
 
 table! {
-    category_price (category, validity_start) {
-        category -> Varchar,
+    category_price (category_id, validity_start) {
+        category_id -> Uuid,
         validity_start -> Timestamp,
         value -> Int4,
     }
@@ -41,16 +49,16 @@ table! {
 
 table! {
     product (id) {
-        id -> Varchar,
+        id -> Uuid,
         name -> Varchar,
-        category -> Nullable<Varchar>,
+        category -> Nullable<Uuid>,
         image -> Nullable<Varchar>,
     }
 }
 
 table! {
-    product_price (product, validity_start) {
-        product -> Varchar,
+    product_price (product_id, validity_start) {
+        product_id -> Uuid,
         validity_start -> Timestamp,
         value -> Int4,
     }
@@ -58,26 +66,26 @@ table! {
 
 table! {
     session (id) {
-        id -> Varchar,
-        account_id -> Varchar,
+        id -> Uuid,
+        account_id -> Uuid,
         valid_until -> Timestamp,
     }
 }
 
 table! {
     transaction (id) {
-        id -> Varchar,
-        account -> Varchar,
-        cashier -> Nullable<Varchar>,
+        id -> Uuid,
+        account_id -> Uuid,
+        cashier_id -> Nullable<Uuid>,
         total -> Int4,
         date -> Timestamp,
     }
 }
 
 table! {
-    transaction_product (transaction, product) {
-        transaction -> Varchar,
-        product -> Varchar,
+    transaction_product (transaction, product_id) {
+        transaction -> Uuid,
+        product_id -> Uuid,
         amount -> Int4,
     }
 }
@@ -86,6 +94,7 @@ allow_tables_to_appear_in_same_query!(
     account,
     authentication_barcode,
     authentication_password,
+    authentication_password_invitation,
     category,
     category_price,
     product,

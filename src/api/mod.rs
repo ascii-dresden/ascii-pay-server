@@ -5,9 +5,7 @@ pub  static ref SECRET_KEY: String = std::env::var("SECRET_KEY").unwrap_or_else(
 }
 
 pub fn init(config: &mut web::ServiceConfig) {
-    let domain = std::env::var("DOMAIN").unwrap_or_else(|_| "localhost".to_string());
+    let _domain = std::env::var("DOMAIN").unwrap_or_else(|_| "localhost".to_string());
     // TODO: Implement API
-    config.service(
-        web::scope("/api/v1")
-    );
+    config.service(web::scope("/api/v1"));
 }

@@ -10,6 +10,8 @@ use handlebars::Handlebars;
 use std::collections::HashMap;
 use std::io::Write;
 
+use uuid::Uuid;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FormProduct {
     pub id: String,
@@ -70,7 +72,7 @@ pub async fn get_product_edit(
 
     let conn = &pool.get()?;
 
-    let product = Product::get(&conn, &product_id)?;
+    let product = Product::get(&conn, &Uuid::parse_str(&product_id)?)?;
 
     let all_categories = Category::all(&conn)?;
 
@@ -101,12 +103,12 @@ pub async fn post_product_edit(
 
     let conn = &pool.get()?;
 
-    let mut server_product = Product::get(&conn, &product_id)?;
+    let mut server_product = Product::get(&conn, &Uuid::parse_str(&product_id)?)?;
 
     let category = if product.category == "" {
         None
     } else {
-        Some(Category::get(&conn, &product.category)?)
+        Some(Category::get(&conn, &Uuid::parse_str(&product.category)?)?)
     };
 
     server_product.name = product.name.clone();
@@ -172,7 +174,7 @@ pub async fn post_product_create(
     let category = if product.category == "" {
         None
     } else {
-        Some(Category::get(&conn, &product.category)?)
+        Some(Category::get(&conn, &Uuid::parse_str(&product.category)?)?)
     };
 
     let mut server_product = Product::create(&conn, &product.name, category)?;
@@ -218,7 +220,7 @@ pub async fn get_product_remove_image(
 
     let conn = &pool.get()?;
 
-    let mut product = Product::get(&conn, &product_id)?;
+    let mut product = Product::get(&conn, &Uuid::parse_str(&product_id)?)?;
 
     product.remove_image(&conn)?;
 
@@ -237,7 +239,7 @@ pub async fn post_product_upload_image(
     logged_account.require_member()?;
 
     let conn = &pool.get()?;
-    let mut product = Product::get(&conn, &product_id)?;
+    let mut product = Product::get(&conn, &Uuid::parse_str(&product_id)?)?;
     let location = format!("/product/{}", &product_id);
 
     save_file(multipart, &conn, &mut product).await?;

@@ -2,6 +2,7 @@ use chrono::{NaiveDateTime, Utc};
 use diesel::prelude::*;
 use std::fs::{self, File};
 use std::path::Path;
+use uuid::Uuid;
 
 use crate::core::{
     generate_uuid, Category, DbConnection, Money, Price, Searchable, ServiceError, ServiceResult,
@@ -17,7 +18,7 @@ pub static ref IMAGE_PATH: String = std::env::var("IMAGE_PATH")
 /// Represent a product
 #[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone)]
 pub struct Product {
-    pub id: String,
+    pub id: Uuid,
     pub name: String,
     pub category: Option<Category>,
     pub image: Option<String>,
@@ -32,15 +33,15 @@ pub struct Product {
 impl
     diesel::Queryable<
         (
+            diesel::sql_types::Uuid,
             diesel::sql_types::Text,
-            diesel::sql_types::Text,
-            diesel::sql_types::Nullable<diesel::sql_types::Text>,
+            diesel::sql_types::Nullable<diesel::sql_types::Uuid>,
             diesel::sql_types::Nullable<diesel::sql_types::Text>,
         ),
         DB,
     > for Product
 {
-    type Row = (String, String, Option<String>, Option<String>);
+    type Row = (Uuid, String, Option<Uuid>, Option<String>);
 
     fn build(row: Self::Row) -> Self {
         let category = match row.2 {
@@ -134,7 +135,7 @@ impl Product {
 
         diesel::insert_into(dsl::product_price)
             .values((
-                dsl::product.eq(&self.id),
+                dsl::product_id.eq(&self.id),
                 dsl::validity_start.eq(&p.validity_start),
                 dsl::value.eq(&p.value),
             ))
@@ -167,7 +168,7 @@ impl Product {
 
         diesel::delete(
             dsl::product_price.filter(
-                dsl::product
+                dsl::product_id
                     .eq(&self.id)
                     .and(dsl::validity_start.eq(validity_start)),
             ),
@@ -197,7 +198,7 @@ impl Product {
         use crate::core::schema::product_price::dsl;
 
         let results = dsl::product_price
-            .filter(dsl::product.eq(&self.id))
+            .filter(dsl::product_id.eq(&self.id))
             .load::<Price>(conn)?;
 
         self.prices = results;
@@ -280,7 +281,7 @@ impl Product {
     }
 
     /// Get a product by the `id`
-    pub fn get(conn: &DbConnection, id: &str) -> ServiceResult<Product> {
+    pub fn get(conn: &DbConnection, id: &Uuid) -> ServiceResult<Product> {
         use crate::core::schema::product::dsl;
 
         let mut results = dsl::product.filter(dsl::id.eq(id)).load::<Product>(conn)?;

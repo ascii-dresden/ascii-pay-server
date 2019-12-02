@@ -2,6 +2,7 @@ use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use uuid::Uuid;
 
 use crate::core::schema::transaction;
 use crate::core::{
@@ -12,9 +13,9 @@ use crate::core::{
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset, Serialize, Deserialize, Clone)]
 #[table_name = "transaction"]
 pub struct Transaction {
-    pub id: String,
-    pub account: String,
-    pub cashier: Option<String>,
+    pub id: Uuid,
+    pub account_id: Uuid,
+    pub cashier_id: Option<Uuid>,
     pub total: Money,
     pub date: NaiveDateTime,
 }
@@ -62,8 +63,8 @@ pub fn execute(
 
         let a = Transaction {
             id: generate_uuid(),
-            account: account.id.clone(),
-            cashier: cashier.map(|c| c.id.clone()),
+            account_id: account.id.clone(),
+            cashier_id: cashier.map(|c| c.id.clone()),
             total,
             date: chrono::Local::now().naive_local(),
         };
@@ -97,8 +98,8 @@ pub fn get_by_account(
 
     let results = dsl::transaction
         .filter(
-            dsl::account
-                .eq(account.id.to_string())
+            dsl::account_id
+                .eq(&account.id)
                 .and(dsl::date.between(from, to)),
         )
         .order(dsl::date.desc())
@@ -125,7 +126,7 @@ fn validate_account(
 
         let result = dsl::transaction
             .select(diesel::dsl::sum(dsl::total))
-            .filter(dsl::account.eq(account.id.to_string()))
+            .filter(dsl::account_id.eq(&account.id))
             .first::<Option<i64>>(conn)?;
 
         if let Some(sum) = result {
@@ -173,7 +174,7 @@ impl Transaction {
             diesel::insert_into(dsl::transaction_product)
                 .values((
                     dsl::transaction.eq(&self.id),
-                    dsl::product.eq(&product.id),
+                    dsl::product_id.eq(&product.id),
                     dsl::amount.eq(amount),
                 ))
                 .execute(conn)?;
@@ -188,7 +189,7 @@ impl Transaction {
 
         let results = dsl::transaction_product
             .filter(dsl::transaction.eq(&self.id))
-            .load::<(String, String, i32)>(conn)?;
+            .load::<(Uuid, Uuid, i32)>(conn)?;
 
         let mut map = HashMap::new();
 

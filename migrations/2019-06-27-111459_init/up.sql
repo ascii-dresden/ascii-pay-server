@@ -1,5 +1,5 @@
 CREATE TABLE "account" (
-  "id" VARCHAR(100) PRIMARY KEY NOT NULL,
+  "id" UUID PRIMARY KEY NOT NULL,
   "credit" INT DEFAULT 0 NOT NULL,
   "minimum_credit" INT DEFAULT 0 NOT NULL,
   "name" VARCHAR(64),
@@ -8,61 +8,66 @@ CREATE TABLE "account" (
 );
 
 CREATE TABLE "authentication_barcode" (
-  "account" VARCHAR(100) NOT NULL,
+  "account_id" UUID NOT NULL,
   "code" VARCHAR UNIQUE NOT NULL,
-  PRIMARY KEY ("account", "code")
+  PRIMARY KEY ("account_id", "code")
 );
 
 CREATE TABLE "authentication_password" (
-  "account" VARCHAR(100) NOT NULL,
+  "account_id" UUID PRIMARY KEY NOT NULL,
   "username" VARCHAR UNIQUE NOT NULL,
-  "password" VARCHAR NOT NULL,
-  PRIMARY KEY ("account", "username")
+  "password" VARCHAR NOT NULL
+);
+
+CREATE TABLE "authentication_password_invitation" (
+  "account_id" UUID PRIMARY KEY NOT NULL,
+  "link" VARCHAR(100) UNIQUE NOT NULL,
+  "valid_until" TIMESTAMP NOT NULL
 );
 
 CREATE TABLE "transaction" (
-  "id" VARCHAR(100) PRIMARY KEY NOT NULL,
-  "account" VARCHAR(100) NOT NULL,
-  "cashier" VARCHAR(100),
+  "id" UUID PRIMARY KEY NOT NULL,
+  "account_id" UUID NOT NULL,
+  "cashier_id" UUID,
   "total" INT NOT NULL,
   "date" TIMESTAMP NOT NULL
 );
 
 CREATE TABLE "category" (
-  "id" VARCHAR(100) PRIMARY KEY NOT NULL,
+  "id" UUID PRIMARY KEY NOT NULL,
   "name" VARCHAR(64) NOT NULL
 );
 
 CREATE TABLE "category_price" (
-  "category" VARCHAR(100) NOT NULL,
+  "category_id" UUID NOT NULL,
   "validity_start" TIMESTAMP NOT NULL,
   "value" INT NOT NULL,
-  PRIMARY KEY ("category", "validity_start")
+  PRIMARY KEY ("category_id", "validity_start")
 );
 
 CREATE TABLE "product" (
-  "id" VARCHAR(100) PRIMARY KEY NOT NULL,
+  "id" UUID PRIMARY KEY NOT NULL,
   "name" VARCHAR(64) NOT NULL,
-  "category" VARCHAR(100),
-  "image" VARCHAR(100)
+  "category" UUID,
+  "image" VARCHAR(105)
 );
 
 CREATE TABLE "product_price" (
-  "product" VARCHAR(100) NOT NULL,
+  "product_id" UUID NOT NULL,
   "validity_start" TIMESTAMP NOT NULL,
   "value" INT NOT NULL,
-  PRIMARY KEY ("product", "validity_start")
+  PRIMARY KEY ("product_id", "validity_start")
 );
 
 CREATE TABLE "transaction_product" (
-  "transaction" VARCHAR(100) NOT NULL,
-  "product" VARCHAR(100) NOT NULL,
+  "transaction" UUID NOT NULL,
+  "product_id" UUID NOT NULL,
   "amount" INT NOT NULL,
-  PRIMARY KEY ("transaction", "product")
+  PRIMARY KEY ("transaction", "product_id")
 );
 
 CREATE TABLE "session" (
-  "id" VARCHAR(100) PRIMARY KEY NOT NULL,
-  "account_id" VARCHAR(100) NOT NULL,
+  "id" UUID PRIMARY KEY NOT NULL,
+  "account_id" UUID NOT NULL,
   "valid_until" TIMESTAMP NOT NULL
 );

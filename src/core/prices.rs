@@ -1,4 +1,5 @@
 use chrono::NaiveDateTime;
+use uuid::Uuid;
 
 use crate::core::{Money, DB};
 
@@ -57,14 +58,14 @@ pub mod naive_date_time_serializer {
 impl
     diesel::Queryable<
         (
-            diesel::sql_types::Text,
+            diesel::sql_types::Uuid,
             diesel::sql_types::Timestamp,
             diesel::sql_types::Integer,
         ),
         DB,
     > for Price
 {
-    type Row = (String, NaiveDateTime, Money);
+    type Row = (Uuid, NaiveDateTime, Money);
 
     fn build(row: Self::Row) -> Self {
         Price {

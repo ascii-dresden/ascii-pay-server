@@ -15,8 +15,12 @@ pub type DbConnection = PgConnection;
 pub type Pool = r2d2::Pool<ConnectionManager<DbConnection>>;
 
 /// Generate a new random uuid
-pub fn generate_uuid() -> String {
+pub fn generate_uuid() -> Uuid {
     Uuid::new_v4()
+}
+
+pub fn generate_uuid_str() -> String {
+    generate_uuid()
         .to_hyphenated()
         .encode_upper(&mut Uuid::encode_buffer())
         .to_string()

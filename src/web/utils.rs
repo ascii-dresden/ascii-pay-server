@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use actix_web::web::HttpRequest;
 use actix_web::http::header::COOKIE;
+use actix_web::web::HttpRequest;
+use handlebars::{Handlebars, RenderError};
 use serde::ser::Serialize;
 use serde_json::value::Value;
-use handlebars::{Handlebars, RenderError};
 
 use crate::core::Account;
 use crate::web::identity_policy::LoggedAccount;
@@ -49,7 +49,7 @@ pub struct HbData {
     theme: String,
     logged_account: Option<Account>,
     #[serde(flatten)]
-    extra: HashMap<String, Value>
+    extra: HashMap<String, Value>,
 }
 
 impl HbData {
@@ -65,7 +65,7 @@ impl HbData {
         HbData {
             theme: theme.to_owned(),
             logged_account: None,
-            extra: HashMap::new()
+            extra: HashMap::new(),
         }
     }
 
@@ -75,7 +75,9 @@ impl HbData {
     }
 
     pub fn with_data<T>(mut self, key: &str, value: &T) -> Self
-    where T: Serialize {
+    where
+        T: Serialize,
+    {
         self.extra.insert(key.to_owned(), json!(value));
         self
     }

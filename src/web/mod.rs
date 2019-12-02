@@ -29,6 +29,11 @@ pub fn init(config: &mut web::ServiceConfig) {
                     .route(web::get().to(index::get_login)),
             )
             .service(web::resource("/logout").route(web::get().to(index::get_logout)))
+            .service(
+                web::resource("/register/{invitation_id}")
+                    .route(web::post().to(index::post_register))
+                    .route(web::get().to(index::get_register)),
+            )
             // Setup account mangement related routes
             .service(web::resource("/accounts").route(web::get().to(accounts::get_accounts)))
             .service(
@@ -39,6 +44,14 @@ pub fn init(config: &mut web::ServiceConfig) {
             .service(
                 web::resource("/account/delete/{account_id}")
                     .route(web::get().to(accounts::delete_get)),
+            )
+            .service(
+                web::resource("/account/invite/{account_id}")
+                    .route(web::get().to(accounts::invite_get)),
+            )
+            .service(
+                web::resource("/account/revoke/{account_id}")
+                    .route(web::get().to(accounts::revoke_get)),
             )
             .service(
                 web::resource("/account/{account_id}")

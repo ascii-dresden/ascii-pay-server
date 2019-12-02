@@ -1,5 +1,6 @@
 use chrono::{NaiveDateTime, Utc};
 use diesel::prelude::*;
+use uuid::Uuid;
 
 use crate::core::{
     generate_uuid, DbConnection, Money, Price, Searchable, ServiceError, ServiceResult, DB,
@@ -14,7 +15,7 @@ pub static ref IMAGE_PATH: String = std::env::var("IMAGE_PATH")
 /// Represent a category
 #[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone)]
 pub struct Category {
-    pub id: String,
+    pub id: Uuid,
     #[serde(default = "std::string::String::new")]
     pub name: String,
     #[serde(default = "std::vec::Vec::new")]
@@ -25,8 +26,8 @@ pub struct Category {
 /// Custom db loader for `Category`
 ///
 /// Ignore price vec
-impl diesel::Queryable<(diesel::sql_types::Text, diesel::sql_types::Text), DB> for Category {
-    type Row = (String, String);
+impl diesel::Queryable<(diesel::sql_types::Uuid, diesel::sql_types::Text), DB> for Category {
+    type Row = (Uuid, String);
 
     fn build(row: Self::Row) -> Self {
         Category {
@@ -88,7 +89,7 @@ impl Category {
 
         diesel::insert_into(dsl::category_price)
             .values((
-                dsl::category.eq(&self.id),
+                dsl::category_id.eq(&self.id),
                 dsl::validity_start.eq(&p.validity_start),
                 dsl::value.eq(&p.value),
             ))
@@ -121,7 +122,7 @@ impl Category {
 
         diesel::delete(
             dsl::category_price.filter(
-                dsl::category
+                dsl::category_id
                     .eq(&self.id)
                     .and(dsl::validity_start.eq(validity_start)),
             ),
@@ -142,7 +143,7 @@ impl Category {
         use crate::core::schema::category_price::dsl;
 
         let results = dsl::category_price
-            .filter(dsl::category.eq(&self.id))
+            .filter(dsl::category_id.eq(&self.id))
             .load::<Price>(conn)?;
 
         self.prices = results;
@@ -184,7 +185,7 @@ impl Category {
     }
 
     /// Get a category by the `id`
-    pub fn get(conn: &DbConnection, id: &str) -> ServiceResult<Category> {
+    pub fn get(conn: &DbConnection, id: &Uuid) -> ServiceResult<Category> {
         use crate::core::schema::category::dsl;
 
         let mut results = dsl::category

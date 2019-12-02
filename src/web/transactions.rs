@@ -1,10 +1,12 @@
-use actix_web::{http, web, HttpResponse, HttpRequest};
+use actix_web::{http, web, HttpRequest, HttpResponse};
 use chrono::{Duration, Local, NaiveDateTime};
 use handlebars::Handlebars;
 
 use crate::core::{transactions, Account, Money, Pool, ServiceResult};
 use crate::web::identity_policy::LoggedAccount;
 use crate::web::utils::HbData;
+
+use uuid::Uuid;
 
 /// Helper to deserialize from-to queries
 #[derive(Deserialize, Serialize)]
@@ -40,7 +42,7 @@ pub async fn get_transactions(
 
     let conn = &pool.get()?;
 
-    let account = Account::get(&conn, &account_id)?;
+    let account = Account::get(&conn, &Uuid::parse_str(&account_id)?)?;
 
     let now = Local::now().naive_local();
 
@@ -55,10 +57,13 @@ pub async fn get_transactions(
 
     let body = HbData::new(&request)
         .with_account(logged_account)
-        .with_data("date", &FromToQuery {
-            from: Some(from),
-            to: Some(to)
-        })
+        .with_data(
+            "date",
+            &FromToQuery {
+                from: Some(from),
+                to: Some(to),
+            },
+        )
         .with_data("account", &account)
         .with_data("transactions", &list)
         .render(&hb, "transaction_list")?;
@@ -78,7 +83,7 @@ pub async fn post_execute_transaction(
     if execute_form.total != 0.0 {
         let conn = &pool.get()?;
 
-        let mut account = Account::get(&conn, &account_id)?;
+        let mut account = Account::get(&conn, &Uuid::parse_str(&account_id)?)?;
 
         transactions::execute(
             &conn,

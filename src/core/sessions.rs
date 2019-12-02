@@ -1,5 +1,6 @@
 use chrono::{Duration, Local, NaiveDateTime};
 use diesel::prelude::*;
+use uuid::Uuid;
 
 use crate::core::schema::session;
 use crate::core::{generate_uuid, DbConnection, ServiceError, ServiceResult};
@@ -23,21 +24,21 @@ const VALIDITY_MINUTES: i64 = 10;
 )]
 #[table_name = "session"]
 pub struct Session {
-    pub id: String,
-    pub account_id: String,
+    pub id: Uuid,
+    pub account_id: Uuid,
     pub valid_until: NaiveDateTime,
 }
 
 impl Session {
     /// Create a new session
-    pub fn create(conn: &DbConnection, account_id: &str) -> ServiceResult<Session> {
+    pub fn create(conn: &DbConnection, account_id: &Uuid) -> ServiceResult<Session> {
         use crate::core::schema::session::dsl;
 
         Session::cleanup(&conn)?;
 
         let a = Session {
             id: generate_uuid(),
-            account_id: account_id.to_owned(),
+            account_id: account_id.clone(),
             valid_until: Local::now().naive_local() + Duration::minutes(VALIDITY_MINUTES),
         };
 
@@ -64,7 +65,7 @@ impl Session {
     }
 
     /// Get an session by the `id`
-    pub fn get(conn: &DbConnection, id: &str) -> ServiceResult<Session> {
+    pub fn get(conn: &DbConnection, id: &Uuid) -> ServiceResult<Session> {
         use crate::core::schema::session::dsl;
 
         let mut results = dsl::session.filter(dsl::id.eq(id)).load::<Session>(conn)?;

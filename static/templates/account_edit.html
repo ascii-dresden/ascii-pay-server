@@ -7,7 +7,14 @@
     <div class="container grid-lg">
         {{> _navigation active="accounts" }}
 
-        <h1>Edit account</h1>
+        <div class="columns">
+            <div class="column col-6 col-sm-12">
+                <h1>Edit account</h1>
+            </div>
+            <div class="column col-auto col-ml-auto">
+                <a class="btn" href="/account/create">Create account</a>
+            </div>
+        </div>
 
         <form class="form-horizontal" method="POST">
             <input type="hidden" name="id" value="{{account.id}}" readonly/>
@@ -59,6 +66,40 @@
                         <option value="MEMBER" {{#if (eq account.permission "MEMBER")}}selected="selected"{{/if}}>Member</option>
                         <option value="ADMIN" {{#if (eq account.permission "ADMIN")}}selected="selected"{{/if}}>Admin</option>
                     </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label">Authentication</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Method</th>
+                                <th>Display</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{#each authentication_methods}}
+                            <tr>
+                                <td>
+                                    <span>{{name}}</span>
+                                </td>
+                                <td>
+                                    {{#if display}}
+                                    {{#if (eq display.0 "LINK")}}<a href="{{display.1}}">{{display.1}}</a>{{/if}}
+                                    {{#if (eq display.0 "TEXT")}}<input class="form-input" type="text" value="{{display.1}}" readonly />{{/if}}
+                                    {{/if}}
+                                </td>
+                                <td>
+                                    {{#if action}}<a class="form-btn" href="{{action.1}}">{{this.action.0}}</a>{{/if}}
+                                </td>
+                            </tr>
+                            {{/each}}
+                        </tbody>
+                    </table>
                 </div>
             </div>
             <div class="columns">

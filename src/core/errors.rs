@@ -1,5 +1,5 @@
-use actix_web::{error::ResponseError, Error as ActixError, HttpResponse};
 use actix_multipart::MultipartError;
+use actix_web::{error::ResponseError, Error as ActixError, HttpResponse};
 use derive_more::Display;
 
 pub const AUTH_COOKIE_NAME: &str = "auth";

@@ -1,10 +1,12 @@
-use actix_web::{http, web, HttpResponse, HttpRequest};
+use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
 use std::collections::HashMap;
 
 use crate::core::{Category, Money, Pool, Searchable, ServiceError, ServiceResult};
 use crate::web::identity_policy::LoggedAccount;
-use crate::web::utils::{Search, HbData};
+use crate::web::utils::{HbData, Search};
+
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FormCategory {
@@ -65,7 +67,7 @@ pub async fn get_category_edit(
 
     let conn = &pool.get()?;
 
-    let category = Category::get(&conn, &category_id)?;
+    let category = Category::get(&conn, &Uuid::parse_str(&category_id)?)?;
 
     let body = HbData::new(&request)
         .with_account(logged_account)
@@ -93,7 +95,7 @@ pub async fn post_category_edit(
 
     let conn = &pool.get()?;
 
-    let mut server_category = Category::get(&conn, &category_id)?;
+    let mut server_category = Category::get(&conn, &Uuid::parse_str(&category_id)?)?;
 
     server_category.name = category.name.clone();
 

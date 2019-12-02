@@ -7,7 +7,14 @@
     <div class="container grid-lg">
         {{> _navigation active="products" }}
 
-        <h1>Edit product</h1>
+        <div class="columns">
+            <div class="column col-6 col-sm-12">
+                <h1>Edit product</h1>
+            </div>
+            <div class="column col-auto col-ml-auto">
+                <a class="btn" href="/product/create">Create product</a>
+            </div>
+        </div>
 
         <form class="form-horizontal" method="POST">
             <input type="hidden" name="id" value="{{product.id}}" readonly/>
