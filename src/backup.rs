@@ -1,5 +1,5 @@
 use crate::core::{
-    transactions, Account, Category, DbConnection, Pool, Product, ServiceResult, Transaction
+    transactions, Account, Category, DbConnection, Pool, Product, ServiceResult, Transaction,
 };
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
@@ -164,7 +164,7 @@ pub fn import(pool: &Pool, src: &str) -> ServiceResult<()> {
             account,
             cashier.as_ref(),
             backup_transaction.transaction.total,
-            backup_transaction.transaction.date
+            backup_transaction.transaction.date,
         )?;
 
         let transaction_products: HashMap<Product, i32> = backup_transaction

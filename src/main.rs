@@ -105,18 +105,17 @@ fn read_value(prompt: &str, hide_input: bool) -> String {
 /// Check if a initial user exists. Otherwise create a new one
 fn check_admin(pool: &Pool) -> ServiceResult<()> {
     let conn = &pool.get().unwrap();
-    if Account::all(&conn)
-        .unwrap()
+
+    let admin_with_password_exists = Account::all(&conn)?
         .iter()
         .filter(|a| a.permission.is_admin())
-        .map(|a| {
+        .any(|a| {
             !authentication_password::get_usernames(&conn, a)
-                .unwrap()
+                .unwrap_or_else(|_| vec![])
                 .is_empty()
-        })
-        .find(|has_usernames| *has_usernames)
-        .is_none()
-    {
+        });
+
+    if !admin_with_password_exists {
         let fullname = read_value("Fullname: ", false);
         let username = read_value("Username: ", false);
         let password = read_value("Password: ", true);

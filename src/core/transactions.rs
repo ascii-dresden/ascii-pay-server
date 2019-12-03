@@ -91,7 +91,7 @@ pub fn import(
     account: &mut Account,
     cashier: Option<&Account>,
     total: Money,
-    date: NaiveDateTime
+    date: NaiveDateTime,
 ) -> ServiceResult<Transaction> {
     use crate::core::schema::transaction::dsl;
 
@@ -106,7 +106,7 @@ pub fn import(
             account_id: account.id,
             cashier_id: cashier.map(|c| c.id),
             total,
-            date: chrono::Local::now().naive_local(),
+            date,
         };
         account.credit = new_credit;
 
