@@ -4,15 +4,20 @@ extern crate diesel;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+extern crate clap;
+extern crate flate2;
 extern crate handlebars;
 extern crate rpassword;
+extern crate tar;
 extern crate uuid;
 
+use clap::{App, Arg};
 use diesel::r2d2::{self, ConnectionManager};
 
 use std::io::{stdin, stdout, Write};
 
 mod api;
+mod backup;
 mod core;
 mod server;
 mod web;
@@ -35,8 +40,35 @@ fn main() -> ServiceResult<()> {
         .build(manager)
         .expect("Failed to create pool.");
 
+    let matches = App::new("ascii-prepaid-system")
+        .version("1.0")
+        .author("Lars Westermann <lars-westermann@live.de>")
+        .author("Felix Wittwer <dev@felixwittwer.de>")
+        .arg(
+            Arg::with_name("export")
+                .long("export")
+                .value_name("FILE")
+                .help("Exports the database to the given file")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("import")
+                .long("import")
+                .value_name("FILE")
+                .help("Import the given file to the database")
+                .takes_value(true),
+        )
+        .get_matches();
+
+    if let Some(export_file) = matches.value_of("export") {
+        return backup::export(&pool, export_file);
+    }
+    if let Some(import_file) = matches.value_of("import") {
+        return backup::import(&pool, import_file);
+    }
+
     // Check if admin exists, create otherwise
-    check_admin(&pool);
+    check_admin(&pool)?;
 
     // Setup web server
     start_server(pool)?;
@@ -71,21 +103,29 @@ fn read_value(prompt: &str, hide_input: bool) -> String {
 }
 
 /// Check if a initial user exists. Otherwise create a new one
-fn check_admin(pool: &Pool) {
+fn check_admin(pool: &Pool) -> ServiceResult<()> {
     let conn = &pool.get().unwrap();
     if Account::all(&conn)
         .unwrap()
         .iter()
-        .find(|a| a.permission.is_admin())
+        .filter(|a| a.permission.is_admin())
+        .map(|a| {
+            !authentication_password::get_usernames(&conn, a)
+                .unwrap()
+                .is_empty()
+        })
+        .find(|has_usernames| *has_usernames)
         .is_none()
     {
         let fullname = read_value("Fullname: ", false);
         let username = read_value("Username: ", false);
         let password = read_value("Password: ", true);
 
-        let mut account = Account::create(&conn, Permission::ADMIN).unwrap();
+        let mut account = Account::create(&conn, Permission::ADMIN)?;
         account.name = Some(fullname);
-        account.update(&conn).unwrap();
-        authentication_password::register(&conn, &account, &username, &password).unwrap();
+        account.update(&conn)?;
+        authentication_password::register(&conn, &account, &username, &password)?;
     }
+
+    Ok(())
 }

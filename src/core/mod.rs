@@ -18,4 +18,5 @@ pub use crate::core::errors::*;
 pub use crate::core::prices::*;
 pub use crate::core::products::*;
 pub use crate::core::sessions::Session;
+pub use crate::core::transactions::Transaction;
 pub use crate::core::utils::*;

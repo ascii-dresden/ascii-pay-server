@@ -63,8 +63,48 @@ pub fn execute(
 
         let a = Transaction {
             id: generate_uuid(),
-            account_id: account.id.clone(),
-            cashier_id: cashier.map(|c| c.id.clone()),
+            account_id: account.id,
+            cashier_id: cashier.map(|c| c.id),
+            total,
+            date: chrono::Local::now().naive_local(),
+        };
+        account.credit = new_credit;
+
+        diesel::insert_into(dsl::transaction)
+            .values(&a)
+            .execute(conn)?;
+
+        account.update(conn)?;
+
+        Ok(a)
+    });
+
+    if result.is_ok() {
+        account.credit = new_credit;
+    }
+
+    result
+}
+
+pub fn import(
+    conn: &DbConnection,
+    account: &mut Account,
+    cashier: Option<&Account>,
+    total: Money,
+    date: NaiveDateTime
+) -> ServiceResult<Transaction> {
+    use crate::core::schema::transaction::dsl;
+
+    let mut new_credit = account.credit;
+
+    let result = conn.build_transaction().serializable().run(|| {
+        let mut account = Account::get(conn, &account.id)?;
+        new_credit = account.credit + total;
+
+        let a = Transaction {
+            id: generate_uuid(),
+            account_id: account.id,
+            cashier_id: cashier.map(|c| c.id),
             total,
             date: chrono::Local::now().naive_local(),
         };
@@ -199,5 +239,15 @@ impl Transaction {
         }
 
         Ok(map)
+    }
+
+    pub fn all(conn: &DbConnection) -> ServiceResult<Vec<Transaction>> {
+        use crate::core::schema::transaction::dsl;
+
+        let results = dsl::transaction
+            .order(dsl::date.desc())
+            .load::<Transaction>(conn)?;
+
+        Ok(results)
     }
 }

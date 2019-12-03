@@ -102,7 +102,7 @@ pub async fn get_account_edit(
             )),
         });
     }
-    if authentication_methods.len() == 0 {
+    if authentication_methods.is_empty() {
         authentication_methods.push(AuthenticationMethod {
             name: "Password".to_owned(),
             display: None,
@@ -188,7 +188,10 @@ pub async fn post_account_create(
     server_account.update(&conn)?;
 
     Ok(HttpResponse::Found()
-        .header(http::header::LOCATION, "/accounts")
+        .header(
+            http::header::LOCATION,
+            format!("/account/{}", server_account.id),
+        )
         .finish())
 }
 

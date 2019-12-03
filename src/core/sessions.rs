@@ -38,7 +38,7 @@ impl Session {
 
         let a = Session {
             id: generate_uuid(),
-            account_id: account_id.clone(),
+            account_id: *account_id,
             valid_until: Local::now().naive_local() + Duration::minutes(VALIDITY_MINUTES),
         };
 

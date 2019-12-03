@@ -293,6 +293,42 @@ impl Product {
 
         Ok(p)
     }
+
+    pub fn import(
+        conn: &DbConnection,
+        template: &Product,
+        category: Option<Category>,
+    ) -> ServiceResult<Product> {
+        use crate::core::schema::product::dsl;
+
+        let category_id = match category.as_ref() {
+            Some(category) => Some(category.id.to_owned()),
+            None => None,
+        };
+
+        let mut p = Product {
+            id: generate_uuid(),
+            name: template.name.to_owned(),
+            category,
+            image: template.image.clone(),
+            prices: vec![],
+            current_price: None,
+        };
+
+        diesel::insert_into(dsl::product)
+            .values((
+                dsl::id.eq(&p.id),
+                dsl::name.eq(&p.name),
+                dsl::category.eq(&category_id),
+            ))
+            .execute(conn)?;
+
+        for price in &template.prices {
+            p.add_price(&conn, price.validity_start, price.value)?;
+        }
+
+        Ok(p)
+    }
 }
 
 impl Searchable for Product {

@@ -29,7 +29,7 @@ pub fn create_invitation_link(conn: &DbConnection, account: &Account) -> Service
     use crate::core::schema::authentication_password_invitation::dsl;
 
     let a = InvitationLink {
-        account_id: account.id.clone(),
+        account_id: account.id,
         link: generate_uuid_str(),
         valid_until: Utc::now().naive_utc() + Duration::days(1),
     };
@@ -94,7 +94,7 @@ pub fn register(
     use crate::core::schema::authentication_password::dsl;
 
     let a = AuthenticationPassword {
-        account_id: account.id.clone(),
+        account_id: account.id,
         username: username.into(),
         password: hash_password(password)?,
     };

@@ -1,30 +1,33 @@
 [package]
-name = 'ascii-prepaid-system'
-version = '0.1.0'
-authors = ['Lars Westermann <lars-westermann@live.de>', 'Felix Wittwer <dev@felixwittwer.de>']
-edition = '2018'
-build = 'build.rs'
+name = "ascii-prepaid-system"
+version = "0.1.0"
+authors = ["Lars Westermann <lars-westermann@live.de>", "Felix Wittwer <dev@felixwittwer.de>"]
+edition = "2018"
+build = "build.rs"
 
 [dependencies]
-actix-identity = '0.2.0-alpha.1'
-actix-web = '2.0.0-alpha.1'
-actix-files = '0.2.0-alpha.1'
-actix-multipart = '0.2.0-alpha.1'
-handlebars = '2.0'
-argonautica = '0.2'
-chrono = {version = '0.4', features = ['serde']}
-derive_more = '0.15'
-diesel = {version = '1.4', features = ['postgres','uuidv07', 'r2d2', 'chrono']}
-dotenv = '0.14'
-env_logger = '0.6'
-futures = '0.3'
-r2d2 = '0.8'
-lazy_static = '1.3'
-serde = '1.0'
-serde_derive = '1.0'
-serde_json = '1.0'
-uuid = {version = '0.7', features = ['serde', 'v4']}
-rpassword = '3.0'
+actix-identity = "0.2.0-alpha.1"
+actix-web = "2.0.0-alpha.1"
+actix-files = "0.2.0-alpha.1"
+actix-multipart = "0.2.0-alpha.1"
+handlebars = "2.0"
+argonautica = "0.2"
+chrono = {version = "0.4", features = ["serde"]}
+derive_more = "0.15"
+diesel = {version = "1.4", features = ["postgres","uuidv07", "r2d2", "chrono"]}
+dotenv = "0.14"
+env_logger = "0.6"
+futures = "0.3"
+r2d2 = "0.8"
+lazy_static = "1.3"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+uuid = {version = "0.7", features = ["serde", "v4"]}
+rpassword = "3.0"
+flate2 = "1.0"
+tar = "0.4"
+clap = "2.33"
 
 [build-dependencies]
-sass-rs = '0.2'
+sass-rs = "0.2"

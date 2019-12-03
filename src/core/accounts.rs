@@ -148,6 +148,23 @@ impl Account {
 
         Ok(a)
     }
+
+    pub fn import(conn: &DbConnection, template: &Account) -> ServiceResult<Account> {
+        use crate::core::schema::account::dsl;
+
+        let a = Account {
+            id: generate_uuid(),
+            credit: 0,
+            minimum_credit: template.minimum_credit,
+            name: template.name.to_owned(),
+            mail: template.mail.to_owned(),
+            permission: template.permission,
+        };
+
+        diesel::insert_into(dsl::account).values(&a).execute(conn)?;
+
+        Ok(a)
+    }
 }
 
 impl Searchable for Account {
