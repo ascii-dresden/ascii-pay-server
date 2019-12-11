@@ -1,6 +1,6 @@
 use crate::core::{Category, Money, Pool, Searchable, ServiceError, ServiceResult};
 use crate::login_required;
-use crate::web::identity_policy::LoggedAccount;
+use crate::web::identity_policy::{LoggedAccount, RetrievedAccount};
 use crate::web::utils::{HbData, Search};
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
@@ -23,12 +23,12 @@ pub struct FormCategory {
 /// GET route for `/categories`
 pub async fn get_categories(
     hb: web::Data<Handlebars>,
-    logged_account: LoggedAccount,
+    logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
     query: web::Query<Search>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    let logged_account = login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -57,12 +57,12 @@ pub async fn get_categories(
 /// GET route for `/category/{category_id}`
 pub async fn get_category_edit(
     hb: web::Data<Handlebars>,
-    logged_account: LoggedAccount,
+    logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
     category_id: web::Path<String>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    let logged_account = login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -78,12 +78,12 @@ pub async fn get_category_edit(
 
 /// POST route for `/category/{category_id}`
 pub async fn post_category_edit(
-    logged_account: LoggedAccount,
+    logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
     category: web::Form<FormCategory>,
     category_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    let logged_account = login_required!(logged_account);
 
     if *category_id != category.id {
         return Err(ServiceError::BadRequest(
@@ -128,10 +128,10 @@ pub async fn post_category_edit(
 /// GET route for `/category/create`
 pub async fn get_category_create(
     hb: web::Data<Handlebars>,
-    logged_account: LoggedAccount,
+    logged_account: RetrievedAccount,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    let logged_account = login_required!(logged_account);
 
     let body = HbData::new(&request)
         .with_account(logged_account)
@@ -142,11 +142,11 @@ pub async fn get_category_create(
 
 /// POST route for `/category/create`
 pub async fn post_category_create(
-    logged_account: LoggedAccount,
+    logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
     category: web::Form<FormCategory>,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    let logged_account = login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -171,10 +171,10 @@ pub async fn post_category_create(
 /// GET route for `/category/delete/{category_id}`
 pub async fn get_category_delete(
     _hb: web::Data<Handlebars>,
-    logged_account: LoggedAccount,
+    logged_account: RetrievedAccount,
     _category_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    let logged_account = login_required!(logged_account);
 
     println!("Delete is not supported!");
 

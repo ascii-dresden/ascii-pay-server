@@ -3,7 +3,7 @@ use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
 use crate::login_required;
 use crate::core::{authentication_password, stats, Pool, ServiceResult};
-use crate::web::identity_policy::LoggedAccount;
+use crate::web::identity_policy::{LoggedAccount, RetrievedAccount};
 use crate::web::utils::HbData;
 
 #[derive(Serialize, Deserialize)]
@@ -23,10 +23,10 @@ pub struct RegisterForm {
 pub async fn get_index(
     pool: web::Data<Pool>,
     hb: web::Data<Handlebars>,
-    logged_account: LoggedAccount,
-    request: HttpRequest,
+    logged_account: RetrievedAccount,
+    request: HttpRequest
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    let logged_account = login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -78,12 +78,15 @@ pub async fn post_login(
 /// GET route for `/logout`
 pub async fn get_logout(
     pool: web::Data<Pool>,
-    logged_account: LoggedAccount,
+    logged_account: RetrievedAccount,
     id: Identity,
 ) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
 
-    logged_account.forget(conn, id)?;
+    // TODO: Check implications of this -> any cleanup needed?
+    if let RetrievedAccount::Acc(acc) = logged_account {
+        acc.forget(conn, id)?;
+    }
 
     Ok(HttpResponse::Found()
         .header(http::header::LOCATION, "/")

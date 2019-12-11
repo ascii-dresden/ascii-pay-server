@@ -2,7 +2,7 @@ use crate::core::{
     Category, DbConnection, Money, Pool, Product, Searchable, ServiceError, ServiceResult,
 };
 use crate::login_required;
-use crate::web::identity_policy::LoggedAccount;
+use crate::web::identity_policy::{LoggedAccount, RetrievedAccount};
 use crate::web::utils::{HbData, Search};
 use actix_multipart::Multipart;
 use actix_web::{http, web, HttpRequest, HttpResponse};
@@ -30,12 +30,12 @@ pub struct FormProduct {
 /// GET route for `/products`
 pub async fn get_products(
     hb: web::Data<Handlebars>,
-    logged_account: LoggedAccount,
+    logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
     query: web::Query<Search>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    let logged_account = login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -64,12 +64,12 @@ pub async fn get_products(
 /// GET route for `/product/{product_id}`
 pub async fn get_product_edit(
     hb: web::Data<Handlebars>,
-    logged_account: LoggedAccount,
+    logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
     product_id: web::Path<String>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    let logged_account = login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -88,12 +88,12 @@ pub async fn get_product_edit(
 
 /// POST route for `/product/{product_id}`
 pub async fn post_product_edit(
-    logged_account: LoggedAccount,
+    logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
     product: web::Form<FormProduct>,
     product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    let logged_account = login_required!(logged_account);
 
     if *product_id != product.id {
         return Err(ServiceError::BadRequest(
@@ -145,11 +145,11 @@ pub async fn post_product_edit(
 /// GET route for `/product/create`
 pub async fn get_product_create(
     hb: web::Data<Handlebars>,
-    logged_account: LoggedAccount,
+    logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    let logged_account = login_required!(logged_account);
     let conn = &pool.get()?;
 
     let all_categories = Category::all(&conn)?;
@@ -164,11 +164,11 @@ pub async fn get_product_create(
 
 /// POST route for `/product/create`
 pub async fn post_product_create(
-    logged_account: LoggedAccount,
+    logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
     product: web::Form<FormProduct>,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    let logged_account = login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -199,10 +199,10 @@ pub async fn post_product_create(
 /// GET route for `/product/delete/{product_id}`
 pub async fn get_product_delete(
     _hb: web::Data<Handlebars>,
-    logged_account: LoggedAccount,
+    logged_account: RetrievedAccount,
     _product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    let logged_account = login_required!(logged_account);
 
     println!("Delete is not supported!");
 
@@ -214,10 +214,10 @@ pub async fn get_product_delete(
 /// GET route for `/product/remove-image/{product_id}`
 pub async fn get_product_remove_image(
     pool: web::Data<Pool>,
-    logged_account: LoggedAccount,
+    logged_account: RetrievedAccount,
     product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    let logged_account = login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -233,11 +233,11 @@ pub async fn get_product_remove_image(
 /// POST route for `/product/upload-image/{product_id}`
 pub async fn post_product_upload_image(
     pool: web::Data<Pool>,
-    logged_account: LoggedAccount,
+    logged_account: RetrievedAccount,
     product_id: web::Path<String>,
     multipart: Multipart,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    let logged_account = login_required!(logged_account);
 
     let conn = &pool.get()?;
     let mut product = Product::get(&conn, &Uuid::parse_str(&product_id)?)?;

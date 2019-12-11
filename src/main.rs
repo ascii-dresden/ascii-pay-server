@@ -90,7 +90,7 @@ fn read_value(prompt: &str, hide_input: bool) -> String {
             if p1 == p2 {
                 return p1;
             } else {
-                println!("Passwords does not match, retry.");
+                println!("Passwords do not match, retry.");
             }
         }
     } else {
@@ -116,6 +116,7 @@ fn check_admin(pool: &Pool) -> ServiceResult<()> {
         });
 
     if !admin_with_password_exists {
+        println!("You seem to have started the server on an empty database. We'll now create the initial superuser.");
         let fullname = read_value("Fullname: ", false);
         let username = read_value("Username: ", false);
         let password = read_value("Password: ", true);

@@ -22,11 +22,49 @@ static ref SECRET_KEY: String = std::env::var("SECRET_KEY").unwrap_or_else(|_| "
 #[macro_export]
 macro_rules! login_required {
     ($account:ident) => {
-        match $account.account.permission {
-            crate::core::Permission::ADMIN | crate::core::Permission::MEMBER => (),
-            _ => return Ok(HttpResponse::Found()
-            .header(http::header::LOCATION, "/login")
-            .finish()),
+        if let RetrievedAccount::Acc(acc) = $account {
+            // if a logged sccount has been retrieved successfully, check its validity
+            match acc.account.permission {
+                crate::core::Permission::ADMIN | crate::core::Permission::MEMBER => acc,
+                _ => {
+                    return Ok(HttpResponse::Found()
+                        .header(http::header::LOCATION, "/login")
+                        .finish())
+                }
+            }
+        } else {
+            // no retrieved session is equal to no session -> login
+            return Ok(HttpResponse::Found()
+                .header(http::header::LOCATION, "/login")
+                .finish());
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! admin_required {
+    ($account:ident) => {
+        if let RetrievedAccount::Acc(acc) = $account {
+            // if a logged sccount has been retrieved successfully, check its validity
+            match acc.account.permission {
+                crate::core::Permission::ADMIN => acc,
+                crate::core::Permission::MEMBER => {
+                    // TODO: Better handling for unauthorized errors
+                    return Ok(HttpResponse::Found()
+                        .header(http::header::LOCATION, "/login")
+                        .finish())
+                }
+                _ => {
+                    return Ok(HttpResponse::Found()
+                        .header(http::header::LOCATION, "/login")
+                        .finish())
+                }
+            }
+        } else {
+            // no retrieved session is equal to no session -> login
+            return Ok(HttpResponse::Found()
+                .header(http::header::LOCATION, "/login")
+                .finish());
         }
     };
 }
@@ -94,7 +132,7 @@ impl IdentityPolicy for DbIdentityPolicy {
             .cookie_policy
             .from_request(req)
             .now_or_never()
-            .expect("ReadyFututre was not ready")
+            .expect("ReadyFuture was not ready")
         {
             Ok(val) => val,
             Err(e) => return err(e),
@@ -140,8 +178,16 @@ pub struct LoggedAccount {
     pub session_id: String,
     pub account: Account,
 }
-/// Extract `LoggedAccount` from http request
-impl FromRequest for LoggedAccount {
+
+/// Represents an optional for a retrieved account for the middleware to return
+#[derive(Debug, Serialize, Deserialize)]
+pub enum RetrievedAccount {
+    Acc(LoggedAccount),
+    Nothing,
+}
+
+/// Extract `RetrievedAccount` from http request
+impl FromRequest for RetrievedAccount {
     type Error = Error;
     type Future = Ready<Result<Self, Error>>;
     type Config = ();
@@ -160,9 +206,9 @@ impl FromRequest for LoggedAccount {
                     return err(srv_err.actix());
                 }
             };
-            return ok(account);
+            return ok(RetrievedAccount::Acc(account));
         }
-        err(ServiceError::Unauthorized.into())
+        ok(RetrievedAccount::Nothing)
     }
 }
 

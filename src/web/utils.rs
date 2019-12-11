@@ -7,7 +7,7 @@ use serde::ser::Serialize;
 use serde_json::value::Value;
 
 use crate::core::Account;
-use crate::web::identity_policy::LoggedAccount;
+use crate::web::identity_policy::{LoggedAccount, RetrievedAccount};
 
 /// Helper to convert empty strings to `None` values
 pub trait EmptyToNone<T> {
