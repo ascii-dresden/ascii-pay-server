@@ -2,7 +2,7 @@ use crate::core::{
     Category, DbConnection, Money, Pool, Product, Searchable, ServiceError, ServiceResult,
 };
 use crate::login_required;
-use crate::web::identity_policy::{LoggedAccount, RetrievedAccount};
+use crate::web::identity_policy::{RetrievedAccount};
 use crate::web::utils::{HbData, Search};
 use actix_multipart::Multipart;
 use actix_web::{http, web, HttpRequest, HttpResponse};
@@ -93,7 +93,7 @@ pub async fn post_product_edit(
     product: web::Form<FormProduct>,
     product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account);
 
     if *product_id != product.id {
         return Err(ServiceError::BadRequest(
@@ -168,7 +168,7 @@ pub async fn post_product_create(
     pool: web::Data<Pool>,
     product: web::Form<FormProduct>,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -202,7 +202,7 @@ pub async fn get_product_delete(
     logged_account: RetrievedAccount,
     _product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account);
 
     println!("Delete is not supported!");
 
@@ -217,7 +217,7 @@ pub async fn get_product_remove_image(
     logged_account: RetrievedAccount,
     product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -237,7 +237,7 @@ pub async fn post_product_upload_image(
     product_id: web::Path<String>,
     multipart: Multipart,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account);
 
     let conn = &pool.get()?;
     let mut product = Product::get(&conn, &Uuid::parse_str(&product_id)?)?;

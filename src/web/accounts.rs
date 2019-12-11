@@ -1,6 +1,6 @@
 use crate::core::{Account, Money, Permission, Pool, Searchable, ServiceError, ServiceResult, authentication_password};
 use crate::login_required;
-use crate::web::identity_policy::{LoggedAccount, RetrievedAccount};
+use crate::web::identity_policy::{RetrievedAccount};
 use crate::web::utils::{EmptyToNone, HbData, Search};
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
@@ -125,7 +125,7 @@ pub async fn post_account_edit(
     account: web::Form<FormAccount>,
     account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account);
 
     if *account_id != account.id {
         return Err(ServiceError::BadRequest(
@@ -171,7 +171,7 @@ pub async fn post_account_create(
     logged_account: RetrievedAccount,
     account: web::Form<FormAccount>,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account);
 
     let conn = &pool.get()?;
 
@@ -234,7 +234,7 @@ pub async fn delete_get(
     logged_account: RetrievedAccount,
     _account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account);
 
     println!("Delete is not supported!");
 

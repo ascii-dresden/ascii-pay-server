@@ -1,6 +1,6 @@
 use crate::core::{transactions, Account, Money, Pool, ServiceResult};
 use crate::login_required;
-use crate::web::identity_policy::{LoggedAccount, RetrievedAccount};
+use crate::web::identity_policy::{RetrievedAccount};
 use crate::web::utils::HbData;
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use chrono::{Duration, Local, NaiveDateTime};

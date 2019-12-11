@@ -244,14 +244,4 @@ impl LoggedAccount {
 
         Ok(())
     }
-
-    // TODO: Port as macro
-    /// Check if the account has admin rights. Otherwise return `ServiceError`
-    pub fn require_admin(&self) -> ServiceResult<()> {
-        match self.account.permission {
-            Permission::ADMIN => Ok(()),
-            Permission::MEMBER => Err(ServiceError::InsufficientPrivileges),
-            _ => Err(ServiceError::Unauthorized),
-        }
-    }
 }
