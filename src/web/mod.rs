@@ -19,6 +19,7 @@ pub fn init(config: &mut web::ServiceConfig) {
             .wrap(IdentityService::new(DbIdentityPolicy::new()))
             // Setup static routes
             .service(fs::Files::new("/stylesheets", "static/stylesheets/"))
+            .service(fs::Files::new("/javascripts", "static/javascripts/"))
             .service(fs::Files::new("/images", "static/images/"))
             .service(fs::Files::new("/product/image", "img/"))
             // Setup index/login routes
