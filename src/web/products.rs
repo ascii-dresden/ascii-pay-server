@@ -2,7 +2,7 @@ use crate::core::{
     Category, DbConnection, Money, Pool, Product, Searchable, ServiceError, ServiceResult,
 };
 use crate::login_required;
-use crate::web::identity_policy::{RetrievedAccount};
+use crate::web::identity_policy::RetrievedAccount;
 use crate::web::utils::{HbData, Search};
 use actix_multipart::Multipart;
 use actix_web::{http, web, HttpRequest, HttpResponse};

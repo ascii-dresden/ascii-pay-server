@@ -1,6 +1,6 @@
 use crate::core::{Category, Money, Pool, Searchable, ServiceError, ServiceResult};
 use crate::login_required;
-use crate::web::identity_policy::{RetrievedAccount};
+use crate::web::identity_policy::RetrievedAccount;
 use crate::web::utils::{HbData, Search};
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;

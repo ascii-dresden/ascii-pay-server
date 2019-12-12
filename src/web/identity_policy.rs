@@ -11,7 +11,7 @@ use futures::prelude::*;
 use uuid::Uuid;
 
 use crate::core::{
-    Account, DbConnection, Permission, Pool, ServiceError, ServiceResult, Session, AUTH_COOKIE_NAME,
+    Account, DbConnection, Pool, ServiceError, ServiceResult, Session, AUTH_COOKIE_NAME,
 };
 
 // Encryption key for cookies
@@ -23,7 +23,7 @@ static ref SECRET_KEY: String = std::env::var("SECRET_KEY").unwrap_or_else(|_| "
 macro_rules! login_required {
     ($account:ident) => {
         if let RetrievedAccount::Acc(acc) = $account {
-            // if a logged sccount has been retrieved successfully, check its validity
+            // if a logged account has been retrieved successfully, check its validity
             match acc.account.permission {
                 crate::core::Permission::ADMIN | crate::core::Permission::MEMBER => acc,
                 _ => {
@@ -45,14 +45,14 @@ macro_rules! login_required {
 macro_rules! admin_required {
     ($account:ident) => {
         if let RetrievedAccount::Acc(acc) = $account {
-            // if a logged sccount has been retrieved successfully, check its validity
+            // if a logged account has been retrieved successfully, check its validity
             match acc.account.permission {
                 crate::core::Permission::ADMIN => acc,
                 crate::core::Permission::MEMBER => {
                     // TODO: Better handling for unauthorized errors
                     return Ok(HttpResponse::Found()
                         .header(http::header::LOCATION, "/login")
-                        .finish())
+                        .finish());
                 }
                 _ => {
                     return Ok(HttpResponse::Found()

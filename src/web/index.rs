@@ -1,10 +1,10 @@
+use crate::core::{authentication_password, stats, Pool, ServiceResult};
+use crate::login_required;
+use crate::web::identity_policy::{LoggedAccount, RetrievedAccount};
+use crate::web::utils::HbData;
 use actix_identity::Identity;
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
-use crate::login_required;
-use crate::core::{authentication_password, stats, Pool, ServiceResult};
-use crate::web::identity_policy::{LoggedAccount, RetrievedAccount};
-use crate::web::utils::HbData;
 
 #[derive(Serialize, Deserialize)]
 pub struct LoginForm {
@@ -24,7 +24,7 @@ pub async fn get_index(
     pool: web::Data<Pool>,
     hb: web::Data<Handlebars>,
     logged_account: RetrievedAccount,
-    request: HttpRequest
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
     let logged_account = login_required!(logged_account);
 

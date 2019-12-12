@@ -1,6 +1,6 @@
 use crate::core::{Account, Money, Permission, Pool, Searchable, ServiceError, ServiceResult, authentication_password};
 use crate::login_required;
-use crate::web::identity_policy::{RetrievedAccount};
+use crate::web::identity_policy::RetrievedAccount;
 use crate::web::utils::{EmptyToNone, HbData, Search};
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
