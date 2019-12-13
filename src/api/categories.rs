@@ -1,7 +1,41 @@
 use crate::api::utils::Search;
-use crate::core::{Category, Pool, Searchable, ServiceResult};
+use crate::core::{Category, Pool, ServiceResult, fuzzy_vec_match};
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
+
+#[derive(Debug, Serialize)]
+pub struct SearchCategory {
+    #[serde(flatten)]
+    pub category: Category,
+    pub name_search: String,
+    pub current_price_search: String,
+}
+
+impl SearchCategory {
+    pub fn wrap(category: Category, search: &str) -> Option<SearchCategory> {
+        let mut values = vec![category.name.clone()];
+
+        values.push(category.current_price
+            .map(|v| format!("{:.2}€", (v as f32) / 100.0))
+            .unwrap_or_else(|| "".to_owned())
+        );
+
+        let mut result = if search.is_empty() {
+            values
+        } else {
+            match fuzzy_vec_match(search, &values) {
+                Some(r) => r,
+                None => return None
+            }
+        };
+
+        Some(SearchCategory{
+            category,
+            current_price_search: result.pop().expect(""),
+            name_search: result.pop().expect(""),
+        })
+    }
+}
 
 /// GET route for `/categories`
 pub async fn get_categories(
@@ -10,17 +44,18 @@ pub async fn get_categories(
 ) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
 
-    let mut all_categories = Category::all(&conn)?;
+    let search = match &query.search {
+        Some(s) => s.clone(),
+        None => "".to_owned()
+    };
 
-    if let Some(search) = &query.search {
-        let lower_search = search.trim().to_ascii_lowercase();
-        all_categories = all_categories
-            .into_iter()
-            .filter(|a| a.contains(&lower_search))
-            .collect();
-    }
+    let lower_search = search.trim().to_ascii_lowercase();
+    let search_categories: Vec<SearchCategory> = Category::all(&conn)?
+        .into_iter()
+        .filter_map(|c| SearchCategory::wrap(c, &lower_search))
+        .collect();
 
-    Ok(HttpResponse::Ok().json(&all_categories))
+    Ok(HttpResponse::Ok().json(&search_categories))
 }
 
 /// GET route for `/category/{category_id}`

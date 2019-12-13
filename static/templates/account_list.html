@@ -13,7 +13,7 @@
             <div class="column col-6 col-sm-12">
                 <form method="GET">
                     <div class="input-group">
-                        <input type="text" class="form-input" name="search" placeholder="Search..." value="{{search}}">
+                        <input type="text" class="form-input" id="search-input" name="search" placeholder="Search..." value="{{search}}">
                         <input type="submit" value="Search" class="btn btn-primary input-group-btn" />
                     </div>
                 </form>
@@ -32,12 +32,12 @@
                     <th>Action</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="search-results">
                 {{#each accounts}}
                 <tr>
-                    <td>{{name}}</td>
-                    <td style="text-transform: lowercase;">{{#if (ne permission "DEFAULT")}}{{permission}}{{/if}}</td>
-                    <td>{{mail}}</td>
+                    <td>{{{name_search}}}</td>
+                    <td style="text-transform: lowercase;">{{#if (ne permission "DEFAULT")}}{{{permission_search}}}{{/if}}</td>
+                    <td>{{{mail_search}}}</td>
                     <td>
                         <a href="/account/{{id}}">Edit</a>
                         <a href="/transactions/{{id}}">Transactions</a>
@@ -47,5 +47,7 @@
             </tbody>
         </table>
     </div>
+
+    <script src="/javascripts/live_search_accounts.js"></script>
 </body>
 </html>

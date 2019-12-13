@@ -1,6 +1,5 @@
 use crate::core::{
-    authentication_password, Account, Money, Permission, Pool, Searchable, ServiceError,
-    ServiceResult,
+    authentication_password, Account, Money, Permission, Pool, ServiceError, ServiceResult, fuzzy_vec_match
 };
 use crate::login_required;
 use crate::web::identity_policy::RetrievedAccount;
@@ -31,6 +30,52 @@ pub struct AuthenticationMethod {
     pub action: Option<(String, String)>,
 }
 
+
+#[derive(Debug, Serialize)]
+pub struct SearchAccount {
+    #[serde(flatten)]
+    pub account: Account,
+    pub name_search: String,
+    pub mail_search: String,
+    pub permission_search: String,
+}
+
+impl SearchAccount {
+    pub fn wrap(account: Account, search: &str) -> Option<SearchAccount> {
+        let mut values = vec![];
+
+        values.push(account.name.clone()
+            .unwrap_or_else(|| "".to_owned())
+        );
+
+        values.push(account.mail.clone()
+            .unwrap_or_else(|| "".to_owned())
+        );
+
+        values.push(match account.permission {
+            Permission::DEFAULT => "",
+            Permission::MEMBER => "member",
+            Permission::ADMIN => "admin",
+        }.to_owned());
+
+        let mut result = if search.is_empty() {
+            values
+        } else {
+            match fuzzy_vec_match(search, &values) {
+                Some(r) => r,
+                None => return None
+            }
+        };
+
+        Some(SearchAccount{
+            account,
+            permission_search: result.pop().expect(""),
+            mail_search: result.pop().expect(""),
+            name_search: result.pop().expect(""),
+        })
+    }
+}
+
 /// GET route for `/accounts`
 pub async fn get_accounts(
     pool: web::Data<Pool>,
@@ -43,23 +88,21 @@ pub async fn get_accounts(
 
     let conn = &pool.get()?;
 
-    let mut all_accounts = Account::all(&conn)?;
-
-    let search = if let Some(search) = &query.search {
-        let lower_search = search.trim().to_ascii_lowercase();
-        all_accounts = all_accounts
-            .into_iter()
-            .filter(|a| a.contains(&lower_search))
-            .collect();
-        search.clone()
-    } else {
-        "".to_owned()
+    let search = match &query.search {
+        Some(s) => s.clone(),
+        None => "".to_owned()
     };
+
+    let lower_search = search.trim().to_ascii_lowercase();
+    let search_accounts: Vec<SearchAccount> = Account::all(&conn)?
+        .into_iter()
+        .filter_map(|a| SearchAccount::wrap(a, &lower_search))
+        .collect();
 
     let body = HbData::new(&request)
         .with_account(logged_account)
         .with_data("search", &search)
-        .with_data("accounts", &all_accounts)
+        .with_data("accounts", &search_accounts)
         .render(&hb, "account_list")?;
 
     Ok(HttpResponse::Ok().body(body))

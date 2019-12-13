@@ -3,7 +3,7 @@ use diesel::prelude::*;
 use uuid::Uuid;
 
 use crate::core::{
-    generate_uuid, DbConnection, Money, Price, Searchable, ServiceError, ServiceResult, DB,
+    generate_uuid, DbConnection, Money, Price, ServiceError, ServiceResult, DB,
 };
 
 // Encryption key for cookies
@@ -218,21 +218,5 @@ impl Category {
         }
 
         Ok(c)
-    }
-}
-
-impl Searchable for Category {
-    fn contains(&self, search: &str) -> bool {
-        if self.name.to_ascii_lowercase().contains(&search) {
-            return true;
-        }
-
-        if let Some(current_price) = &self.current_price {
-            if current_price.to_string().contains(&search) {
-                return true;
-            }
-        }
-
-        false
     }
 }

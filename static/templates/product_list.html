@@ -13,7 +13,7 @@
             <div class="column col-6 col-sm-12">
                 <form method="GET">
                     <div class="input-group">
-                        <input type="text" class="form-input" name="search" placeholder="Search..." value="{{search}}">
+                        <input type="text" class="form-input" id="search-input" name="search" placeholder="Search..." value="{{search}}">
                         <input type="submit" value="Search" class="btn btn-primary input-group-btn" />
                     </div>
                 </form>
@@ -33,7 +33,7 @@
                     <th>Action</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="search-results">
                 {{#each products}}
                 <tr>
                     <td>
@@ -41,9 +41,9 @@
                         <img class="img-responsive" src="/product/image/{{image}}" />
                         {{/if}}
                     </td>
-                    <td>{{name}}</td>
-                    <td>{{#if category}}{{category.name}}{{/if}}</td>
-                    <td>{{currency current_price}}{{#if current_price}}€{{/if}}</td>
+                    <td>{{{name_search}}}</td>
+                    <td>{{{category_search}}}</td>
+                    <td>{{{current_price_search}}}</td>
                     <td>
                         <a href="/product/{{id}}">Edit</a>
                     </td>
@@ -52,5 +52,7 @@
             </tbody>
         </table>
     </div>
+
+    <script src="/javascripts/live_search_products.js"></script>
 </body>
 </html>

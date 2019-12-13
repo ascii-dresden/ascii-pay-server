@@ -5,8 +5,7 @@ use std::path::Path;
 use uuid::Uuid;
 
 use crate::core::{
-    generate_uuid, Category, DbConnection, Money, Price, Searchable, ServiceError, ServiceResult,
-    DB,
+    generate_uuid, Category, DbConnection, Money, Price, ServiceError, ServiceResult, DB,
 };
 
 // Encryption key for cookies
@@ -328,27 +327,5 @@ impl Product {
         }
 
         Ok(p)
-    }
-}
-
-impl Searchable for Product {
-    fn contains(&self, search: &str) -> bool {
-        if self.name.to_ascii_lowercase().contains(&search) {
-            return true;
-        }
-
-        if let Some(category) = &self.category {
-            if category.contains(&search) {
-                return true;
-            }
-        }
-
-        if let Some(current_price) = &self.current_price {
-            if current_price.to_string().contains(&search) {
-                return true;
-            }
-        }
-
-        false
     }
 }

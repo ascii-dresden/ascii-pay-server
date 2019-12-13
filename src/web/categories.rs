@@ -1,4 +1,4 @@
-use crate::core::{Category, Money, Pool, Searchable, ServiceError, ServiceResult};
+use crate::core::{Category, Money, Pool, ServiceError, ServiceResult, fuzzy_vec_match};
 use crate::login_required;
 use crate::web::identity_policy::RetrievedAccount;
 use crate::web::utils::{HbData, Search};
@@ -20,6 +20,40 @@ pub struct FormCategory {
     pub extra: HashMap<String, String>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct SearchCategory {
+    #[serde(flatten)]
+    pub category: Category,
+    pub name_search: String,
+    pub current_price_search: String,
+}
+
+impl SearchCategory {
+    pub fn wrap(category: Category, search: &str) -> Option<SearchCategory> {
+        let mut values = vec![category.name.clone()];
+
+        values.push(category.current_price
+            .map(|v| format!("{:.2}€", (v as f32) / 100.0))
+            .unwrap_or_else(|| "".to_owned())
+        );
+
+        let mut result = if search.is_empty() {
+            values
+        } else {
+            match fuzzy_vec_match(search, &values) {
+                Some(r) => r,
+                None => return None
+            }
+        };
+
+        Some(SearchCategory{
+            category,
+            current_price_search: result.pop().expect(""),
+            name_search: result.pop().expect(""),
+        })
+    }
+}
+
 /// GET route for `/categories`
 pub async fn get_categories(
     hb: web::Data<Handlebars>,
@@ -32,23 +66,21 @@ pub async fn get_categories(
 
     let conn = &pool.get()?;
 
-    let mut all_categories = Category::all(&conn)?;
-
-    let search = if let Some(search) = &query.search {
-        let lower_search = search.trim().to_ascii_lowercase();
-        all_categories = all_categories
-            .into_iter()
-            .filter(|a| a.contains(&lower_search))
-            .collect();
-        search.clone()
-    } else {
-        "".to_owned()
+    let search = match &query.search {
+        Some(s) => s.clone(),
+        None => "".to_owned()
     };
+
+    let lower_search = search.trim().to_ascii_lowercase();
+    let search_categories: Vec<SearchCategory> = Category::all(&conn)?
+        .into_iter()
+        .filter_map(|c| SearchCategory::wrap(c, &lower_search))
+        .collect();
 
     let body = HbData::new(&request)
         .with_account(logged_account)
         .with_data("search", &search)
-        .with_data("categories", &all_categories)
+        .with_data("categories", &search_categories)
         .render(&hb, "category_list")?;
 
     Ok(HttpResponse::Ok().body(body))

@@ -7,7 +7,7 @@ use std::io;
 use uuid::Uuid;
 
 use crate::core::schema::account;
-use crate::core::{generate_uuid, DbConnection, Money, Searchable, ServiceError, ServiceResult};
+use crate::core::{generate_uuid, DbConnection, Money, ServiceError, ServiceResult};
 
 /// Represent a account
 #[derive(
@@ -164,33 +164,5 @@ impl Account {
         diesel::insert_into(dsl::account).values(&a).execute(conn)?;
 
         Ok(a)
-    }
-}
-
-impl Searchable for Account {
-    fn contains(&self, search: &str) -> bool {
-        if let Some(name) = &self.name {
-            if name.to_ascii_lowercase().contains(&search) {
-                return true;
-            }
-        }
-
-        if let Some(mail) = &self.mail {
-            if mail.to_ascii_lowercase().contains(&search) {
-                return true;
-            }
-        }
-
-        let permission = match self.permission {
-            Permission::DEFAULT => "default",
-            Permission::MEMBER => "member",
-            Permission::ADMIN => "admin",
-        };
-
-        if permission.contains(&search) {
-            return true;
-        }
-
-        false
     }
 }
