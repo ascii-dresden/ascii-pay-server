@@ -1,6 +1,6 @@
+mod accounts;
 mod categories;
 mod products;
-mod accounts;
 pub mod utils;
 
 use actix_web::web;

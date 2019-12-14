@@ -1,9 +1,11 @@
 <header class="navbar">
     <section class="navbar-section">
         <a href="/" class="btn btn-link{{#if (eq active "home")}} active{{/if}}">Dashboard</a>
+        {{#if (ne logged_account.permission "DEFAULT")}}
         <a href="/accounts" class="btn btn-link{{#if (eq active "accounts")}} active{{/if}}">Accounts</a>
         <a href="/products" class="btn btn-link{{#if (eq active "products")}} active{{/if}}">Products</a>
         <a href="/categories" class="btn btn-link{{#if (eq active "categories")}} active{{/if}}">Categories</a>
+        {{/if}}
     </section>
     <!--
     <section class="navbar-center">

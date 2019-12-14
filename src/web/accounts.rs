@@ -1,5 +1,6 @@
 use crate::core::{
-    authentication_password, Account, Money, Permission, Pool, ServiceError, ServiceResult, fuzzy_vec_match
+    authentication_password, fuzzy_vec_match, Account, Money, Permission, Pool, ServiceError,
+    ServiceResult,
 };
 use crate::login_required;
 use crate::web::identity_policy::RetrievedAccount;
@@ -30,7 +31,6 @@ pub struct AuthenticationMethod {
     pub action: Option<(String, String)>,
 }
 
-
 #[derive(Debug, Serialize)]
 pub struct SearchAccount {
     #[serde(flatten)]
@@ -44,30 +44,29 @@ impl SearchAccount {
     pub fn wrap(account: Account, search: &str) -> Option<SearchAccount> {
         let mut values = vec![];
 
-        values.push(account.name.clone()
-            .unwrap_or_else(|| "".to_owned())
-        );
+        values.push(account.name.clone().unwrap_or_else(|| "".to_owned()));
 
-        values.push(account.mail.clone()
-            .unwrap_or_else(|| "".to_owned())
-        );
+        values.push(account.mail.clone().unwrap_or_else(|| "".to_owned()));
 
-        values.push(match account.permission {
-            Permission::DEFAULT => "",
-            Permission::MEMBER => "member",
-            Permission::ADMIN => "admin",
-        }.to_owned());
+        values.push(
+            match account.permission {
+                Permission::DEFAULT => "",
+                Permission::MEMBER => "member",
+                Permission::ADMIN => "admin",
+            }
+            .to_owned(),
+        );
 
         let mut result = if search.is_empty() {
             values
         } else {
             match fuzzy_vec_match(search, &values) {
                 Some(r) => r,
-                None => return None
+                None => return None,
             }
         };
 
-        Some(SearchAccount{
+        Some(SearchAccount {
             account,
             permission_search: result.pop().expect(""),
             mail_search: result.pop().expect(""),
@@ -84,13 +83,13 @@ pub async fn get_accounts(
     query: web::Query<Search>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let logged_account = login_required!(logged_account, Permission::MEMBER);
 
     let conn = &pool.get()?;
 
     let search = match &query.search {
         Some(s) => s.clone(),
-        None => "".to_owned()
+        None => "".to_owned(),
     };
 
     let lower_search = search.trim().to_ascii_lowercase();
@@ -116,7 +115,7 @@ pub async fn get_account_edit(
     account_id: web::Path<String>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let logged_account = login_required!(logged_account, Permission::MEMBER);
 
     let conn = &pool.get()?;
 
@@ -171,7 +170,7 @@ pub async fn post_account_edit(
     account: web::Form<FormAccount>,
     account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account, Permission::MEMBER);
 
     if *account_id != account.id {
         return Err(ServiceError::BadRequest(
@@ -202,7 +201,7 @@ pub async fn get_account_create(
     logged_account: RetrievedAccount,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let logged_account = login_required!(logged_account, Permission::MEMBER);
 
     let body = HbData::new(&request)
         .with_account(logged_account)
@@ -217,7 +216,7 @@ pub async fn post_account_create(
     logged_account: RetrievedAccount,
     account: web::Form<FormAccount>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account, Permission::MEMBER);
 
     let conn = &pool.get()?;
 
@@ -243,7 +242,7 @@ pub async fn invite_get(
     logged_account: RetrievedAccount,
     account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    login_required!(logged_account, Permission::MEMBER);
 
     let conn = &pool.get()?;
 
@@ -261,7 +260,7 @@ pub async fn revoke_get(
     logged_account: RetrievedAccount,
     account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account);
+    login_required!(logged_account, Permission::MEMBER);
 
     let conn = &pool.get()?;
 
@@ -280,7 +279,7 @@ pub async fn delete_get(
     logged_account: RetrievedAccount,
     _account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account, Permission::MEMBER);
 
     println!("Delete is not supported!");
 

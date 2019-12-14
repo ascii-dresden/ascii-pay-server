@@ -1,4 +1,6 @@
-use crate::core::{Category, Money, Pool, ServiceError, ServiceResult, fuzzy_vec_match};
+use crate::core::{
+    fuzzy_vec_match, Category, Money, Permission, Pool, ServiceError, ServiceResult,
+};
 use crate::login_required;
 use crate::web::identity_policy::RetrievedAccount;
 use crate::web::utils::{HbData, Search};
@@ -32,9 +34,11 @@ impl SearchCategory {
     pub fn wrap(category: Category, search: &str) -> Option<SearchCategory> {
         let mut values = vec![category.name.clone()];
 
-        values.push(category.current_price
-            .map(|v| format!("{:.2}€", (v as f32) / 100.0))
-            .unwrap_or_else(|| "".to_owned())
+        values.push(
+            category
+                .current_price
+                .map(|v| format!("{:.2}€", (v as f32) / 100.0))
+                .unwrap_or_else(|| "".to_owned()),
         );
 
         let mut result = if search.is_empty() {
@@ -42,11 +46,11 @@ impl SearchCategory {
         } else {
             match fuzzy_vec_match(search, &values) {
                 Some(r) => r,
-                None => return None
+                None => return None,
             }
         };
 
-        Some(SearchCategory{
+        Some(SearchCategory {
             category,
             current_price_search: result.pop().expect(""),
             name_search: result.pop().expect(""),
@@ -62,13 +66,13 @@ pub async fn get_categories(
     query: web::Query<Search>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let logged_account = login_required!(logged_account, Permission::MEMBER);
 
     let conn = &pool.get()?;
 
     let search = match &query.search {
         Some(s) => s.clone(),
-        None => "".to_owned()
+        None => "".to_owned(),
     };
 
     let lower_search = search.trim().to_ascii_lowercase();
@@ -94,7 +98,7 @@ pub async fn get_category_edit(
     category_id: web::Path<String>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let logged_account = login_required!(logged_account, Permission::MEMBER);
 
     let conn = &pool.get()?;
 
@@ -115,7 +119,7 @@ pub async fn post_category_edit(
     category: web::Form<FormCategory>,
     category_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account, Permission::MEMBER);
 
     if *category_id != category.id {
         return Err(ServiceError::BadRequest(
@@ -163,7 +167,7 @@ pub async fn get_category_create(
     logged_account: RetrievedAccount,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let logged_account = login_required!(logged_account, Permission::MEMBER);
 
     let body = HbData::new(&request)
         .with_account(logged_account)
@@ -178,7 +182,7 @@ pub async fn post_category_create(
     pool: web::Data<Pool>,
     category: web::Form<FormCategory>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account, Permission::MEMBER);
 
     let conn = &pool.get()?;
 
@@ -206,7 +210,7 @@ pub async fn get_category_delete(
     logged_account: RetrievedAccount,
     _category_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account, Permission::MEMBER);
 
     println!("Delete is not supported!");
 

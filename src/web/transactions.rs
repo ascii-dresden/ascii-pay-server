@@ -1,4 +1,4 @@
-use crate::core::{transactions, Account, Money, Pool, ServiceResult};
+use crate::core::{transactions, Account, Money, Permission, Pool, ServiceResult};
 use crate::login_required;
 use crate::web::identity_policy::RetrievedAccount;
 use crate::web::utils::HbData;
@@ -38,7 +38,7 @@ pub async fn get_transactions(
     query: web::Query<FromToQuery>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let logged_account = login_required!(logged_account, Permission::MEMBER);
 
     let conn = &pool.get()?;
 
@@ -78,7 +78,7 @@ pub async fn post_execute_transaction(
     account_id: web::Path<String>,
     execute_form: web::Form<Execute>,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let logged_account = login_required!(logged_account, Permission::MEMBER);
 
     if execute_form.total != 0.0 {
         let conn = &pool.get()?;

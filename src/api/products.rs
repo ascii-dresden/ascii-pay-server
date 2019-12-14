@@ -1,5 +1,5 @@
 use crate::api::utils::Search;
-use crate::core::{Pool, Product, ServiceResult, fuzzy_vec_match};
+use crate::core::{fuzzy_vec_match, Pool, Product, ServiceResult};
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
 
@@ -16,14 +16,19 @@ impl SearchProduct {
     pub fn wrap(product: Product, search: &str) -> Option<SearchProduct> {
         let mut values = vec![product.name.clone()];
 
-        values.push(product.category.clone()
-            .map(|v| v.name)
-            .unwrap_or_else(|| "".to_owned())
+        values.push(
+            product
+                .category
+                .clone()
+                .map(|v| v.name)
+                .unwrap_or_else(|| "".to_owned()),
         );
 
-        values.push(product.current_price
-            .map(|v| format!("{:.2}€", (v as f32) / 100.0))
-            .unwrap_or_else(|| "".to_owned())
+        values.push(
+            product
+                .current_price
+                .map(|v| format!("{:.2}€", (v as f32) / 100.0))
+                .unwrap_or_else(|| "".to_owned()),
         );
 
         let mut result = if search.is_empty() {
@@ -31,11 +36,11 @@ impl SearchProduct {
         } else {
             match fuzzy_vec_match(search, &values) {
                 Some(r) => r,
-                None => return None
+                None => return None,
             }
         };
 
-        Some(SearchProduct{
+        Some(SearchProduct {
             product,
             current_price_search: result.pop().expect(""),
             category_search: result.pop().expect(""),
@@ -53,7 +58,7 @@ pub async fn get_products(
 
     let search = match &query.search {
         Some(s) => s.clone(),
-        None => "".to_owned()
+        None => "".to_owned(),
     };
 
     let lower_search = search.trim().to_ascii_lowercase();

@@ -2,9 +2,7 @@ use chrono::{NaiveDateTime, Utc};
 use diesel::prelude::*;
 use uuid::Uuid;
 
-use crate::core::{
-    generate_uuid, DbConnection, Money, Price, ServiceError, ServiceResult, DB,
-};
+use crate::core::{generate_uuid, DbConnection, Money, Price, ServiceError, ServiceResult, DB};
 
 // Encryption key for cookies
 lazy_static::lazy_static! {

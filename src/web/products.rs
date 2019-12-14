@@ -1,5 +1,6 @@
 use crate::core::{
-    Category, DbConnection, Money, Pool, Product, fuzzy_vec_match, ServiceError, ServiceResult,
+    fuzzy_vec_match, Category, DbConnection, Money, Permission, Pool, Product, ServiceError,
+    ServiceResult,
 };
 use crate::login_required;
 use crate::web::identity_policy::RetrievedAccount;
@@ -40,14 +41,19 @@ impl SearchProduct {
     pub fn wrap(product: Product, search: &str) -> Option<SearchProduct> {
         let mut values = vec![product.name.clone()];
 
-        values.push(product.category.clone()
-            .map(|v| v.name)
-            .unwrap_or_else(|| "".to_owned())
+        values.push(
+            product
+                .category
+                .clone()
+                .map(|v| v.name)
+                .unwrap_or_else(|| "".to_owned()),
         );
 
-        values.push(product.current_price
-            .map(|v| format!("{:.2}€", (v as f32) / 100.0))
-            .unwrap_or_else(|| "".to_owned())
+        values.push(
+            product
+                .current_price
+                .map(|v| format!("{:.2}€", (v as f32) / 100.0))
+                .unwrap_or_else(|| "".to_owned()),
         );
 
         let mut result = if search.is_empty() {
@@ -55,11 +61,11 @@ impl SearchProduct {
         } else {
             match fuzzy_vec_match(search, &values) {
                 Some(r) => r,
-                None => return None
+                None => return None,
             }
         };
 
-        Some(SearchProduct{
+        Some(SearchProduct {
             product,
             current_price_search: result.pop().expect(""),
             category_search: result.pop().expect(""),
@@ -76,13 +82,13 @@ pub async fn get_products(
     query: web::Query<Search>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let logged_account = login_required!(logged_account, Permission::MEMBER);
 
     let conn = &pool.get()?;
 
     let search = match &query.search {
         Some(s) => s.clone(),
-        None => "".to_owned()
+        None => "".to_owned(),
     };
 
     let lower_search = search.trim().to_ascii_lowercase();
@@ -108,7 +114,7 @@ pub async fn get_product_edit(
     product_id: web::Path<String>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let logged_account = login_required!(logged_account, Permission::MEMBER);
 
     let conn = &pool.get()?;
 
@@ -132,7 +138,7 @@ pub async fn post_product_edit(
     product: web::Form<FormProduct>,
     product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account, Permission::MEMBER);
 
     if *product_id != product.id {
         return Err(ServiceError::BadRequest(
@@ -188,7 +194,7 @@ pub async fn get_product_create(
     pool: web::Data<Pool>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account);
+    let logged_account = login_required!(logged_account, Permission::MEMBER);
     let conn = &pool.get()?;
 
     let all_categories = Category::all(&conn)?;
@@ -207,7 +213,7 @@ pub async fn post_product_create(
     pool: web::Data<Pool>,
     product: web::Form<FormProduct>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account, Permission::MEMBER);
 
     let conn = &pool.get()?;
 
@@ -241,7 +247,7 @@ pub async fn get_product_delete(
     logged_account: RetrievedAccount,
     _product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account, Permission::MEMBER);
 
     println!("Delete is not supported!");
 
@@ -256,7 +262,7 @@ pub async fn get_product_remove_image(
     logged_account: RetrievedAccount,
     product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account, Permission::MEMBER);
 
     let conn = &pool.get()?;
 
@@ -276,7 +282,7 @@ pub async fn post_product_upload_image(
     product_id: web::Path<String>,
     multipart: Multipart,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account);
+    let _logged_account = login_required!(logged_account, Permission::MEMBER);
 
     let conn = &pool.get()?;
     let mut product = Product::get(&conn, &Uuid::parse_str(&product_id)?)?;

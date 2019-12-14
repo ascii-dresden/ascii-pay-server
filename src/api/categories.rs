@@ -1,5 +1,5 @@
 use crate::api::utils::Search;
-use crate::core::{Category, Pool, ServiceResult, fuzzy_vec_match};
+use crate::core::{fuzzy_vec_match, Category, Pool, ServiceResult};
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
 
@@ -15,9 +15,11 @@ impl SearchCategory {
     pub fn wrap(category: Category, search: &str) -> Option<SearchCategory> {
         let mut values = vec![category.name.clone()];
 
-        values.push(category.current_price
-            .map(|v| format!("{:.2}€", (v as f32) / 100.0))
-            .unwrap_or_else(|| "".to_owned())
+        values.push(
+            category
+                .current_price
+                .map(|v| format!("{:.2}€", (v as f32) / 100.0))
+                .unwrap_or_else(|| "".to_owned()),
         );
 
         let mut result = if search.is_empty() {
@@ -25,11 +27,11 @@ impl SearchCategory {
         } else {
             match fuzzy_vec_match(search, &values) {
                 Some(r) => r,
-                None => return None
+                None => return None,
             }
         };
 
-        Some(SearchCategory{
+        Some(SearchCategory {
             category,
             current_price_search: result.pop().expect(""),
             name_search: result.pop().expect(""),
@@ -46,7 +48,7 @@ pub async fn get_categories(
 
     let search = match &query.search {
         Some(s) => s.clone(),
-        None => "".to_owned()
+        None => "".to_owned(),
     };
 
     let lower_search = search.trim().to_ascii_lowercase();

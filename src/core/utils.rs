@@ -1,7 +1,7 @@
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
-use uuid::Uuid;
 use sublime_fuzzy as fuzzy;
+use uuid::Uuid;
 
 /// Reference type for money values
 pub type Money = i32;
@@ -36,11 +36,14 @@ pub fn fuzzy_vec_match(search: &str, values: &[String]) -> Option<Vec<String>> {
     };
 
     let mut start_index = 0;
-    let vec: Vec<String> = values.iter()
+    let vec: Vec<String> = values
+        .iter()
         .map(|v| {
             let len = v.chars().count();
             let next_start_index = start_index + len;
-            let matches = result.matches().iter()
+            let matches = result
+                .matches()
+                .iter()
                 .filter(|i| start_index <= **i && **i < next_start_index)
                 .map(|i| *i - start_index)
                 .collect();

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+
+{{> _head title="Home" }}
+
+<body>
+    <div class="container grid-lg">
+        {{> _navigation active="home" }}
+
+        <h1>Account</h1>
+
+        <div class="columns">
+            <div class="column col-12">
+                <div>Name</div>
+                <h3 class="d-block">{{logged_account.name}}</h1>
+            </div>
+            <div class="column col-4 col-sm-6">
+                <div>Credit</div>
+                <h3 class="d-block{{#if (lt logged_account.credit 0)}} text-error{{/if}}{{#if (gt logged_account.credit 0)}} text-success{{/if}}">{{currency logged_account.credit}}€</h1>
+            </div>
+            <div class="column col-4 col-sm-6">
+                <div>Minimum credit</div>
+                <h3 class="d-block">{{currency logged_account.minimum_credit}}€</h1>
+            </div>
+        </div>
+
+        <form method="GET">
+            <div class="columns">
+                <div class="column col-4 col-sm-12">
+                    <div class="form-group">
+                        <label class="form-label" for="from">From</label>
+                        <input class="form-input" type="date" name="from" value="{{date.from}}">
+                    </div>
+                </div>
+                <div class="column col-4 col-sm-12">
+                    <div class="form-group">
+                        <label class="form-label" for="to">To</label>
+                        <input class="form-input" type="date" name="to" value="{{date.to}}">
+                    </div>
+                </div>
+                <div class="column col-4 col-sm-12" style="margin-top: auto;">
+                    <input type="submit" value="Refresh" class="btn btn-primary input-group-btn" />
+                </div>
+            </div>
+        </form>
+
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Total</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each transactions}}
+                <tr>
+                    <td>{{format_datetime date}}</td>
+                    <td class="{{#if (lt total 0)}}text-error{{/if}}{{#if (gt total 0)}}text-success{{/if}}">{{currency total}}</td>
+                    <td>
+                        <a href="#">Details</a>
+                    </td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

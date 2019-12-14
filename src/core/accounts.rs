@@ -48,6 +48,18 @@ pub enum Permission {
     ADMIN,
 }
 
+impl PartialOrd for Permission {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Permission {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.level().cmp(&other.level())
+    }
+}
+
 impl Permission {
     /// Check if the permission level is `Permission::DEFAULT`
     pub fn is_default(self) -> bool {
@@ -62,6 +74,14 @@ impl Permission {
     /// Check if the permission level is `Permission::ADMIN`
     pub fn is_admin(self) -> bool {
         Permission::ADMIN == self
+    }
+
+    pub fn level(self) -> u32 {
+        match self {
+            Permission::DEFAULT => 0,
+            Permission::MEMBER => 1,
+            Permission::ADMIN => 2,
+        }
     }
 }
 

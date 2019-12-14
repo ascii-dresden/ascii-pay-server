@@ -21,44 +21,13 @@ static ref SECRET_KEY: String = std::env::var("SECRET_KEY").unwrap_or_else(|_| "
 
 #[macro_export]
 macro_rules! login_required {
-    ($account:ident) => {
+    ($account:ident, $permission:path) => {
         if let RetrievedAccount::Acc(acc) = $account {
             // if a logged account has been retrieved successfully, check its validity
-            match acc.account.permission {
-                crate::core::Permission::ADMIN | crate::core::Permission::MEMBER => acc,
-                _ => {
-                    return Ok(HttpResponse::Found()
-                        .header(http::header::LOCATION, "/login")
-                        .finish())
-                }
-            }
-        } else {
-            // no retrieved session is equal to no session -> login
-            return Ok(HttpResponse::Found()
-                .header(http::header::LOCATION, "/login")
-                .finish());
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! admin_required {
-    ($account:ident) => {
-        if let RetrievedAccount::Acc(acc) = $account {
-            // if a logged account has been retrieved successfully, check its validity
-            match acc.account.permission {
-                crate::core::Permission::ADMIN => acc,
-                crate::core::Permission::MEMBER => {
-                    // TODO: Better handling for unauthorized errors
-                    return Ok(HttpResponse::Found()
-                        .header(http::header::LOCATION, "/login")
-                        .finish());
-                }
-                _ => {
-                    return Ok(HttpResponse::Found()
-                        .header(http::header::LOCATION, "/login")
-                        .finish())
-                }
+            if acc.account.permission >= $permission {
+                acc
+            } else {
+                return Ok(HttpResponse::Forbidden().finish());
             }
         } else {
             // no retrieved session is equal to no session -> login
