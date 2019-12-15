@@ -35,6 +35,7 @@ pub struct AuthenticationMethod {
 pub struct SearchAccount {
     #[serde(flatten)]
     pub account: Account,
+    pub id_search: String,
     pub name_search: String,
     pub mail_search: String,
     pub permission_search: String,
@@ -42,20 +43,21 @@ pub struct SearchAccount {
 
 impl SearchAccount {
     pub fn wrap(account: Account, search: &str) -> Option<SearchAccount> {
-        let mut values = vec![];
-
-        values.push(account.name.clone().unwrap_or_else(|| "".to_owned()));
-
-        values.push(account.mail.clone().unwrap_or_else(|| "".to_owned()));
-
-        values.push(
+        let values = vec![
+            account
+                .id
+                .to_hyphenated()
+                .encode_upper(&mut Uuid::encode_buffer())
+                .to_string(),
+            account.name.clone().unwrap_or_else(|| "".to_owned()),
+            account.mail.clone().unwrap_or_else(|| "".to_owned()),
             match account.permission {
                 Permission::DEFAULT => "",
                 Permission::MEMBER => "member",
                 Permission::ADMIN => "admin",
             }
             .to_owned(),
-        );
+        ];
 
         let mut result = if search.is_empty() {
             values
@@ -71,6 +73,7 @@ impl SearchAccount {
             permission_search: result.pop().expect(""),
             mail_search: result.pop().expect(""),
             name_search: result.pop().expect(""),
+            id_search: result.pop().expect(""),
         })
     }
 }

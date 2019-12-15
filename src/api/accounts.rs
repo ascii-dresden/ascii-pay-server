@@ -1,51 +1,8 @@
 use crate::api::utils::Search;
-use crate::core::{fuzzy_vec_match, Account, Permission, Pool, ServiceResult};
+use crate::core::{Account, Pool, ServiceResult};
+use crate::web::accounts::SearchAccount;
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
-
-#[derive(Debug, Serialize)]
-pub struct SearchAccount {
-    #[serde(flatten)]
-    pub account: Account,
-    pub name_search: String,
-    pub mail_search: String,
-    pub permission_search: String,
-}
-
-impl SearchAccount {
-    pub fn wrap(account: Account, search: &str) -> Option<SearchAccount> {
-        let mut values = vec![];
-
-        values.push(account.name.clone().unwrap_or_else(|| "".to_owned()));
-
-        values.push(account.mail.clone().unwrap_or_else(|| "".to_owned()));
-
-        values.push(
-            match account.permission {
-                Permission::DEFAULT => "",
-                Permission::MEMBER => "member",
-                Permission::ADMIN => "admin",
-            }
-            .to_owned(),
-        );
-
-        let mut result = if search.is_empty() {
-            values
-        } else {
-            match fuzzy_vec_match(search, &values) {
-                Some(r) => r,
-                None => return None,
-            }
-        };
-
-        Some(SearchAccount {
-            account,
-            permission_search: result.pop().expect(""),
-            mail_search: result.pop().expect(""),
-            name_search: result.pop().expect(""),
-        })
-    }
-}
 
 /// GET route for `/accounts`
 pub async fn get_accounts(

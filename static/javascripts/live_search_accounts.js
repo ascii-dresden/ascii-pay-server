@@ -3,11 +3,11 @@ function generateRow(json) {
 
     cell = document.createElement("td");
     row.appendChild(cell);
-    cell.innerHTML = json.name_search;
-
-    cell = document.createElement("td");
-    row.appendChild(cell);
-    cell.innerHTML = json.mail_search;
+    if (json.name_search) {
+        cell.innerHTML = json.name_search;
+    } else {
+        cell.innerHTML = "<span class='text-gray'>" + json.id_search + "</span>";
+    }
 
     cell = document.createElement("td");
     cell.style = "text-transform: lowercase;";
@@ -15,6 +15,10 @@ function generateRow(json) {
     if (json.permission != "DEFAULT") {
         cell.innerHTML = json.permission_search;
     }
+
+    cell = document.createElement("td");
+    row.appendChild(cell);
+    cell.innerHTML = json.mail_search;
 
     cell = document.createElement("td");
     row.appendChild(cell);

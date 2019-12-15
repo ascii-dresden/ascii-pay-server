@@ -32,14 +32,13 @@ pub struct SearchCategory {
 
 impl SearchCategory {
     pub fn wrap(category: Category, search: &str) -> Option<SearchCategory> {
-        let mut values = vec![category.name.clone()];
-
-        values.push(
+        let values = vec![
+            category.name.clone(),
             category
                 .current_price
                 .map(|v| format!("{:.2}€", (v as f32) / 100.0))
                 .unwrap_or_else(|| "".to_owned()),
-        );
+        ];
 
         let mut result = if search.is_empty() {
             values

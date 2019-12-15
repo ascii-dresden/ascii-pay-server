@@ -1,43 +1,8 @@
 use crate::api::utils::Search;
-use crate::core::{fuzzy_vec_match, Category, Pool, ServiceResult};
+use crate::core::{Category, Pool, ServiceResult};
+use crate::web::categories::SearchCategory;
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
-
-#[derive(Debug, Serialize)]
-pub struct SearchCategory {
-    #[serde(flatten)]
-    pub category: Category,
-    pub name_search: String,
-    pub current_price_search: String,
-}
-
-impl SearchCategory {
-    pub fn wrap(category: Category, search: &str) -> Option<SearchCategory> {
-        let mut values = vec![category.name.clone()];
-
-        values.push(
-            category
-                .current_price
-                .map(|v| format!("{:.2}€", (v as f32) / 100.0))
-                .unwrap_or_else(|| "".to_owned()),
-        );
-
-        let mut result = if search.is_empty() {
-            values
-        } else {
-            match fuzzy_vec_match(search, &values) {
-                Some(r) => r,
-                None => return None,
-            }
-        };
-
-        Some(SearchCategory {
-            category,
-            current_price_search: result.pop().expect(""),
-            name_search: result.pop().expect(""),
-        })
-    }
-}
 
 /// GET route for `/categories`
 pub async fn get_categories(

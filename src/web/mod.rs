@@ -1,10 +1,10 @@
-mod accounts;
-mod categories;
-mod identity_policy;
-mod index;
-mod products;
-mod transactions;
-mod utils;
+pub mod accounts;
+pub mod categories;
+pub mod identity_policy;
+pub mod index;
+pub mod products;
+pub mod transactions;
+pub mod utils;
 
 use actix_files as fs;
 use actix_identity::IdentityService;

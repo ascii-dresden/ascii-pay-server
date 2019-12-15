@@ -39,22 +39,18 @@ pub struct SearchProduct {
 
 impl SearchProduct {
     pub fn wrap(product: Product, search: &str) -> Option<SearchProduct> {
-        let mut values = vec![product.name.clone()];
-
-        values.push(
+        let values = vec![
+            product.name.clone(),
             product
                 .category
                 .clone()
                 .map(|v| v.name)
                 .unwrap_or_else(|| "".to_owned()),
-        );
-
-        values.push(
             product
                 .current_price
                 .map(|v| format!("{:.2}€", (v as f32) / 100.0))
                 .unwrap_or_else(|| "".to_owned()),
-        );
+        ];
 
         let mut result = if search.is_empty() {
             values

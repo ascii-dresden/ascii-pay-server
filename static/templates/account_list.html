@@ -35,7 +35,7 @@
             <tbody id="search-results">
                 {{#each accounts}}
                 <tr>
-                    <td>{{{name_search}}}</td>
+                    <td>{{#if name_search}}{{{name_search}}}{{else}}<span class="text-gray">{{{id_search}}}</span>{{/if}}</td>
                     <td style="text-transform: lowercase;">{{#if (ne permission "DEFAULT")}}{{{permission_search}}}{{/if}}</td>
                     <td>{{{mail_search}}}</td>
                     <td>
