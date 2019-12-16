@@ -1,14 +1,19 @@
-use crate::api::utils::Search;
-use crate::core::{Account, Pool, ServiceResult};
+use crate::core::{Account, Permission, Pool, ServiceResult};
+use crate::identity_policy::{Action, RetrievedAccount};
+use crate::login_required;
 use crate::web::accounts::SearchAccount;
+use crate::web::utils::Search;
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
 
 /// GET route for `/accounts`
 pub async fn get_accounts(
     pool: web::Data<Pool>,
+    logged_account: RetrievedAccount,
     query: web::Query<Search>,
 ) -> ServiceResult<HttpResponse> {
+    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+
     let conn = &pool.get()?;
 
     let search = match &query.search {

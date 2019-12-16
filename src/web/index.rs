@@ -1,6 +1,6 @@
 use crate::core::{authentication_password, transactions, Permission, Pool, ServiceResult};
+use crate::identity_policy::{Action, LoggedAccount, RetrievedAccount};
 use crate::login_required;
-use crate::web::identity_policy::{LoggedAccount, RetrievedAccount};
 use crate::web::transactions::naive_date_time_option_serializer;
 use crate::web::utils::HbData;
 use actix_identity::Identity;
@@ -44,7 +44,7 @@ pub async fn get_index(
     query: web::Query<FromToQuery>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account, Permission::DEFAULT);
+    let logged_account = login_required!(logged_account, Permission::DEFAULT, Action::REDIRECT);
 
     let conn = &pool.get()?;
 

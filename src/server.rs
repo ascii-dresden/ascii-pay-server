@@ -1,9 +1,11 @@
+use actix_identity::IdentityService;
 use actix_web::{middleware, web, App, HttpServer};
 use chrono::NaiveDateTime;
 use handlebars::{Context, Handlebars, Helper, Output, RenderContext, RenderError};
 
 use crate::api as module_api;
-use crate::core::{Pool, ServiceError, ServiceResult};
+use crate::core::{Pool, ServiceResult};
+use crate::identity_policy::DbIdentityPolicy;
 use crate::web as module_web;
 
 /// Helper function for handlebars. Converts cents to euros
@@ -46,7 +48,7 @@ pub fn start_server(pool: Pool) -> ServiceResult<()> {
     let host = std::env::var("HOST").unwrap_or_else(|_| "localhost".to_string());
     let port = std::env::var("PORT")
         .unwrap_or_else(|_| "".to_string())
-        .parse::<i32>()
+        .parse::<u16>()
         .unwrap_or(8080);
 
     let address = format!("{}:{}", &host, port);
@@ -73,12 +75,15 @@ pub fn start_server(pool: Pool) -> ServiceResult<()> {
             .register_data(handlebars_ref.clone())
             // Logger
             .wrap(middleware::Logger::default())
+            // Set identity service for encrypted cookies
+            .wrap(IdentityService::new(DbIdentityPolicy::new()))
             // Register api module
             .configure(module_api::init)
             // Register admin ui module
             .configure(module_web::init)
     })
     .bind(address)?
-    .run()
-    .map_err(|err| ServiceError::InternalServerError("Server error", format!("{}", err)))
+    .run()?;
+
+    Ok(())
 }

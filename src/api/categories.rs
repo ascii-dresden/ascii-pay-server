@@ -1,6 +1,6 @@
-use crate::api::utils::Search;
 use crate::core::{Category, Pool, ServiceResult};
 use crate::web::categories::SearchCategory;
+use crate::web::utils::Search;
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
 

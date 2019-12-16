@@ -1,8 +1,8 @@
 use crate::core::{
     fuzzy_vec_match, Category, Money, Permission, Pool, ServiceError, ServiceResult,
 };
+use crate::identity_policy::{Action, RetrievedAccount};
 use crate::login_required;
-use crate::web::identity_policy::RetrievedAccount;
 use crate::web::utils::{HbData, Search};
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
@@ -65,7 +65,7 @@ pub async fn get_categories(
     query: web::Query<Search>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account, Permission::MEMBER);
+    let logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
 
     let conn = &pool.get()?;
 
@@ -97,7 +97,7 @@ pub async fn get_category_edit(
     category_id: web::Path<String>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account, Permission::MEMBER);
+    let logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
 
     let conn = &pool.get()?;
 
@@ -118,7 +118,7 @@ pub async fn post_category_edit(
     category: web::Form<FormCategory>,
     category_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER);
+    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
 
     if *category_id != category.id {
         return Err(ServiceError::BadRequest(
@@ -166,7 +166,7 @@ pub async fn get_category_create(
     logged_account: RetrievedAccount,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account, Permission::MEMBER);
+    let logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
 
     let body = HbData::new(&request)
         .with_account(logged_account)
@@ -181,7 +181,7 @@ pub async fn post_category_create(
     pool: web::Data<Pool>,
     category: web::Form<FormCategory>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER);
+    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
 
     let conn = &pool.get()?;
 
@@ -209,7 +209,7 @@ pub async fn get_category_delete(
     logged_account: RetrievedAccount,
     _category_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER);
+    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
 
     println!("Delete is not supported!");
 

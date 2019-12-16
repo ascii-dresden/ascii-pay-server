@@ -1,22 +1,17 @@
 pub mod accounts;
 pub mod categories;
-pub mod identity_policy;
 pub mod index;
 pub mod products;
 pub mod transactions;
 pub mod utils;
 
 use actix_files as fs;
-use actix_identity::IdentityService;
 use actix_web::web;
-use identity_policy::DbIdentityPolicy;
 
 /// Setup routes for admin ui
 pub fn init(config: &mut web::ServiceConfig) {
     config.service(
         web::scope("/")
-            // Set identity service for encrypted cookies
-            .wrap(IdentityService::new(DbIdentityPolicy::new()))
             // Setup static routes
             .service(fs::Files::new("/stylesheets", "static/stylesheets/"))
             .service(fs::Files::new("/javascripts", "static/javascripts/"))

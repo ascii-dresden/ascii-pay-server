@@ -19,11 +19,12 @@ use std::io::{stdin, stdout, Write};
 mod api;
 mod backup;
 mod core;
+mod identity_policy;
 mod server;
 mod web;
 
 use crate::core::{
-    authentication_password, Account, DbConnection, Permission, Pool, ServiceResult
+    authentication_password, Account, DbConnection, Permission, Pool, ServiceResult,
 };
 use server::start_server;
 
@@ -50,8 +51,7 @@ fn init() -> ServiceResult<()> {
     // Setup database connection
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let manager = ConnectionManager::<DbConnection>::new(database_url);
-    let pool = r2d2::Pool::builder()
-        .build(manager)?;
+    let pool = r2d2::Pool::builder().build(manager)?;
 
     let matches = App::new("ascii-prepaid-system")
         .version("1.0")

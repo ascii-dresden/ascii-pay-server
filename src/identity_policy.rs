@@ -19,21 +19,33 @@ lazy_static::lazy_static! {
 static ref SECRET_KEY: String = std::env::var("SECRET_KEY").unwrap_or_else(|_| "0123".repeat(8));
 }
 
+pub enum Action {
+    FORBIDDEN,
+    REDIRECT,
+}
+
 #[macro_export]
 macro_rules! login_required {
-    ($account:ident, $permission:path) => {
+    ($account:ident, $permission:path, $action:path) => {
         if let RetrievedAccount::Acc(acc) = $account {
             // if a logged account has been retrieved successfully, check its validity
             if acc.account.permission >= $permission {
                 acc
             } else {
-                return Ok(HttpResponse::Forbidden().finish());
+                return Ok(actix_web::HttpResponse::Forbidden().finish());
             }
         } else {
             // no retrieved session is equal to no session -> login
-            return Ok(HttpResponse::Found()
-                .header(http::header::LOCATION, "/login")
-                .finish());
+            match $action {
+                Action::FORBIDDEN => {
+                    return Ok(actix_web::HttpResponse::Forbidden().finish());
+                }
+                Action::REDIRECT => {
+                    return Ok(HttpResponse::Found()
+                        .header(actix_web::http::header::LOCATION, "/login")
+                        .finish());
+                }
+            }
         }
     };
 }
