@@ -1,4 +1,3 @@
-use actix_multipart::MultipartError;
 use actix_web::{error::ResponseError, Error as ActixError, HttpResponse};
 use derive_more::Display;
 
@@ -70,8 +69,8 @@ impl From<serde_json::Error> for ServiceError {
     }
 }
 
-impl From<MultipartError> for ServiceError {
-    fn from(error: MultipartError) -> Self {
+impl From<actix_multipart::MultipartError> for ServiceError {
+    fn from(error: actix_multipart::MultipartError) -> Self {
         ServiceError::InternalServerError("Error in Multipart stream", format!("{}", error))
     }
 }

@@ -23,12 +23,26 @@ mod server;
 mod web;
 
 use crate::core::{
-    authentication_password, Account, DbConnection, Permission, Pool, ServiceResult,
+    authentication_password, Account, DbConnection, Permission, Pool, ServiceResult
 };
 use server::start_server;
 
+fn main() {
+    let result = init();
+
+    let exit_code = match result {
+        Ok(_) => 0,
+        Err(e) => {
+            eprintln!("{}", e);
+            1
+        }
+    };
+
+    std::process::exit(exit_code);
+}
+
 // For later ref: https://gill.net.in/posts/auth-microservice-rust-actix-web1.0-diesel-complete-tutorial/
-fn main() -> ServiceResult<()> {
+fn init() -> ServiceResult<()> {
     dotenv::dotenv().ok();
     std::env::set_var("RUST_LOG", "actix_web=info,actix_server=info");
     env_logger::init();
@@ -37,8 +51,7 @@ fn main() -> ServiceResult<()> {
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let manager = ConnectionManager::<DbConnection>::new(database_url);
     let pool = r2d2::Pool::builder()
-        .build(manager)
-        .expect("Failed to create pool.");
+        .build(manager)?;
 
     let matches = App::new("ascii-prepaid-system")
         .version("1.0")
