@@ -148,6 +148,20 @@ pub fn get_by_account(
     Ok(results)
 }
 
+pub fn get_by_account_and_id(
+    conn: &DbConnection,
+    account: &Account,
+    id: &Uuid,
+) -> ServiceResult<Transaction> {
+    use crate::core::schema::transaction::dsl;
+
+    let mut results = dsl::transaction
+        .filter(dsl::account_id.eq(&account.id).and(dsl::id.eq(id)))
+        .load::<Transaction>(conn)?;
+
+    results.pop().ok_or_else(|| ServiceError::NotFound)
+}
+
 #[derive(Debug)]
 pub enum ValidationError {
     Invalid(Money),
@@ -206,39 +220,97 @@ impl Transaction {
     pub fn add_products(
         &self,
         conn: &DbConnection,
-        products: HashMap<Product, i32>,
+        products: Vec<(Product, i32)>,
     ) -> ServiceResult<()> {
         use crate::core::schema::transaction_product::dsl;
 
+        let current_products = self
+            .get_products(&conn)?
+            .into_iter()
+            .collect::<HashMap<Product, i32>>();
+
         for (product, amount) in products {
-            diesel::insert_into(dsl::transaction_product)
-                .values((
-                    dsl::transaction.eq(&self.id),
-                    dsl::product_id.eq(&product.id),
-                    dsl::amount.eq(amount),
-                ))
-                .execute(conn)?;
+            match current_products.get(&product) {
+                Some(current_amount) => {
+                    diesel::update(
+                        dsl::transaction_product.filter(
+                            dsl::transaction
+                                .eq(&self.id)
+                                .and(dsl::product_id.eq(&product.id)),
+                        ),
+                    )
+                    .set(dsl::amount.eq(current_amount + amount))
+                    .execute(conn)?;
+                }
+                None => {
+                    diesel::insert_into(dsl::transaction_product)
+                        .values((
+                            dsl::transaction.eq(&self.id),
+                            dsl::product_id.eq(&product.id),
+                            dsl::amount.eq(amount),
+                        ))
+                        .execute(conn)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Remove products with amounts from this transaction
+    pub fn remove_products(
+        &self,
+        conn: &DbConnection,
+        products: Vec<(Product, i32)>,
+    ) -> ServiceResult<()> {
+        use crate::core::schema::transaction_product::dsl;
+
+        let current_products = self
+            .get_products(&conn)?
+            .into_iter()
+            .collect::<HashMap<Product, i32>>();
+
+        for (product, amount) in products {
+            if let Some(current_amount) = current_products.get(&product) {
+                if *current_amount <= amount {
+                    diesel::delete(
+                        dsl::transaction_product.filter(
+                            dsl::transaction
+                                .eq(&self.id)
+                                .and(dsl::product_id.eq(&product.id)),
+                        ),
+                    )
+                    .execute(conn)?;
+                } else {
+                    diesel::update(
+                        dsl::transaction_product.filter(
+                            dsl::transaction
+                                .eq(&self.id)
+                                .and(dsl::product_id.eq(&product.id)),
+                        ),
+                    )
+                    .set(dsl::amount.eq(current_amount - amount))
+                    .execute(conn)?;
+                }
+            }
         }
 
         Ok(())
     }
 
     /// List assigned products with amounts of this transaction
-    pub fn get_products(&self, conn: &DbConnection) -> ServiceResult<HashMap<Product, i32>> {
+    pub fn get_products(&self, conn: &DbConnection) -> ServiceResult<Vec<(Product, i32)>> {
         use crate::core::schema::transaction_product::dsl;
 
-        let results = dsl::transaction_product
+        Ok(dsl::transaction_product
             .filter(dsl::transaction.eq(&self.id))
-            .load::<(Uuid, Uuid, i32)>(conn)?;
-
-        let mut map = HashMap::new();
-
-        for (_, p, a) in results {
-            let product = Product::get(conn, &p)?;
-            map.insert(product, a);
-        }
-
-        Ok(map)
+            .load::<(Uuid, Uuid, i32)>(conn)?
+            .into_iter()
+            .filter_map(|(_, p, a)| match Product::get(conn, &p) {
+                Ok(p) => Some((p, a)),
+                _ => None,
+            })
+            .collect())
     }
 
     pub fn all(conn: &DbConnection) -> ServiceResult<Vec<Transaction>> {

@@ -100,6 +100,10 @@ pub fn init(config: &mut web::ServiceConfig) {
                     .route(web::get().to(transactions::get_transactions)),
             )
             .service(
+                web::resource("/transaction/{account_id}/{transaction_id}")
+                    .route(web::get().to(transactions::get_transaction_details)),
+            )
+            .service(
                 web::resource("/transaction/execute/{account_id}")
                     .route(web::post().to(transactions::post_execute_transaction)),
             ),

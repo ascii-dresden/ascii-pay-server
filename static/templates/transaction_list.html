@@ -12,15 +12,15 @@
         <div class="columns">
             <div class="column col-12">
                 <div>Name</div>
-                <h3 class="d-block">{{account.name}}</h1>
+                <h3 class="d-block">{{account.name}}</h3>
             </div>
             <div class="column col-4 col-sm-6">
                 <div>Credit</div>
-                <h3 class="d-block{{#if (lt account.credit 0)}} text-error{{/if}}{{#if (gt account.credit 0)}} text-success{{/if}}">{{currency account.credit}}€</h1>
+                <h3 class="d-block{{#if (lt account.credit 0)}} text-error{{/if}}{{#if (gt account.credit 0)}} text-success{{/if}}">{{currency account.credit}}€</h3>
             </div>
             <div class="column col-4 col-sm-6">
                 <div>Minimum credit</div>
-                <h3 class="d-block">{{currency account.minimum_credit}}€</h1>
+                <h3 class="d-block">{{currency account.minimum_credit}}€</h3>
             </div>
             <div class="column col-ml-auto col-4 col-sm-12" style="margin-top: auto; margin-bottom: auto;">
                 <form action="/transaction/execute/{{account.id}}" method="POST">
@@ -67,7 +67,7 @@
                     <td>{{format_datetime date}}</td>
                     <td class="{{#if (lt total 0)}}text-error{{/if}}{{#if (gt total 0)}}text-success{{/if}}">{{currency total}}</td>
                     <td>
-                        <a href="#">Details</a>
+                        <a href="/transaction/{{../account.id}}/{{id}}">Details</a>
                     </td>
                 </tr>
                 {{/each}}

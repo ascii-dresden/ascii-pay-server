@@ -164,9 +164,7 @@ impl Account {
 
         let mut results = dsl::account.filter(dsl::id.eq(id)).load::<Account>(conn)?;
 
-        let a = results.pop().ok_or_else(|| ServiceError::NotFound)?;
-
-        Ok(a)
+        results.pop().ok_or_else(|| ServiceError::NotFound)
     }
 
     pub fn import(conn: &DbConnection, template: &Account) -> ServiceResult<Account> {

@@ -167,7 +167,7 @@ pub fn import(pool: &Pool, src: &str) -> ServiceResult<()> {
             backup_transaction.transaction.date,
         )?;
 
-        let transaction_products: HashMap<Product, i32> = backup_transaction
+        let transaction_products: Vec<(Product, i32)> = backup_transaction
             .products
             .iter()
             .map(|(key, count)| {

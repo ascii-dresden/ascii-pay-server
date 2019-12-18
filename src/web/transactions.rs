@@ -1,4 +1,6 @@
-use crate::core::{transactions, Account, Money, Permission, Pool, ServiceResult};
+use crate::core::{
+    transactions, Account, DbConnection, Money, Permission, Pool, Product, ServiceResult,
+};
 use crate::identity_policy::{Action, RetrievedAccount};
 use crate::login_required;
 use crate::web::utils::HbData;
@@ -27,6 +29,39 @@ fn get_none() -> Option<NaiveDateTime> {
 #[derive(Deserialize)]
 pub struct Execute {
     pub total: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TransactionProduct {
+    pub product_id: Uuid,
+    pub product: Option<Product>,
+    pub amount: i32,
+    pub current_price: Option<Money>,
+}
+
+impl TransactionProduct {
+    pub fn vec_to_transaction_product(list: Vec<(Product, i32)>) -> Vec<TransactionProduct> {
+        list.into_iter()
+            .map(|(p, a)| TransactionProduct {
+                product_id: p.id,
+                current_price: p.current_price.map(|price| price * a),
+                product: Some(p),
+                amount: a,
+            })
+            .collect()
+    }
+
+    pub fn vec_from_transaction_product(
+        conn: &DbConnection,
+        list: Vec<TransactionProduct>,
+    ) -> Vec<(Product, i32)> {
+        list.into_iter()
+            .filter_map(|p| match Product::get(&conn, &p.product_id) {
+                Ok(product) => Some((product, p.amount)),
+                _ => None,
+            })
+            .collect()
+    }
 }
 
 /// GET route for `/transactions/{account_id}`
@@ -99,6 +134,39 @@ pub async fn post_execute_transaction(
             format!("/transactions/{}", &account_id),
         )
         .finish())
+}
+
+/// GET route for `/transaction/{account_id}/{transaction_id}`
+pub async fn get_transaction_details(
+    pool: web::Data<Pool>,
+    hb: web::Data<Handlebars>,
+    logged_account: RetrievedAccount,
+    request: HttpRequest,
+    path: web::Path<(String, String)>,
+) -> ServiceResult<HttpResponse> {
+    println!("call");
+    let logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+
+    let conn = &pool.get()?;
+
+    let account_id = Uuid::parse_str(&path.0)?;
+    let transaction_id = Uuid::parse_str(&path.1)?;
+
+    let account = Account::get(&conn, &account_id)?;
+
+    let transaction = transactions::get_by_account_and_id(&conn, &account, &transaction_id)?;
+    let products = transaction.get_products(&conn)?;
+
+    let products = TransactionProduct::vec_to_transaction_product(products);
+
+    let body = HbData::new(&request)
+        .with_account(logged_account)
+        .with_data("account", &account)
+        .with_data("transaction", &transaction)
+        .with_data("products", &products)
+        .render(&hb, "transaction_details")?;
+
+    Ok(HttpResponse::Ok().body(body))
 }
 
 /// Serialize/Deserialize a datetime to/from only a date

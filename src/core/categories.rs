@@ -190,11 +190,11 @@ impl Category {
             .filter(dsl::id.eq(id))
             .load::<Category>(conn)?;
 
-        let mut a = results.pop().ok_or_else(|| ServiceError::NotFound)?;
+        let mut category = results.pop().ok_or_else(|| ServiceError::NotFound)?;
 
-        a.load_prices(conn)?;
+        category.load_prices(conn)?;
 
-        Ok(a)
+        Ok(category)
     }
 
     pub fn import(conn: &DbConnection, template: &Category) -> ServiceResult<Category> {
