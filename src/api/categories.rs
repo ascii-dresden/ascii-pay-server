@@ -4,7 +4,7 @@ use crate::web::utils::Search;
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
 
-/// GET route for `/categories`
+/// GET route for `/api/v1/categories`
 pub async fn get_categories(
     pool: web::Data<Pool>,
     query: web::Query<Search>,
@@ -25,7 +25,7 @@ pub async fn get_categories(
     Ok(HttpResponse::Ok().json(&search_categories))
 }
 
-/// GET route for `/category/{category_id}`
+/// GET route for `/api/v1/category/{category_id}`
 pub async fn get_category_edit(
     pool: web::Data<Pool>,
     category_id: web::Path<String>,

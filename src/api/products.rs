@@ -4,7 +4,7 @@ use crate::web::utils::Search;
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
 
-/// GET route for `/products`
+/// GET route for `/api/v1/products`
 pub async fn get_products(
     pool: web::Data<Pool>,
     query: web::Query<Search>,
@@ -25,7 +25,7 @@ pub async fn get_products(
     Ok(HttpResponse::Ok().json(&search_products))
 }
 
-/// GET route for `/product/{product_id}`
+/// GET route for `/api/v1/product/{product_id}`
 pub async fn get_product_edit(
     pool: web::Data<Pool>,
     product_id: web::Path<String>,

@@ -71,7 +71,7 @@ pub async fn get_transactions(
     Ok(HttpResponse::Ok().body(body))
 }
 
-/// GET route for `/transaction/execute/{account_id}`
+/// POST route for `/transaction/execute/{account_id}`
 pub async fn post_execute_transaction(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,

@@ -123,9 +123,9 @@ fn check_admin(pool: &Pool) -> ServiceResult<()> {
         .iter()
         .filter(|a| a.permission.is_admin())
         .any(|a| {
-            !authentication_password::get_usernames(&conn, a)
-                .unwrap_or_else(|_| vec![])
-                .is_empty()
+            authentication_password::get_usernames(&conn, a)
+                .map(|v| !v.is_empty())
+                .unwrap_or_else(|_| false)
         });
 
     if !admin_with_password_exists {

@@ -1,6 +1,8 @@
-mod accounts;
-mod categories;
-mod products;
+pub mod accounts;
+pub mod authentication;
+pub mod categories;
+pub mod products;
+pub mod transactions;
 
 use actix_web::web;
 
@@ -8,11 +10,17 @@ use actix_web::web;
 pub fn init(config: &mut web::ServiceConfig) {
     config.service(
         web::scope("/api/v1")
+            .service(web::resource("/login").route(web::post().to(authentication::post_login)))
+            .service(web::resource("/logout").route(web::post().to(authentication::post_logout)))
             // Setup account mangement related routes
             .service(web::resource("/accounts").route(web::get().to(accounts::get_accounts)))
             .service(
                 web::resource("/account/{account_id}")
                     .route(web::get().to(accounts::get_account_edit)),
+            )
+            .service(
+                web::resource("/transaction/execute")
+                    .route(web::post().to(transactions::post_execute_transaction)),
             )
             // Setup product mangement related routes
             .service(web::resource("/products").route(web::get().to(products::get_products)))

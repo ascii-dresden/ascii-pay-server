@@ -6,7 +6,7 @@ use crate::web::utils::Search;
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
 
-/// GET route for `/accounts`
+/// GET route for `/api/v1/accounts`
 pub async fn get_accounts(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
@@ -30,7 +30,7 @@ pub async fn get_accounts(
     Ok(HttpResponse::Ok().json(&search_accounts))
 }
 
-/// GET route for `/account/{account_id}`
+/// GET route for `/api/v1/account/{account_id}`
 pub async fn get_account_edit(
     pool: web::Data<Pool>,
     account_id: web::Path<String>,
