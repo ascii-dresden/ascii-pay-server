@@ -43,7 +43,7 @@ fn format_datetime_helper(
 }
 
 /// Start a new actix server with the given database pool
-pub fn start_server(pool: Pool) -> ServiceResult<()> {
+pub async fn start_server(pool: Pool) -> ServiceResult<()> {
     // Read config params from env
     let host = std::env::var("HOST").unwrap_or_else(|_| "localhost".to_string());
     let port = std::env::var("PORT")
@@ -72,7 +72,7 @@ pub fn start_server(pool: Pool) -> ServiceResult<()> {
             // Move database pool
             .data(pool.clone())
             // Set handlebars reference
-            .register_data(handlebars_ref.clone())
+            .app_data(handlebars_ref.clone())
             // Logger
             .wrap(middleware::Logger::default())
             // Set identity service for encrypted cookies
@@ -83,7 +83,8 @@ pub fn start_server(pool: Pool) -> ServiceResult<()> {
             .configure(module_web::init)
     })
     .bind(address)?
-    .run()?;
+    .run()
+    .await?;
 
     Ok(())
 }

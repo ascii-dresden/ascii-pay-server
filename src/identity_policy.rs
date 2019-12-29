@@ -204,7 +204,7 @@ impl LoggedAccount {
                 .id
                 .to_hyphenated()
                 .encode_upper(&mut Uuid::encode_buffer())
-                .to_string(),
+                .to_owned(),
             account,
         })
     }

@@ -41,7 +41,7 @@ where
     let name = Uuid::new_v4()
         .to_hyphenated()
         .encode_upper(&mut Uuid::encode_buffer())
-        .to_string();
+        .to_owned();
 
     let mut dir = std::env::temp_dir();
     dir.push(format!("aps-{}.tmp", name));
@@ -114,7 +114,7 @@ pub fn import(pool: &Pool, src: &str) -> ServiceResult<()> {
     let name = Uuid::new_v4()
         .to_hyphenated()
         .encode_upper(&mut Uuid::encode_buffer())
-        .to_string();
+        .to_owned();
 
     let mut dir = std::env::temp_dir();
     dir.push(format!("aps-{}", name));

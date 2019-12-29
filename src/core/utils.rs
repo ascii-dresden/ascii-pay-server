@@ -24,7 +24,7 @@ pub fn generate_uuid_str() -> String {
     generate_uuid()
         .to_hyphenated()
         .encode_upper(&mut Uuid::encode_buffer())
-        .to_string()
+        .to_owned()
 }
 
 pub fn fuzzy_vec_match(search: &str, values: &[String]) -> Option<Vec<String>> {

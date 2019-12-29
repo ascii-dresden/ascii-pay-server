@@ -48,7 +48,7 @@ impl SearchAccount {
                 .id
                 .to_hyphenated()
                 .encode_upper(&mut Uuid::encode_buffer())
-                .to_string(),
+                .to_owned(),
             account.name.clone().unwrap_or_else(|| "".to_owned()),
             account.mail.clone().unwrap_or_else(|| "".to_owned()),
             match account.permission {

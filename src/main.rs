@@ -28,8 +28,9 @@ use crate::core::{
 };
 use server::start_server;
 
-fn main() {
-    let result = init();
+#[actix_rt::main]
+async fn main() -> ServiceResult<()> {
+    let result = init().await;
 
     let exit_code = match result {
         Ok(_) => 0,
@@ -43,7 +44,7 @@ fn main() {
 }
 
 // For later ref: https://gill.net.in/posts/auth-microservice-rust-actix-web1.0-diesel-complete-tutorial/
-fn init() -> ServiceResult<()> {
+async fn init() -> ServiceResult<()> {
     dotenv::dotenv().ok();
     std::env::set_var("RUST_LOG", "actix_web=info,actix_server=info");
     env_logger::init();
@@ -84,7 +85,7 @@ fn init() -> ServiceResult<()> {
     check_admin(&pool)?;
 
     // Setup web server
-    start_server(pool)?;
+    start_server(pool).await?;
 
     Ok(())
 }
