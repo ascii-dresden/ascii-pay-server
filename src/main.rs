@@ -54,7 +54,7 @@ async fn init() -> ServiceResult<()> {
     let manager = ConnectionManager::<DbConnection>::new(database_url);
     let pool = r2d2::Pool::builder().build(manager)?;
 
-    let matches = App::new("ascii-prepaid-system")
+    let matches = App::new("ascii-pay")
         .version("1.0")
         .author("Lars Westermann <lars-westermann@live.de>")
         .author("Felix Wittwer <dev@felixwittwer.de>")
@@ -82,7 +82,7 @@ async fn init() -> ServiceResult<()> {
     }
 
     // Check if admin exists, create otherwise
-    check_admin(&pool)?;
+    check_admin_user_exisits(&pool)?;
 
     // Setup web server
     start_server(pool).await?;
@@ -117,7 +117,7 @@ fn read_value(prompt: &str, hide_input: bool) -> String {
 }
 
 /// Check if a initial user exists. Otherwise create a new one
-fn check_admin(pool: &Pool) -> ServiceResult<()> {
+fn check_admin_user_exisits(pool: &Pool) -> ServiceResult<()> {
     let conn = &pool.get().unwrap();
 
     let admin_with_password_exists = Account::all(&conn)?

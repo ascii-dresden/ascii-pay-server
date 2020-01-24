@@ -3,3 +3,11 @@
 
 b {
   color: #3b4351; }
+
+.body-toast {
+  position: fixed;
+  bottom: 0;
+  width: 100%; }
+
+.toast-action {
+  margin-right: 1rem; }

@@ -8,9 +8,8 @@ CREATE TABLE "account" (
 );
 
 CREATE TABLE "authentication_barcode" (
-  "account_id" UUID NOT NULL,
-  "code" VARCHAR UNIQUE NOT NULL,
-  PRIMARY KEY ("account_id", "code")
+  "account_id" UUID PRIMARY KEY NOT NULL,
+  "code" VARCHAR UNIQUE NOT NULL
 );
 
 CREATE TABLE "authentication_password" (
@@ -23,6 +22,13 @@ CREATE TABLE "authentication_password_invitation" (
   "account_id" UUID PRIMARY KEY NOT NULL,
   "link" VARCHAR(100) UNIQUE NOT NULL,
   "valid_until" TIMESTAMP NOT NULL
+);
+
+CREATE TABLE "authentication_nfc" (
+  "account_id" UUID PRIMARY KEY NOT NULL,
+  "card_id" VARCHAR UNIQUE NOT NULL,
+  "key" VARCHAR,
+  "secret" VARCHAR
 );
 
 CREATE TABLE "transaction" (
@@ -52,6 +58,11 @@ CREATE TABLE "product" (
   "image" VARCHAR(105)
 );
 
+CREATE TABLE "product_barcode" (
+  "product_id" UUID PRIMARY KEY NOT NULL,
+  "code" VARCHAR UNIQUE NOT NULL
+);
+
 CREATE TABLE "product_price" (
   "product_id" UUID NOT NULL,
   "validity_start" TIMESTAMP NOT NULL,
@@ -67,7 +78,7 @@ CREATE TABLE "transaction_product" (
 );
 
 CREATE TABLE "session" (
-  "id" UUID PRIMARY KEY NOT NULL,
+  "id" VARCHAR PRIMARY KEY NOT NULL,
   "account_id" UUID NOT NULL,
   "valid_until" TIMESTAMP NOT NULL
 );

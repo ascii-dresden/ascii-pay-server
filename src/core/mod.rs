@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
 mod accounts;
-mod authentication;
 pub mod authentication_barcode;
+pub mod authentication_nfc;
 pub mod authentication_password;
 mod categories;
 mod errors;
@@ -15,7 +15,6 @@ pub mod transactions;
 mod utils;
 
 pub use self::accounts::{Account, Permission};
-pub use self::authentication::Authentication;
 pub use self::categories::*;
 pub use self::errors::*;
 pub use self::prices::*;

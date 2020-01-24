@@ -182,9 +182,88 @@ function initMoneyInput(input) {
     });
 }
 
+let eventHandlers = [];
+
+function initSSE(onmessage) {
+    if (eventHandlers.length == 0) {
+        eventHandlers.push(onmessage)
+
+        const evtSource = new EventSource("/events");
+        evtSource.onmessage = function(event) {
+            try {
+                let data = JSON.parse(event.data);
+                for (let on of eventHandlers) {
+                    console.log(1);
+                    on(data);
+                }
+            } catch {
+                // Nothing to do
+            }
+        }
+    } else {
+        eventHandlers.push(onmessage)
+    }
+}
+
+function toast(message, actionLabel, actionCallback) {
+    let toasts = document.body.getElementsByClassName("body-toast");
+    for (let t of toasts) {
+        document.body.removeChild(t);
+    }
+
+    let container = document.createElement("div");
+    container.classList.add("body-toast");
+
+    let toast = document.createElement("div");
+    toast.classList.add("container", "grid-lg", "toast", "toast-primary");
+    toast.textContent = message;
+    container.appendChild(toast);
+    
+    let close = document.createElement("span");
+    close.classList.add("btn", "btn-clear", "float-right");
+    close.addEventListener("click", () => {
+        let toasts = document.body.getElementsByClassName("body-toast");
+        for (let t of toasts) {
+            document.body.removeChild(t);
+        }
+    });
+    toast.appendChild(close);
+
+    let action = document.createElement("span");
+    action.classList.add("toast-action", "float-right");
+    action.textContent = actionLabel;
+    action.addEventListener("click", () => {
+        actionCallback();
+
+        let toasts = document.body.getElementsByClassName("body-toast");
+        for (let t of toasts) {
+            document.body.removeChild(t);
+        }
+    });
+    toast.appendChild(action);
+
+    document.body.appendChild(container);
+    setTimeout(() => {
+        let toasts = document.body.getElementsByClassName("body-toast");
+        for (let t of toasts) {
+            document.body.removeChild(t);
+        }
+    }, 10000);
+}
+
+function parseGlobalSSE(data) {
+    let path = "/product/" + data.id;
+    if (data && data.name && data.current_price && window.location.pathname !== path) {
+        toast("Found product: '" + data.name + "' ("+(data.current_price / 100).toFixed(2)+"€)", "Edit?", () => {
+            window.location = path;
+        });
+    }
+}
+
 /**
  * Init function is called after dom is completly loaded.
  */
 window.addEventListener('DOMContentLoaded', (event) => {
     initMoneyInputs();
+    initSSE(parseGlobalSSE);
 });

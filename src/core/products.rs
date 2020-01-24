@@ -4,6 +4,7 @@ use std::fs::{self, File};
 use std::path::Path;
 use uuid::Uuid;
 
+use crate::core::schema::product_barcode;
 use crate::core::{
     generate_uuid, Category, DbConnection, Money, Price, ServiceError, ServiceResult, DB,
 };
@@ -24,6 +25,15 @@ pub struct Product {
     #[serde(default = "std::vec::Vec::new")]
     pub prices: Vec<Price>,
     pub current_price: Option<Money>,
+    pub barcode: Option<String>,
+}
+
+#[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset, Clone)]
+#[table_name = "product_barcode"]
+#[primary_key("product_id")]
+struct ProductBarcode {
+    product_id: Uuid,
+    code: String,
 }
 
 /// Custom db loader for `Product`
@@ -60,6 +70,7 @@ impl
             image: row.3,
             prices: vec![],
             current_price: None,
+            barcode: None,
         }
     }
 }
@@ -85,6 +96,7 @@ impl Product {
             image: None,
             prices: vec![],
             current_price: None,
+            barcode: None,
         };
 
         diesel::insert_into(dsl::product)
@@ -112,6 +124,29 @@ impl Product {
         diesel::update(dsl::product.find(&self.id))
             .set((dsl::name.eq(&self.name), dsl::category.eq(&category)))
             .execute(conn)?;
+
+        match &self.barcode {
+            Some(barcode) => {
+                use crate::core::schema::product_barcode::dsl;
+
+                let help = ProductBarcode {
+                    product_id: self.id,
+                    code: barcode.clone(),
+                };
+
+                diesel::insert_into(dsl::product_barcode)
+                    .values(&help)
+                    .on_conflict(dsl::product_id)
+                    .do_update()
+                    .set(&help)
+                    .execute(conn)?;
+            }
+            None => {
+                use crate::core::schema::product_barcode::dsl;
+                diesel::delete(dsl::product_barcode.filter(dsl::product_id.eq(&self.id)))
+                    .execute(conn)?;
+            }
+        }
 
         Ok(())
     }
@@ -186,6 +221,17 @@ impl Product {
             Some(category) => Some(Category::get(&conn, &category.id)?),
             None => None,
         };
+
+        Ok(())
+    }
+
+    fn load_barcode(&mut self, conn: &DbConnection) -> ServiceResult<()> {
+        use crate::core::schema::product_barcode::dsl;
+        let mut results = dsl::product_barcode
+            .filter(dsl::product_id.eq(&self.id))
+            .load::<ProductBarcode>(conn)?;
+
+        self.barcode = results.pop().map(|x| x.code);
 
         Ok(())
     }
@@ -274,6 +320,7 @@ impl Product {
         for p in &mut results {
             p.load_category(conn)?;
             p.load_prices(conn)?;
+            p.load_barcode(conn)?;
         }
 
         Ok(results)
@@ -289,8 +336,21 @@ impl Product {
 
         p.load_category(conn)?;
         p.load_prices(conn)?;
+        p.load_barcode(conn)?;
 
         Ok(p)
+    }
+
+    pub fn get_by_barcode(conn: &DbConnection, code: &str) -> ServiceResult<Product> {
+        use crate::core::schema::product_barcode::dsl;
+
+        let mut results = dsl::product_barcode
+            .filter(dsl::code.eq(code))
+            .load::<ProductBarcode>(conn)?;
+
+        let p = results.pop().ok_or_else(|| ServiceError::NotFound)?;
+
+        Self::get(conn, &p.product_id)
     }
 
     pub fn import(
@@ -312,6 +372,7 @@ impl Product {
             image: template.image.clone(),
             prices: vec![],
             current_price: None,
+            barcode: template.barcode.clone(),
         };
 
         diesel::insert_into(dsl::product)
@@ -321,6 +382,19 @@ impl Product {
                 dsl::category.eq(&category_id),
             ))
             .execute(conn)?;
+
+        if let Some(barcode) = &p.barcode {
+            use crate::core::schema::product_barcode::dsl;
+
+            let help = ProductBarcode {
+                product_id: p.id,
+                code: barcode.clone(),
+            };
+
+            diesel::insert_into(dsl::product_barcode)
+                .values(&help)
+                .execute(conn)?;
+        }
 
         for price in &template.prices {
             p.add_price(&conn, price.validity_start, price.value)?;

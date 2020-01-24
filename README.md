@@ -1,4 +1,4 @@
-# ascii-prepaid-system
+# ascii-pay
 
 ## Run
 

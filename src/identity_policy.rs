@@ -8,8 +8,6 @@ use actix_web::{web, Error, FromRequest, HttpRequest};
 use futures::future::{err, ok, Ready};
 use futures::prelude::*;
 
-use uuid::Uuid;
-
 use crate::core::{
     Account, DbConnection, Pool, ServiceError, ServiceResult, Session, AUTH_COOKIE_NAME,
 };
@@ -87,7 +85,7 @@ impl DbIdentityPolicy {
         };
         let conn = &pool.get()?;
 
-        let mut session = Session::get(&conn, &Uuid::parse_str(&session_id)?)?;
+        let mut session = Session::get(&conn, &session_id)?;
 
         let account = Account::get(conn, &session.account_id)?;
 
@@ -200,11 +198,7 @@ impl LoggedAccount {
         let session = Session::create(&conn, &account.id)?;
 
         Ok(LoggedAccount {
-            session_id: session
-                .id
-                .to_hyphenated()
-                .encode_upper(&mut Uuid::encode_buffer())
-                .to_owned(),
+            session_id: session.id,
             account,
         })
     }
@@ -220,7 +214,7 @@ impl LoggedAccount {
     pub fn forget(&self, conn: &DbConnection, id: Identity) -> ServiceResult<()> {
         id.forget();
 
-        let session = Session::get(&conn, &Uuid::parse_str(&self.session_id)?)?;
+        let session = Session::get(&conn, &self.session_id)?;
         session.delete(&conn)?;
 
         Ok(())

@@ -26,6 +26,7 @@
                     <input class="form-input" type="text" name="name" value="{{product.name}}"/>
                 </div>
             </div>
+
             <div class="form-group">
                 <div class="col-3 col-sm-12">
                     <label class="form-label" for="category">Category</label>
@@ -39,6 +40,16 @@
                     </select>
                 </div>
             </div>
+
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="barcode">Barcode</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <input class="form-input barcode-target" type="text" name="barcode" value="{{product.barcode}}"/>
+                </div>
+            </div>
+
             <div class="form-group">
                 <div class="col-3 col-sm-12">
                     <label class="form-label">Prices</label>
@@ -135,5 +146,7 @@
             </div>
         </form>
     </div>
+
+    <script src="/javascripts/set_product_barcode.js"></script>
 </body>
 </html>

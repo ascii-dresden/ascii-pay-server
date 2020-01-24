@@ -1,5 +1,5 @@
 [package]
-name = "ascii-prepaid-system"
+name = "ascii-pay-server"
 version = "0.1.0"
 authors = ["Lars Westermann <lars-westermann@live.de>", "Felix Wittwer <dev@felixwittwer.de>"]
 edition = "2018"
@@ -11,7 +11,7 @@ actix-web = "2.0"
 actix-files = "0.2"
 actix-multipart = "0.2"
 actix-rt = "1.0"
-handlebars = "2.0"
+handlebars = {version = "3.0", features = ["dir_source"]}
 argonautica = "0.2"
 chrono = {version = "0.4", features = ["serde"]}
 derive_more = "0.15"
@@ -30,6 +30,7 @@ flate2 = "1.0"
 tar = "0.4"
 clap = "2.33"
 sublime_fuzzy = "0.6"
+base64 = "0.11"
 
 [build-dependencies]
 sass-rs = "0.2"

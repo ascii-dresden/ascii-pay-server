@@ -39,7 +39,7 @@ fn get_none() -> Option<NaiveDateTime> {
 /// GET route for `/` if user is logged in
 pub async fn get_index(
     pool: web::Data<Pool>,
-    hb: web::Data<Handlebars>,
+    hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
     query: web::Query<FromToQuery>,
     request: HttpRequest,
@@ -76,7 +76,7 @@ pub async fn get_index(
 
 /// GET route for `/login` if user is not logged in
 pub async fn get_login(
-    hb: web::Data<Handlebars>,
+    hb: web::Data<Handlebars<'_>>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
     let body = HbData::new(&request)
@@ -129,7 +129,7 @@ pub async fn get_logout(
 
 /// GET route for `/register/{invitation_id}` if user is not logged in
 pub async fn get_register(
-    hb: web::Data<Handlebars>,
+    hb: web::Data<Handlebars<'_>>,
     request: HttpRequest,
     pool: web::Data<Pool>,
     invitation_id: web::Path<String>,

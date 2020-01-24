@@ -81,7 +81,7 @@ impl SearchAccount {
 /// GET route for `/accounts`
 pub async fn get_accounts(
     pool: web::Data<Pool>,
-    hb: web::Data<Handlebars>,
+    hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
     query: web::Query<Search>,
     request: HttpRequest,
@@ -113,7 +113,7 @@ pub async fn get_accounts(
 /// GET route for `/account/{account_id}`
 pub async fn get_account_edit(
     pool: web::Data<Pool>,
-    hb: web::Data<Handlebars>,
+    hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
     account_id: web::Path<String>,
     request: HttpRequest,
@@ -200,7 +200,7 @@ pub async fn post_account_edit(
 
 /// GET route for `/account/create`
 pub async fn get_account_create(
-    hb: web::Data<Handlebars>,
+    hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
@@ -278,7 +278,7 @@ pub async fn revoke_get(
 
 /// GET route for `/account/delete/{account_id}`
 pub async fn delete_get(
-    _hb: web::Data<Handlebars>,
+    _hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
     _account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {

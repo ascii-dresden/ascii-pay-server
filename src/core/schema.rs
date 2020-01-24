@@ -10,9 +10,18 @@ table! {
 }
 
 table! {
-    authentication_barcode (account_id, code) {
+    authentication_barcode (account_id) {
         account_id -> Uuid,
         code -> Varchar,
+    }
+}
+
+table! {
+    authentication_nfc (account_id) {
+        account_id -> Uuid,
+        card_id -> Varchar,
+        key -> Nullable<Varchar>,
+        secret -> Nullable<Varchar>,
     }
 }
 
@@ -57,6 +66,13 @@ table! {
 }
 
 table! {
+    product_barcode (product_id) {
+        product_id -> Uuid,
+        code -> Varchar,
+    }
+}
+
+table! {
     product_price (product_id, validity_start) {
         product_id -> Uuid,
         validity_start -> Timestamp,
@@ -66,7 +82,7 @@ table! {
 
 table! {
     session (id) {
-        id -> Uuid,
+        id -> Varchar,
         account_id -> Uuid,
         valid_until -> Timestamp,
     }
@@ -93,11 +109,13 @@ table! {
 allow_tables_to_appear_in_same_query!(
     account,
     authentication_barcode,
+    authentication_nfc,
     authentication_password,
     authentication_password_invitation,
     category,
     category_price,
     product,
+    product_barcode,
     product_price,
     session,
     transaction,

@@ -10,8 +10,11 @@ use actix_web::web;
 pub fn init(config: &mut web::ServiceConfig) {
     config.service(
         web::scope("/api/v1")
-            .service(web::resource("/login").route(web::post().to(authentication::post_login)))
-            .service(web::resource("/logout").route(web::post().to(authentication::post_logout)))
+            .service(
+                web::resource("/barcode/find")
+                    .route(web::get().to(authentication::get_barcode_find)),
+            )
+            .service(web::resource("/nfc/find").route(web::get().to(authentication::get_nfc_find)))
             // Setup account mangement related routes
             .service(web::resource("/accounts").route(web::get().to(accounts::get_accounts)))
             .service(
@@ -19,8 +22,12 @@ pub fn init(config: &mut web::ServiceConfig) {
                     .route(web::get().to(accounts::get_account_edit)),
             )
             .service(
-                web::resource("/transaction/execute")
-                    .route(web::post().to(transactions::post_execute_transaction)),
+                web::resource("/transaction/token")
+                    .route(web::post().to(transactions::post_transaction_token)),
+            )
+            .service(
+                web::resource("/transaction/payment")
+                    .route(web::post().to(transactions::post_transaction_payment)),
             )
             // Setup product mangement related routes
             .service(web::resource("/products").route(web::get().to(products::get_products)))

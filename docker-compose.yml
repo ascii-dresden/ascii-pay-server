@@ -2,11 +2,11 @@ version: "3"
 services:
   db:
     image: "postgres"
-    container_name: "ascii-prepaid-system-postgres"
+    container_name: "ascii-pay-postgres"
     environment:
       - POSTGRES_USER=ascii
       - POSTGRES_PASSWORD=ascii
-      - POSTGRES_DB=ascii-prepaid-system
+      - POSTGRES_DB=ascii-pay
     ports:
       - "54320:5432"
     volumes:

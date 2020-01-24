@@ -59,7 +59,7 @@ impl SearchCategory {
 
 /// GET route for `/categories`
 pub async fn get_categories(
-    hb: web::Data<Handlebars>,
+    hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
     query: web::Query<Search>,
@@ -91,7 +91,7 @@ pub async fn get_categories(
 
 /// GET route for `/category/{category_id}`
 pub async fn get_category_edit(
-    hb: web::Data<Handlebars>,
+    hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
     category_id: web::Path<String>,
@@ -162,7 +162,7 @@ pub async fn post_category_edit(
 
 /// GET route for `/category/create`
 pub async fn get_category_create(
-    hb: web::Data<Handlebars>,
+    hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
@@ -205,7 +205,7 @@ pub async fn post_category_create(
 
 /// GET route for `/category/delete/{category_id}`
 pub async fn get_category_delete(
-    _hb: web::Data<Handlebars>,
+    _hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
     _category_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {

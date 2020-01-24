@@ -24,6 +24,7 @@ pub struct FormProduct {
     pub validity_start: chrono::NaiveDateTime,
     #[serde(rename = "price-value-create")]
     pub value: f32,
+    pub barcode: String,
     #[serde(flatten)]
     pub extra: HashMap<String, String>,
 }
@@ -35,6 +36,7 @@ pub struct SearchProduct {
     pub name_search: String,
     pub category_search: String,
     pub current_price_search: String,
+    pub barcode_search: String,
 }
 
 impl SearchProduct {
@@ -50,6 +52,7 @@ impl SearchProduct {
                 .current_price
                 .map(|v| format!("{:.2}€", (v as f32) / 100.0))
                 .unwrap_or_else(|| "".to_owned()),
+            product.barcode.clone().unwrap_or_else(String::new),
         ];
 
         let mut result = if search.is_empty() {
@@ -63,6 +66,7 @@ impl SearchProduct {
 
         Some(SearchProduct {
             product,
+            barcode_search: result.pop().expect(""),
             current_price_search: result.pop().expect(""),
             category_search: result.pop().expect(""),
             name_search: result.pop().expect(""),
@@ -72,7 +76,7 @@ impl SearchProduct {
 
 /// GET route for `/products`
 pub async fn get_products(
-    hb: web::Data<Handlebars>,
+    hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
     query: web::Query<Search>,
@@ -104,7 +108,7 @@ pub async fn get_products(
 
 /// GET route for `/product/{product_id}`
 pub async fn get_product_edit(
-    hb: web::Data<Handlebars>,
+    hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
     product_id: web::Path<String>,
@@ -156,6 +160,12 @@ pub async fn post_product_edit(
     server_product.name = product.name.clone();
     server_product.category = category;
 
+    server_product.barcode = if product.barcode.trim().is_empty() {
+        None
+    } else {
+        Some(product.barcode.trim().to_owned())
+    };
+
     server_product.update(&conn)?;
 
     let mut delete_indeces = product
@@ -185,7 +195,7 @@ pub async fn post_product_edit(
 
 /// GET route for `/product/create`
 pub async fn get_product_create(
-    hb: web::Data<Handlebars>,
+    hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
     request: HttpRequest,
@@ -209,9 +219,12 @@ pub async fn post_product_create(
     pool: web::Data<Pool>,
     product: web::Form<FormProduct>,
 ) -> ServiceResult<HttpResponse> {
+    println!("------------------");
     let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
 
     let conn = &pool.get()?;
+
+    println!("-- '{}' --", product.category);
 
     let category = if product.category == "" {
         None
@@ -229,6 +242,12 @@ pub async fn post_product_create(
         )?;
     }
 
+    server_product.barcode = if product.barcode.trim().is_empty() {
+        None
+    } else {
+        Some(product.barcode.trim().to_owned())
+    };
+
     Ok(HttpResponse::Found()
         .header(
             http::header::LOCATION,
@@ -239,7 +258,7 @@ pub async fn post_product_create(
 
 /// GET route for `/product/delete/{product_id}`
 pub async fn get_product_delete(
-    _hb: web::Data<Handlebars>,
+    _hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
     _product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {

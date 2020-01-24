@@ -51,6 +51,7 @@ impl TransactionProduct {
             .collect()
     }
 
+    #[allow(dead_code)]
     pub fn vec_from_transaction_product(
         conn: &DbConnection,
         list: Vec<TransactionProduct>,
@@ -67,7 +68,7 @@ impl TransactionProduct {
 /// GET route for `/transactions/{account_id}`
 pub async fn get_transactions(
     pool: web::Data<Pool>,
-    hb: web::Data<Handlebars>,
+    hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
     account_id: web::Path<String>,
     query: web::Query<FromToQuery>,
@@ -139,7 +140,7 @@ pub async fn post_execute_transaction(
 /// GET route for `/transaction/{account_id}/{transaction_id}`
 pub async fn get_transaction_details(
     pool: web::Data<Pool>,
-    hb: web::Data<Handlebars>,
+    hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
     request: HttpRequest,
     path: web::Path<(String, String)>,

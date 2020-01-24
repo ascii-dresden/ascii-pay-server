@@ -74,6 +74,19 @@ impl From<actix_multipart::MultipartError> for ServiceError {
         ServiceError::InternalServerError("Error in Multipart stream", format!("{}", error))
     }
 }
+
+impl From<base64::DecodeError> for ServiceError {
+    fn from(error: base64::DecodeError) -> Self {
+        ServiceError::InternalServerError("Base64 error", format!("{}", error))
+    }
+}
+
+impl From<std::string::FromUtf8Error> for ServiceError {
+    fn from(error: std::string::FromUtf8Error) -> Self {
+        ServiceError::InternalServerError("Utf8Encoding error", format!("{}", error))
+    }
+}
+
 /*
 /// nightly - allow `?` on Option<T> to unwrap
 impl From<std::option::NoneError> for ServiceError {

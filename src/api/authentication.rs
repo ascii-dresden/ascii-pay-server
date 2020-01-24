@@ -1,39 +1,40 @@
-use crate::core::{Authentication, Pool, ServiceResult};
-use crate::identity_policy::{LoggedAccount, RetrievedAccount};
-use actix_identity::Identity;
+use crate::core::{
+    authentication_barcode, authentication_nfc, Pool, Product, ServiceError, ServiceResult,
+};
 use actix_web::{web, HttpResponse};
+use std::collections::HashMap;
 
-/// POST route for `/api/v1/login` if user is logged in
-pub async fn post_login(
+/// GET route for `/api/v1/barcode/find`
+pub async fn get_barcode_find(
     pool: web::Data<Pool>,
-    id: Identity,
-    authentication_data: web::Json<Authentication>,
+    data: web::Query<HashMap<String,String>>,
 ) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
 
-    let login_result = authentication_data.get_account(&conn);
-    match login_result {
-        Ok(account) => {
-            LoggedAccount::new(&conn, account)?.save(id)?;
-
-            Ok(HttpResponse::Ok().finish())
-        }
-        Err(_) => Ok(HttpResponse::Forbidden().finish()),
+    if !data.contains_key("code") {
+        return Err(ServiceError::BadRequest("Parameter expected!", "A get parameter 'code' was expected!".to_owned()));
     }
+    let code = data["code"].clone();
+
+    if let Ok(product) = Product::get_by_barcode(&conn, &code) {
+        return Ok(HttpResponse::Ok().json(&product));
+    }
+
+    if let Ok(account) = authentication_barcode::get(&conn, &code) {
+        return Ok(HttpResponse::Ok().json(&account));
+    }
+
+    Err(ServiceError::NotFound)
 }
 
-/// POST route for `/api/v1/logout`
-pub async fn post_logout(
+/// GET route for `/api/v1/nfc/find`
+pub async fn get_nfc_find(
     pool: web::Data<Pool>,
-    logged_account: RetrievedAccount,
-    id: Identity,
+    id: web::Query<String>,
 ) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
 
-    // TODO: Check implications of this -> any cleanup needed?
-    if let RetrievedAccount::Acc(acc) = logged_account {
-        acc.forget(conn, id)?;
-    }
+    let account = authentication_nfc::get(&conn, &id)?;
 
-    Ok(HttpResponse::Ok().finish())
+    Ok(HttpResponse::Ok().json(&account))
 }

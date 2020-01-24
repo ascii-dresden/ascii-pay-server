@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use uuid::Uuid;
 
 use crate::core::schema::authentication_barcode;
-use crate::core::{generate_uuid_str, Account, DbConnection, ServiceError, ServiceResult};
+use crate::core::{Account, DbConnection, ServiceError, ServiceResult};
 
 /// Represent a barcode - barcode authentication for the given account
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset)]
@@ -14,14 +14,12 @@ struct AuthenticationBarcode {
 }
 
 /// Set the barcode as authentication method for the given account
-pub fn generate(conn: &DbConnection, account: &Account) -> ServiceResult<()> {
+pub fn register(conn: &DbConnection, account: &Account, code: &str) -> ServiceResult<()> {
     use crate::core::schema::authentication_barcode::dsl;
-
-    let code = format!("ascii-pay-{}", generate_uuid_str());
 
     let a = AuthenticationBarcode {
         account_id: account.id,
-        code,
+        code: code.to_owned(),
     };
 
     remove(&conn, &account)?;
@@ -42,7 +40,7 @@ pub fn remove(conn: &DbConnection, account: &Account) -> ServiceResult<()> {
     Ok(())
 }
 
-pub fn get_barcodess(conn: &DbConnection, account: &Account) -> ServiceResult<Vec<String>> {
+pub fn get_barcodes(conn: &DbConnection, account: &Account) -> ServiceResult<Vec<String>> {
     use crate::core::schema::authentication_barcode::dsl;
 
     let results = dsl::authentication_barcode
