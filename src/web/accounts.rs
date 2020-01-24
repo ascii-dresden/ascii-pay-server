@@ -1,6 +1,6 @@
 use crate::core::{
     authentication_password, fuzzy_vec_match, Account, Money, Permission, Pool, ServiceError,
-    ServiceResult,
+    ServiceResult, authentication_barcode,
 };
 use crate::identity_policy::{Action, RetrievedAccount};
 use crate::login_required;
@@ -9,6 +9,8 @@ use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
 use uuid::Uuid;
 
+use std::collections::HashMap;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FormAccount {
     pub id: String,
@@ -16,11 +18,14 @@ pub struct FormAccount {
     pub mail: String,
     pub minimum_credit: f32,
     pub permission: Permission,
+    #[serde(flatten)]
+    pub extra: HashMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum DisplayType {
     TEXT,
+    EDIT,
     LINK,
 }
 
@@ -29,6 +34,7 @@ pub struct AuthenticationMethod {
     pub name: String,
     pub display: Option<(DisplayType, String)>,
     pub action: Option<(String, String)>,
+    pub id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -134,6 +140,7 @@ pub async fn get_account_edit(
                 "Revoke".to_owned(),
                 format!("/account/revoke/{}", &account.id),
             )),
+            id: None,
         });
     }
     for username in authentication_password::get_usernames(&conn, &account)? {
@@ -144,6 +151,7 @@ pub async fn get_account_edit(
                 "Revoke".to_owned(),
                 format!("/account/revoke/{}", &account.id),
             )),
+            id: None,
         });
     }
     if authentication_methods.is_empty() {
@@ -154,6 +162,26 @@ pub async fn get_account_edit(
                 "Create invitation".to_owned(),
                 format!("/account/invite/{}", &account.id),
             )),
+            id: None,
+        });
+    }
+
+    let mut barcode_id = 0;
+    for barcode in authentication_barcode::get_barcodes(&conn, &account)? {
+        authentication_methods.push(AuthenticationMethod {
+            name: "Barcode".to_owned(),
+            display: Some((DisplayType::EDIT, barcode)),
+            action: None,
+            id: Some(format!("barcode-{}", barcode_id)),
+        });
+        barcode_id += 1;
+    }
+    if authentication_methods.len() == 1 {
+        authentication_methods.push(AuthenticationMethod {
+            name: "Barcode".to_owned(),
+            display: Some((DisplayType::EDIT, "".to_owned())),
+            action: None,
+            id: Some(format!("barcode-{}", barcode_id)),
         });
     }
 
@@ -192,6 +220,13 @@ pub async fn post_account_edit(
     server_account.minimum_credit = (account.minimum_credit * 100.0) as Money;
 
     server_account.update(&conn)?;
+
+    authentication_barcode::remove(&conn, &server_account)?;
+    for (key, value) in &account.extra {
+        if key.starts_with("barcode-") {
+            authentication_barcode::register(&conn, &server_account, value).ok();
+        }
+    }
 
     Ok(HttpResponse::Found()
         .header(http::header::LOCATION, "/accounts")

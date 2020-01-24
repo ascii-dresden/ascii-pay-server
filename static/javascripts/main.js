@@ -193,7 +193,6 @@ function initSSE(onmessage) {
             try {
                 let data = JSON.parse(event.data);
                 for (let on of eventHandlers) {
-                    console.log(1);
                     on(data);
                 }
             } catch {
@@ -252,11 +251,26 @@ function toast(message, actionLabel, actionCallback) {
 }
 
 function parseGlobalSSE(data) {
-    let path = "/product/" + data.id;
-    if (data && data.name && data.current_price && window.location.pathname !== path) {
-        toast("Found product: '" + data.name + "' ("+(data.current_price / 100).toFixed(2)+"€)", "Edit?", () => {
-            window.location = path;
-        });
+    console.log(data);
+    if (data && data.id && data.prices) {
+        let path = "/product/" + data.id;
+        if (window.location.pathname !== path) {
+            var p = ""
+            if (data.current_price) {
+                p = " ("+(data.current_price / 100).toFixed(2)+"€)"
+            }
+            toast("Found product: '" + data.name + "'", "Edit?", () => {
+                window.location = path;
+            });
+        }
+    }
+    if (data && data.id && data.credit !== undefined) {
+        let path = "/account/" + data.id;
+        if (window.location.pathname !== path) {
+            toast("Found account: '" + data.name + "'", "Edit?", () => {
+                window.location = path;
+            });
+        }
     }
 }
 

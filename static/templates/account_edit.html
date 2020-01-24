@@ -90,7 +90,8 @@
                                 <td>
                                     {{#if display}}
                                     {{#if (eq display.0 "LINK")}}<a href="{{display.1}}">{{display.1}}</a>{{/if}}
-                                    {{#if (eq display.0 "TEXT")}}<input class="form-input" type="text" value="{{display.1}}" readonly />{{/if}}
+                                    {{#if (eq display.0 "TEXT")}}<input name="{{id}}" class="form-input" type="text" value="{{display.1}}" readonly />{{/if}}
+                                    {{#if (eq display.0 "EDIT")}}<input name="{{id}}" class="form-input" type="text" value="{{display.1}}" />{{/if}}
                                     {{/if}}
                                 </td>
                                 <td>
@@ -113,5 +114,7 @@
             </div>
         </form>
     </div>
+
+    <script src="/javascripts/set_account_barcode.js"></script>
 </body>
 </html>

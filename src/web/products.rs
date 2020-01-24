@@ -248,6 +248,8 @@ pub async fn post_product_create(
         Some(product.barcode.trim().to_owned())
     };
 
+    server_product.update(&conn)?;
+
     Ok(HttpResponse::Found()
         .header(
             http::header::LOCATION,
