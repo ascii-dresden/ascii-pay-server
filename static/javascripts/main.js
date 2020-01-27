@@ -252,22 +252,22 @@ function toast(message, actionLabel, actionCallback) {
 
 function parseGlobalSSE(data) {
     console.log(data);
-    if (data && data.id && data.prices) {
-        let path = "/product/" + data.id;
+    if (data && data.type === "product") {
+        let path = "/product/" + data.content.id;
         if (window.location.pathname !== path) {
             var p = ""
-            if (data.current_price) {
-                p = " ("+(data.current_price / 100).toFixed(2)+"€)"
+            if (data.content.current_price) {
+                p = " ("+(data.content.current_price / 100).toFixed(2)+"€)"
             }
-            toast("Found product: '" + data.name + "'", "Edit?", () => {
+            toast("Found product: '" + data.content.name + "'" + p, "Edit?", () => {
                 window.location = path;
             });
         }
     }
-    if (data && data.id && data.credit !== undefined) {
-        let path = "/account/" + data.id;
+    if (data && data.type === "account") {
+        let path = "/account/" + data.content.id;
         if (window.location.pathname !== path) {
-            toast("Found account: '" + data.name + "'", "Edit?", () => {
+            toast("Found account: '" + data.content.name + "'", "Edit?", () => {
                 window.location = path;
             });
         }

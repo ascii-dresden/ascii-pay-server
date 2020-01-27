@@ -1,6 +1,6 @@
 pub mod accounts;
-pub mod authentication;
 pub mod categories;
+pub mod identification;
 pub mod products;
 pub mod transactions;
 
@@ -11,10 +11,8 @@ pub fn init(config: &mut web::ServiceConfig) {
     config.service(
         web::scope("/api/v1")
             .service(
-                web::resource("/barcode/find")
-                    .route(web::get().to(authentication::get_barcode_find)),
+                web::resource("/identify").route(web::post().to(identification::post_identify)),
             )
-            .service(web::resource("/nfc/find").route(web::get().to(authentication::get_nfc_find)))
             // Setup account mangement related routes
             .service(web::resource("/accounts").route(web::get().to(accounts::get_accounts)))
             .service(

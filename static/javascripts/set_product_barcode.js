@@ -1,11 +1,11 @@
 function parseSSE(data) {
-    if (data && data.Qr && data.Qr.code) {
+    if (data && data.type === "qr-code") {
 
         let elements = document.getElementsByClassName("barcode-target");
 
-        toast("New barcode scanned: '" + data.Qr.code + "'", "Apply?", () => {
+        toast("New barcode scanned: '" + data.content.code + "'", "Apply?", () => {
             for (let element of elements) {
-                element.value = data.Qr.code;
+                element.value = data.content.code;
             }
         });
     }

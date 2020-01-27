@@ -47,9 +47,17 @@ impl Token {
 #[serde(tag = "type")]
 #[serde(rename_all = "kebab-case")]
 pub enum Authentication {
-    Barcode { code: String },
-    Nfc { id: String },
-    NfcSecret { id: String, secret: String },
+    Barcode {
+        code: String,
+    },
+    Nfc {
+        id: String,
+    },
+    NfcSecret {
+        id: String,
+        challenge: String,
+        response: String,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -62,8 +70,19 @@ pub struct TokenRequest {
 #[serde(tag = "type")]
 #[serde(rename_all = "kebab-case")]
 pub enum TokenResponse {
-    Authorized { token: String },
-    AuthenticationNeeded { id: String, key: String },
+    Authorized {
+        token: String,
+    },
+    AuthenticationNeeded {
+        id: String,
+        key: String,
+        challenge: String,
+    },
+    WriteKey {
+        id: String,
+        key: String,
+        secret: String,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -94,31 +113,34 @@ pub async fn post_transaction_token(
             }
         }
         Authentication::Nfc { id } => {
-            let result = authentication_nfc::get_with_secret(&conn, &id, "")?;
+            let result = authentication_nfc::get(&conn, &id)?;
             match result {
                 authentication_nfc::NfcResult::Ok { account } => TokenResponse::Authorized {
                     token: Token::new(&conn, &account, token_request.total)?.to_string()?,
                 },
-                authentication_nfc::NfcResult::AuthenticationRequested { key } => {
+                authentication_nfc::NfcResult::AuthenticationRequested { key, challenge } => {
                     TokenResponse::AuthenticationNeeded {
                         id: id.clone(),
                         key,
+                        challenge,
                     }
-                }
+                },
+                authentication_nfc::NfcResult::WriteKey { key, secret} => TokenResponse::WriteKey {
+                    id: id.clone(),
+                    key,
+                    secret
+                },
             }
         }
-        Authentication::NfcSecret { id, secret } => {
-            let result = authentication_nfc::get_with_secret(&conn, &id, &secret)?;
-            match result {
-                authentication_nfc::NfcResult::Ok { account } => TokenResponse::Authorized {
-                    token: Token::new(&conn, &account, token_request.total)?.to_string()?,
-                },
-                authentication_nfc::NfcResult::AuthenticationRequested { key } => {
-                    TokenResponse::AuthenticationNeeded {
-                        id: id.clone(),
-                        key,
-                    }
-                }
+        Authentication::NfcSecret {
+            id,
+            challenge,
+            response,
+        } => {
+            let account =
+                authentication_nfc::get_challenge_response(&conn, &id, &challenge, &response)?;
+            TokenResponse::Authorized {
+                token: Token::new(&conn, &account, token_request.total)?.to_string()?,
             }
         }
     };

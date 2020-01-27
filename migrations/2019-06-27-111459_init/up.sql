@@ -31,6 +31,12 @@ CREATE TABLE "authentication_nfc" (
   "secret" VARCHAR
 );
 
+CREATE TABLE "authentication_nfc_write_key" (
+  "account_id" UUID NOT NULL,
+  "card_id" VARCHAR NOT NULL,
+  PRIMARY KEY ("account_id", "card_id")
+);
+
 CREATE TABLE "transaction" (
   "id" UUID PRIMARY KEY NOT NULL,
   "account_id" UUID NOT NULL,

@@ -219,12 +219,9 @@ pub async fn post_product_create(
     pool: web::Data<Pool>,
     product: web::Form<FormProduct>,
 ) -> ServiceResult<HttpResponse> {
-    println!("------------------");
     let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
 
     let conn = &pool.get()?;
-
-    println!("-- '{}' --", product.category);
 
     let category = if product.category == "" {
         None

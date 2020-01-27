@@ -87,6 +87,18 @@ impl From<std::string::FromUtf8Error> for ServiceError {
     }
 }
 
+impl From<block_modes::InvalidKeyIvLength> for ServiceError {
+    fn from(error: block_modes::InvalidKeyIvLength) -> Self {
+        ServiceError::InternalServerError("Encryption error", format!("{}", error))
+    }
+}
+
+impl From<block_modes::BlockModeError> for ServiceError {
+    fn from(error: block_modes::BlockModeError) -> Self {
+        ServiceError::InternalServerError("Encryption error", format!("{}", error))
+    }
+}
+
 /*
 /// nightly - allow `?` on Option<T> to unwrap
 impl From<std::option::NoneError> for ServiceError {

@@ -26,6 +26,13 @@ table! {
 }
 
 table! {
+    authentication_nfc_write_key (account_id, card_id) {
+        account_id -> Uuid,
+        card_id -> Varchar,
+    }
+}
+
+table! {
     authentication_password (account_id) {
         account_id -> Uuid,
         username -> Varchar,
@@ -110,6 +117,7 @@ allow_tables_to_appear_in_same_query!(
     account,
     authentication_barcode,
     authentication_nfc,
+    authentication_nfc_write_key,
     authentication_password,
     authentication_password_invitation,
     category,

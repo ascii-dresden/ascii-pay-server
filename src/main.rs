@@ -10,6 +10,9 @@ extern crate handlebars;
 extern crate rpassword;
 extern crate tar;
 extern crate uuid;
+extern crate block_modes;
+#[macro_use]
+extern crate hex_literal;
 
 use clap::{App, Arg};
 use diesel::r2d2::{self, ConnectionManager};

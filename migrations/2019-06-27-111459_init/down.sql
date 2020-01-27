@@ -3,6 +3,7 @@ DROP TABLE "authentication_barcode";
 DROP TABLE "authentication_password";
 DROP TABLE "authentication_password_invitation";
 DROP TABLE "authentication_nfc";
+DROP TABLE "authentication_nfc_write_key";
 DROP TABLE "transaction";
 DROP TABLE "category";
 DROP TABLE "category_price";

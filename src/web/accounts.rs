@@ -1,6 +1,6 @@
 use crate::core::{
-    authentication_password, fuzzy_vec_match, Account, Money, Permission, Pool, ServiceError,
-    ServiceResult, authentication_barcode,
+    authentication_barcode, authentication_password, authentication_nfc, fuzzy_vec_match, Account, Money, Permission,
+    Pool, ServiceError, ServiceResult,
 };
 use crate::identity_policy::{Action, RetrievedAccount};
 use crate::login_required;
@@ -181,7 +181,36 @@ pub async fn get_account_edit(
             name: "Barcode".to_owned(),
             display: Some((DisplayType::EDIT, "".to_owned())),
             action: None,
-            id: Some(format!("barcode-{}", barcode_id)),
+            id: Some(format!("barcode-new")),
+        });
+    }
+
+    let mut nfc_id = 0;
+    for nfc in authentication_nfc::get_nfcs(&conn, &account)? {
+        let card_id = nfc.card_id.clone();
+
+        let name = match nfc.is_secure() {
+            true => "ascii card",
+            false => match nfc.need_write_key(&conn)? {
+                true => "ascii card (pending)",
+                false => "generic card",
+            },
+        }.to_owned();
+
+        authentication_methods.push(AuthenticationMethod {
+            name,
+            display: Some((DisplayType::TEXT, card_id)),
+            action: None,
+            id: Some(format!("nfc-{}", nfc_id)),
+        });
+        nfc_id += 1;
+    }
+    if authentication_methods.len() == 2 {
+        authentication_methods.push(AuthenticationMethod {
+            name: "NFC".to_owned(),
+            display: Some((DisplayType::EDIT, "".to_owned())),
+            action: None,
+            id: Some(format!("nfc-new")),
         });
     }
 
@@ -225,6 +254,17 @@ pub async fn post_account_edit(
     for (key, value) in &account.extra {
         if key.starts_with("barcode-") {
             authentication_barcode::register(&conn, &server_account, value).ok();
+        }
+    }
+
+    for (key, value) in &account.extra {
+        if key.starts_with("nfc-new") {
+            let mut writeable = false;
+            let value = if value.starts_with("ascii:") {
+                writeable = true;
+                value.replace("ascii:", "").trim().to_owned()
+            } else {value.clone()};
+            authentication_nfc::register(&conn, &server_account, &value, writeable).ok();
         }
     }
 
