@@ -4,13 +4,13 @@ extern crate diesel;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+extern crate block_modes;
 extern crate clap;
 extern crate flate2;
 extern crate handlebars;
 extern crate rpassword;
 extern crate tar;
 extern crate uuid;
-extern crate block_modes;
 #[macro_use]
 extern crate hex_literal;
 

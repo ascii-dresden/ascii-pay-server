@@ -1,11 +1,11 @@
 use diesel::prelude::*;
 use uuid::Uuid;
 
-use rand_core::RngCore;
-use byteorder::{WriteBytesExt, ReadBytesExt, LittleEndian};
-use block_modes::{BlockMode, Cbc};
-use block_modes::block_padding::Pkcs7;
 use aes::Aes128;
+use block_modes::block_padding::Pkcs7;
+use block_modes::{BlockMode, Cbc};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use rand_core::RngCore;
 use std::io::Cursor;
 
 use crate::core::schema::authentication_nfc;
@@ -39,7 +39,7 @@ impl AuthenticationNfc {
         diesel::update(self)
             .set((
                 dsl::key.eq(self.key.as_ref()),
-                dsl::secret.eq(self.secret.as_ref())
+                dsl::secret.eq(self.secret.as_ref()),
             ))
             .execute(conn)?;
 
@@ -50,7 +50,7 @@ impl AuthenticationNfc {
         use crate::core::schema::authentication_nfc_write_key::dsl;
 
         let a = AuthenticationNfcWriteKey {
-            account_id: self.account_id.clone(),
+            account_id: self.account_id,
             card_id: self.card_id.clone(),
         };
 
@@ -65,8 +65,10 @@ impl AuthenticationNfc {
     fn remove_write_key(&self, conn: &DbConnection) -> ServiceResult<()> {
         use crate::core::schema::authentication_nfc_write_key::dsl;
 
-        diesel::delete(dsl::authentication_nfc_write_key.filter(dsl::account_id.eq(&self.account_id)))
-            .execute(conn)?;
+        diesel::delete(
+            dsl::authentication_nfc_write_key.filter(dsl::account_id.eq(&self.account_id)),
+        )
+        .execute(conn)?;
 
         Ok(())
     }
@@ -75,7 +77,11 @@ impl AuthenticationNfc {
         use crate::core::schema::authentication_nfc_write_key::dsl;
 
         let results = dsl::authentication_nfc_write_key
-            .filter(dsl::account_id.eq(&self.account_id).and(dsl::card_id.eq(&self.card_id)))
+            .filter(
+                dsl::account_id
+                    .eq(&self.account_id)
+                    .and(dsl::card_id.eq(&self.card_id)),
+            )
             .load::<AuthenticationNfcWriteKey>(conn)?;
 
         Ok(!results.is_empty())
@@ -138,7 +144,7 @@ pub fn get_nfcs(conn: &DbConnection, account: &Account) -> ServiceResult<Vec<Aut
     Ok(results)
 }
 
-fn generate_challenge() -> ServiceResult<String> {    
+fn generate_challenge() -> ServiceResult<String> {
     let mut buffer: Vec<u8> = Vec::new();
 
     // Generate current timestamp to validate challenge
@@ -192,7 +198,7 @@ fn create_response(_secret: &str, challenge: &str) -> ServiceResult<String> {
 }
 
 fn verify_challenge_response(secret: &str, challenge: &str, response: &str) -> ServiceResult<bool> {
-    Ok(verify_challenge(challenge)? && &create_response(secret, challenge)? == response)
+    Ok(verify_challenge(challenge)? && create_response(secret, challenge)? == response)
 }
 
 fn bytes_to_string(bytes: &[u8]) -> String {
@@ -219,7 +225,7 @@ fn generate_key(length: usize) -> Vec<u8> {
 #[serde(untagged)]
 pub enum NfcResult {
     Ok { account: Account },
-    WriteKey { key: String, secret: String},
+    WriteKey { key: String, secret: String },
     AuthenticationRequested { key: String, challenge: String },
 }
 
@@ -245,13 +251,10 @@ pub fn get(conn: &DbConnection, card_id: &str) -> ServiceResult<NfcResult> {
         entry.update(&conn)?;
         entry.remove_write_key(&conn)?;
 
-        return Ok(NfcResult::WriteKey {
-            key, 
-            secret,
-        })
+        return Ok(NfcResult::WriteKey { key, secret });
     }
 
-    if let Some(_) = entry.secret {
+    if entry.secret.is_some() {
         match entry.key {
             Some(key) => Ok(NfcResult::AuthenticationRequested {
                 key,

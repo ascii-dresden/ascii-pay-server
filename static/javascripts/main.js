@@ -183,6 +183,7 @@ function initMoneyInput(input) {
 }
 
 let eventHandlers = [];
+var useDefaultSSE = true;
 
 function initSSE(onmessage) {
     if (eventHandlers.length == 0) {
@@ -197,6 +198,12 @@ function initSSE(onmessage) {
                 }
             } catch {
                 // Nothing to do
+            }
+        }
+
+        evtSource.onopen = function(event) {
+            for (let entry of document.querySelectorAll(".navbar .hidden")) {
+                entry.classList.remove("hidden");
             }
         }
     } else {
@@ -252,6 +259,9 @@ function toast(message, actionLabel, actionCallback) {
 
 function parseGlobalSSE(data) {
     console.log(data);
+    if (!useDefaultSSE) {
+        return;
+    }
     if (data && data.type === "product") {
         let path = "/product/" + data.content.id;
         if (window.location.pathname !== path) {
@@ -280,4 +290,16 @@ function parseGlobalSSE(data) {
 window.addEventListener('DOMContentLoaded', (event) => {
     initMoneyInputs();
     initSSE(parseGlobalSSE);
+
+    if (window.location.search === "?reauthenticate") {
+        window.location.search = "";
+
+        fetch("/reauthenticate", {
+            method: "GET",
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+    }
 });

@@ -1,6 +1,6 @@
 use crate::core::{
-    authentication_barcode, authentication_password, authentication_nfc, fuzzy_vec_match, Account, Money, Permission,
-    Pool, ServiceError, ServiceResult,
+    authentication_barcode, authentication_nfc, authentication_password, fuzzy_vec_match, Account,
+    Money, Permission, Pool, ServiceError, ServiceResult,
 };
 use crate::identity_policy::{Action, RetrievedAccount};
 use crate::login_required;
@@ -166,51 +166,60 @@ pub async fn get_account_edit(
         });
     }
 
-    let mut barcode_id = 0;
-    for barcode in authentication_barcode::get_barcodes(&conn, &account)? {
+    for (barcode_id, barcode) in authentication_barcode::get_barcodes(&conn, &account)?
+        .into_iter()
+        .enumerate()
+    {
         authentication_methods.push(AuthenticationMethod {
             name: "Barcode".to_owned(),
-            display: Some((DisplayType::EDIT, barcode)),
-            action: None,
+            display: Some((DisplayType::TEXT, barcode)),
+            action: Some((
+                "Delete".to_owned(),
+                format!("/account/remove-barcode/{}", &account.id),
+            )),
             id: Some(format!("barcode-{}", barcode_id)),
         });
-        barcode_id += 1;
     }
     if authentication_methods.len() == 1 {
         authentication_methods.push(AuthenticationMethod {
-            name: "Barcode".to_owned(),
+            name: "Add Barcode".to_owned(),
             display: Some((DisplayType::EDIT, "".to_owned())),
             action: None,
-            id: Some(format!("barcode-new")),
+            id: Some("barcode-new".to_owned()),
         });
     }
 
-    let mut nfc_id = 0;
-    for nfc in authentication_nfc::get_nfcs(&conn, &account)? {
+    for (nfc_id, nfc) in authentication_nfc::get_nfcs(&conn, &account)?
+        .into_iter()
+        .enumerate()
+    {
         let card_id = nfc.card_id.clone();
 
-        let name = match nfc.is_secure() {
-            true => "ascii card",
-            false => match nfc.need_write_key(&conn)? {
-                true => "ascii card (pending)",
-                false => "generic card",
-            },
-        }.to_owned();
+        let name = if nfc.is_secure() {
+            "NFC (secure)"
+        } else if nfc.need_write_key(&conn)? {
+            "NFC (pending)"
+        } else {
+            "NFC (insecure)"
+        }
+        .to_owned();
 
         authentication_methods.push(AuthenticationMethod {
             name,
             display: Some((DisplayType::TEXT, card_id)),
-            action: None,
+            action: Some((
+                "Delete".to_owned(),
+                format!("/account/remove-nfc/{}", &account.id),
+            )),
             id: Some(format!("nfc-{}", nfc_id)),
         });
-        nfc_id += 1;
     }
     if authentication_methods.len() == 2 {
         authentication_methods.push(AuthenticationMethod {
-            name: "NFC".to_owned(),
+            name: "Add NFC".to_owned(),
             display: Some((DisplayType::EDIT, "".to_owned())),
             action: None,
-            id: Some(format!("nfc-new")),
+            id: Some("nfc-new".to_owned()),
         });
     }
 
@@ -250,26 +259,37 @@ pub async fn post_account_edit(
 
     server_account.update(&conn)?;
 
-    authentication_barcode::remove(&conn, &server_account)?;
-    for (key, value) in &account.extra {
-        if key.starts_with("barcode-") {
-            authentication_barcode::register(&conn, &server_account, value).ok();
-        }
-    }
+    let mut reauth = false;
 
     for (key, value) in &account.extra {
+        if value.trim().is_empty() {
+            continue;
+        }
+
+        if key.starts_with("barcode-new") {
+            authentication_barcode::register(&conn, &server_account, value).ok();
+        }
         if key.starts_with("nfc-new") {
             let mut writeable = false;
             let value = if value.starts_with("ascii:") {
                 writeable = true;
                 value.replace("ascii:", "").trim().to_owned()
-            } else {value.clone()};
+            } else {
+                value.clone()
+            };
             authentication_nfc::register(&conn, &server_account, &value, writeable).ok();
+            reauth = true;
         }
     }
 
+    let location = if reauth {
+        "/accounts?reauthenticate"
+    } else {
+        "/accounts"
+    };
+
     Ok(HttpResponse::Found()
-        .header(http::header::LOCATION, "/accounts")
+        .header(http::header::LOCATION, location)
         .finish())
 }
 
@@ -345,6 +365,42 @@ pub async fn revoke_get(
     let account = Account::get(&conn, &Uuid::parse_str(&account_id)?)?;
     authentication_password::revoke_invitation_link(&conn, &account)?;
     authentication_password::remove(&conn, &account)?;
+
+    Ok(HttpResponse::Found()
+        .header(http::header::LOCATION, format!("/account/{}", account.id))
+        .finish())
+}
+
+/// GET route for `/account/remove-nfc/{account_id}`
+pub async fn remove_nfc_get(
+    pool: web::Data<Pool>,
+    logged_account: RetrievedAccount,
+    account_id: web::Path<String>,
+) -> ServiceResult<HttpResponse> {
+    login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+
+    let conn = &pool.get()?;
+
+    let account = Account::get(&conn, &Uuid::parse_str(&account_id)?)?;
+    authentication_nfc::remove(&conn, &account)?;
+
+    Ok(HttpResponse::Found()
+        .header(http::header::LOCATION, format!("/account/{}", account.id))
+        .finish())
+}
+
+/// GET route for `/account/remove-nfc/{account_id}`
+pub async fn remove_barcode_get(
+    pool: web::Data<Pool>,
+    logged_account: RetrievedAccount,
+    account_id: web::Path<String>,
+) -> ServiceResult<HttpResponse> {
+    login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+
+    let conn = &pool.get()?;
+
+    let account = Account::get(&conn, &Uuid::parse_str(&account_id)?)?;
+    authentication_barcode::remove(&conn, &account)?;
 
     Ok(HttpResponse::Found()
         .header(http::header::LOCATION, format!("/account/{}", account.id))

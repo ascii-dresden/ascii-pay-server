@@ -68,8 +68,9 @@ pub async fn post_identify(
             }
             NfcResult::AuthenticationRequested { key, challenge } => Ok(HttpResponse::Ok()
                 .json(&IdentificationResponse::AuthenticationNeeded { id, key, challenge })),
-            NfcResult::WriteKey { key, secret } =>  Ok(HttpResponse::Ok()
-                .json(&IdentificationResponse::WriteKey { id, key, secret })),
+            NfcResult::WriteKey { key, secret } => {
+                Ok(HttpResponse::Ok().json(&IdentificationResponse::WriteKey { id, key, secret }))
+            }
         },
         IdentificationRequest::NfcSecret {
             id,

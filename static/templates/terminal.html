@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+
+{{> _head title="Terminal" }}
+
+<body>
+    <div class="container grid-lg">
+        {{> _navigation active="terminal" }}
+
+        <h1>Terminal</h1>
+
+        <div id="terminal">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title h5">Payment</div>
+                  </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label class="form-label" for="card-payment-amount">Amount</label>
+                        <div class="input-group">
+                            <input class="form-input money-input" type="text" id="card-payment-amount" value="0.00" />
+                            <span class="input-group-addon">€</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="card-payment-pay">Pay</button>
+                </div>
+            </div>
+            <div class="card card-hidden" id="card-account">
+                <div class="card-header">
+                    <div class="card-title h5">Account</div>
+                  </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label class="form-label" for="card-account-name">Name</label>
+                        <input class="form-input" type="text" id="card-account-name" readonly />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="card-account-credit">Credit</label>
+                        <div class="input-group">
+                            <input class="form-input money-input" type="text" id="card-account-credit" value="0.00" />
+                            <span class="input-group-addon">€</span>
+                        </div>
+                    </div>
+                    <a class="btn btn-primary" id="card-account-edit">Edit</a>
+                </div>
+            </div>
+            <div class="card card-hidden" id="card-product">
+                <div class="card-header">
+                    <div class="card-title h5">Product</div>
+                  </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label class="form-label" for="card-product-name">Name</label>
+                        <input class="form-input" type="text" id="card-product-name" readonly />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="card-product-price">Price</label>
+                        <div class="input-group">
+                            <input class="form-input money-input" type="text" id="card-product-price" value="0.00" />
+                            <span class="input-group-addon">€</span>
+                        </div>
+                    </div>
+                    <a class="btn btn-primary" id="card-product-edit">Edit</a>
+                </div>
+            </div>
+            <div class="card card-hidden" id="card-qr">
+                <div class="card-header">
+                    <div class="card-title h5">New qr-code</div>
+                  </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label class="form-label" for="card-qr-code">Code</label>
+                        <input class="form-input" type="text" id="card-qr-code" readonly />
+                    </div>
+                </div>
+            </div>
+            <div class="card card-hidden" id="card-nfc">
+                <div class="card-header">
+                    <div class="card-title h5">New nfc card</div>
+                  </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label class="form-label" for="card-nfc-id">Id</label>
+                        <input class="form-input" type="text" id="card-nfc-id" readonly />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="card-nfc-writeable">Writeable</label>
+                        <input class="form-input" type="text" id="card-nfc-writeable" readonly />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/javascripts/terminal.js"></script>
+</body>
+</html>

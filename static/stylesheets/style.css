@@ -1,5 +1,7 @@
 .navbar {
   padding: 1rem 0; }
+  .navbar .hidden {
+    display: none; }
 
 b {
   color: #3b4351; }
@@ -11,3 +13,9 @@ b {
 
 .toast-action {
   margin-right: 1rem; }
+
+.card-hidden {
+  display: none;
+  margin-top: 1rem; }
+  .card-hidden.active {
+    display: block; }

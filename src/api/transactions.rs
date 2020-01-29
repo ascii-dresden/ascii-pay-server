@@ -9,14 +9,14 @@ use uuid::Uuid;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Token {
     pub id: Uuid,
-    pub total: i32,
+    pub amount: i32,
     pub account_id: Uuid,
 }
 impl Token {
-    pub fn new(conn: &DbConnection, account: &Account, total: i32) -> ServiceResult<Token> {
+    pub fn new(conn: &DbConnection, account: &Account, amount: i32) -> ServiceResult<Token> {
         let token = Token {
             id: generate_uuid(),
-            total,
+            amount,
             account_id: account.id,
         };
 
@@ -37,7 +37,8 @@ impl Token {
     }
 
     pub fn parse(conn: &DbConnection, s: &str) -> ServiceResult<Self> {
-        let _session = Session::get(conn, s)?;
+        let session = Session::get(&conn, s)?;
+        session.delete(&conn)?;
 
         Self::from_str(s)
     }
@@ -62,7 +63,7 @@ pub enum Authentication {
 
 #[derive(Debug, Deserialize)]
 pub struct TokenRequest {
-    pub total: i32,
+    pub amount: i32,
     pub method: Authentication,
 }
 
@@ -78,16 +79,11 @@ pub enum TokenResponse {
         key: String,
         challenge: String,
     },
-    WriteKey {
-        id: String,
-        key: String,
-        secret: String,
-    },
 }
 
 #[derive(Debug, Deserialize)]
 pub struct PaymentRequest {
-    pub total: i32,
+    pub amount: i32,
     pub token: String,
     pub products: HashMap<Uuid, i32>,
 }
@@ -109,14 +105,14 @@ pub async fn post_transaction_token(
         Authentication::Barcode { code } => {
             let account = authentication_barcode::get(&conn, &code)?;
             TokenResponse::Authorized {
-                token: Token::new(&conn, &account, token_request.total)?.to_string()?,
+                token: Token::new(&conn, &account, token_request.amount)?.to_string()?,
             }
         }
         Authentication::Nfc { id } => {
             let result = authentication_nfc::get(&conn, &id)?;
             match result {
                 authentication_nfc::NfcResult::Ok { account } => TokenResponse::Authorized {
-                    token: Token::new(&conn, &account, token_request.total)?.to_string()?,
+                    token: Token::new(&conn, &account, token_request.amount)?.to_string()?,
                 },
                 authentication_nfc::NfcResult::AuthenticationRequested { key, challenge } => {
                     TokenResponse::AuthenticationNeeded {
@@ -124,12 +120,10 @@ pub async fn post_transaction_token(
                         key,
                         challenge,
                     }
-                },
-                authentication_nfc::NfcResult::WriteKey { key, secret} => TokenResponse::WriteKey {
-                    id: id.clone(),
-                    key,
-                    secret
-                },
+                }
+                authentication_nfc::NfcResult::WriteKey { .. } => {
+                    return Err(ServiceError::Unauthorized);
+                }
             }
         }
         Authentication::NfcSecret {
@@ -140,7 +134,7 @@ pub async fn post_transaction_token(
             let account =
                 authentication_nfc::get_challenge_response(&conn, &id, &challenge, &response)?;
             TokenResponse::Authorized {
-                token: Token::new(&conn, &account, token_request.total)?.to_string()?,
+                token: Token::new(&conn, &account, token_request.amount)?.to_string()?,
             }
         }
     };
@@ -155,18 +149,15 @@ pub async fn post_transaction_payment(
 ) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
 
-    let session = Session::get(&conn, &payment_request.token)?;
-    session.delete(&conn)?;
-
     let token = Token::parse(&conn, &payment_request.token)?;
 
     let mut account = Account::get(&conn, &token.account_id)?;
 
-    if payment_request.total != token.total {
+    if payment_request.amount != token.amount {
         return Err(ServiceError::Unauthorized);
     }
 
-    let transaction = transactions::execute(&conn, &mut account, None, payment_request.total)?;
+    let transaction = transactions::execute(&conn, &mut account, None, payment_request.amount)?;
 
     let mut products: Vec<(Product, i32)> = Vec::new();
 

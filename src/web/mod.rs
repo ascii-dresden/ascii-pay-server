@@ -4,6 +4,7 @@ pub mod index;
 pub mod products;
 pub mod transactions;
 pub mod utils;
+pub mod terminal;
 
 use actix_files as fs;
 use actix_web::web;
@@ -48,6 +49,14 @@ pub fn init(config: &mut web::ServiceConfig) {
             .service(
                 web::resource("/account/revoke/{account_id}")
                     .route(web::get().to(accounts::revoke_get)),
+            )
+            .service(
+                web::resource("/account/remove-nfc/{account_id}")
+                    .route(web::get().to(accounts::remove_nfc_get)),
+            )
+            .service(
+                web::resource("/account/remove-barcode/{account_id}")
+                    .route(web::get().to(accounts::remove_barcode_get)),
             )
             .service(
                 web::resource("/account/{account_id}")
@@ -106,6 +115,10 @@ pub fn init(config: &mut web::ServiceConfig) {
             .service(
                 web::resource("/transaction/execute/{account_id}")
                     .route(web::post().to(transactions::post_execute_transaction)),
+            )
+            .service(
+                web::resource("/terminal")
+                    .route(web::get().to(terminal::get_terminal)),
             ),
     );
 }
