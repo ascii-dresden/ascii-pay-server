@@ -13,6 +13,9 @@ function parseSSE(data) {
             case "nfc-card":
                 load_nfc_card(data.content);
                 break;
+            case "remove-nfc-card":
+                load_remove_nfc_card();
+                break;
             case "payment-token":
                 load_payment_token(data.content);
                 break;
@@ -55,6 +58,10 @@ function load_nfc_card(content) {
 
     document.getElementById("card-nfc-id").value = content.id;
     document.getElementById("card-nfc-writeable").value = content.writeable;
+}
+
+function load_remove_nfc_card() {
+    hide_cards();
 }
 
 function load_payment_token(content) {
