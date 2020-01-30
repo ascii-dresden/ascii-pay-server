@@ -26,11 +26,9 @@ pub enum IdentificationRequest {
 #[serde(rename_all = "kebab-case")]
 pub enum IdentificationResponse {
     Account {
-        #[serde(flatten)]
         account: Account,
     },
     Product {
-        #[serde(flatten)]
         product: Product,
     },
     AuthenticationNeeded {
