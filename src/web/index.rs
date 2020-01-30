@@ -16,7 +16,6 @@ pub struct LoginForm {
 
 #[derive(Serialize, Deserialize)]
 pub struct RegisterForm {
-    username: String,
     password: String,
     password2: String,
 }
@@ -164,7 +163,7 @@ pub async fn post_register(
             .finish());
     }
 
-    authentication_password::register(&conn, &account, &params.username, &params.password)?;
+    authentication_password::register(&conn, &account, &params.password)?;
 
     Ok(HttpResponse::Found()
         .header(http::header::LOCATION, "/login")

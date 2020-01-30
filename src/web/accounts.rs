@@ -16,6 +16,8 @@ pub struct FormAccount {
     pub id: String,
     pub name: String,
     pub mail: String,
+    pub username: String,
+    pub account_number: String,
     pub minimum_credit: f32,
     pub permission: Permission,
     #[serde(flatten)]
@@ -44,6 +46,8 @@ pub struct SearchAccount {
     pub id_search: String,
     pub name_search: String,
     pub mail_search: String,
+    pub username_search: String,
+    pub account_number_search: String,
     pub permission_search: String,
 }
 
@@ -55,8 +59,13 @@ impl SearchAccount {
                 .to_hyphenated()
                 .encode_upper(&mut Uuid::encode_buffer())
                 .to_owned(),
-            account.name.clone().unwrap_or_else(|| "".to_owned()),
+            account.name.clone(),
             account.mail.clone().unwrap_or_else(|| "".to_owned()),
+            account.username.clone().unwrap_or_else(|| "".to_owned()),
+            account
+                .account_number
+                .clone()
+                .unwrap_or_else(|| "".to_owned()),
             match account.permission {
                 Permission::DEFAULT => "",
                 Permission::MEMBER => "member",
@@ -77,6 +86,8 @@ impl SearchAccount {
         Some(SearchAccount {
             account,
             permission_search: result.pop().expect(""),
+            account_number_search: result.pop().expect(""),
+            username_search: result.pop().expect(""),
             mail_search: result.pop().expect(""),
             name_search: result.pop().expect(""),
             id_search: result.pop().expect(""),
@@ -143,10 +154,10 @@ pub async fn get_account_edit(
             id: None,
         });
     }
-    for username in authentication_password::get_usernames(&conn, &account)? {
+    if authentication_password::has_password(&conn, &account)? {
         authentication_methods.push(AuthenticationMethod {
-            name: "Username".to_owned(),
-            display: Some((DisplayType::TEXT, username)),
+            name: "Password".to_owned(),
+            display: Some((DisplayType::TEXT, "Password exists".to_owned())),
             action: Some((
                 "Revoke".to_owned(),
                 format!("/account/revoke/{}", &account.id),
@@ -252,8 +263,10 @@ pub async fn post_account_edit(
 
     let mut server_account = Account::get(&conn, &Uuid::parse_str(&account_id)?)?;
 
-    server_account.name = account.name.empty_to_none();
+    server_account.name = account.name.clone();
     server_account.mail = account.mail.empty_to_none();
+    server_account.username = account.username.empty_to_none();
+    server_account.account_number = account.account_number.empty_to_none();
     server_account.permission = account.permission;
     server_account.minimum_credit = (account.minimum_credit * 100.0) as Money;
 
@@ -318,10 +331,11 @@ pub async fn post_account_create(
 
     let conn = &pool.get()?;
 
-    let mut server_account = Account::create(&conn, account.permission)?;
+    let mut server_account = Account::create(&conn, &account.name, account.permission)?;
 
-    server_account.name = account.name.empty_to_none();
     server_account.mail = account.mail.empty_to_none();
+    server_account.username = account.username.empty_to_none();
+    server_account.account_number = account.account_number.empty_to_none();
     server_account.minimum_credit = (account.minimum_credit * 100.0) as Money;
 
     server_account.update(&conn)?;

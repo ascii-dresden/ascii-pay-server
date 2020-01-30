@@ -2,8 +2,10 @@ CREATE TABLE "account" (
   "id" UUID PRIMARY KEY NOT NULL,
   "credit" INT DEFAULT 0 NOT NULL,
   "minimum_credit" INT DEFAULT 0 NOT NULL,
-  "name" VARCHAR(64),
+  "name" VARCHAR(64) NOT NULL,
   "mail" VARCHAR(64),
+  "username" VARCHAR(64),
+  "account_number" VARCHAR(64),
   "permission" SMALLINT NOT NULL
 );
 
@@ -14,7 +16,6 @@ CREATE TABLE "authentication_barcode" (
 
 CREATE TABLE "authentication_password" (
   "account_id" UUID PRIMARY KEY NOT NULL,
-  "username" VARCHAR UNIQUE NOT NULL,
   "password" VARCHAR NOT NULL
 );
 

@@ -12,7 +12,6 @@ use crate::core::{generate_uuid_str, Account, DbConnection, ServiceError, Servic
 #[primary_key(account_id)]
 struct AuthenticationPassword {
     account_id: Uuid,
-    username: String,
     password: String,
 }
 
@@ -85,17 +84,11 @@ pub fn get_account_by_invitation_link(conn: &DbConnection, link: &str) -> Servic
 }
 
 /// Set the username and password as authentication method for the given account
-pub fn register(
-    conn: &DbConnection,
-    account: &Account,
-    username: &str,
-    password: &str,
-) -> ServiceResult<()> {
+pub fn register(conn: &DbConnection, account: &Account, password: &str) -> ServiceResult<()> {
     use crate::core::schema::authentication_password::dsl;
 
     let a = AuthenticationPassword {
         account_id: account.id,
-        username: username.into(),
         password: hash_password(password)?,
     };
 
@@ -119,24 +112,25 @@ pub fn remove(conn: &DbConnection, account: &Account) -> ServiceResult<()> {
     Ok(())
 }
 
-pub fn get_usernames(conn: &DbConnection, account: &Account) -> ServiceResult<Vec<String>> {
+pub fn has_password(conn: &DbConnection, account: &Account) -> ServiceResult<bool> {
     use crate::core::schema::authentication_password::dsl;
 
     let results = dsl::authentication_password
         .filter(dsl::account_id.eq(&account.id))
         .load::<AuthenticationPassword>(conn)?;
 
-    Ok(results.into_iter().map(|p| p.username).collect())
+    Ok(!results.is_empty())
 }
 
 /// Get account by username and password.
 /// Return `ServiceError` if no account is registered for given username - passoword pair
-pub fn get(conn: &DbConnection, username: &str, password: &str) -> ServiceResult<Account> {
+pub fn get(conn: &DbConnection, login: &str, password: &str) -> ServiceResult<Account> {
     use crate::core::schema::authentication_password::dsl;
 
+    let account = Account::find_by_login(&conn, login)?;
+
     let mut results = dsl::authentication_password
-        .filter(dsl::username.eq(username))
-        .limit(1)
+        .filter(dsl::account_id.eq(account.id))
         .load::<AuthenticationPassword>(conn)?;
 
     let entry = results.pop().ok_or_else(|| ServiceError::NotFound)?;

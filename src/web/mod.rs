@@ -2,9 +2,9 @@ pub mod accounts;
 pub mod categories;
 pub mod index;
 pub mod products;
+pub mod terminal;
 pub mod transactions;
 pub mod utils;
-pub mod terminal;
 
 use actix_files as fs;
 use actix_web::web;
@@ -116,9 +116,6 @@ pub fn init(config: &mut web::ServiceConfig) {
                 web::resource("/transaction/execute/{account_id}")
                     .route(web::post().to(transactions::post_execute_transaction)),
             )
-            .service(
-                web::resource("/terminal")
-                    .route(web::get().to(terminal::get_terminal)),
-            ),
+            .service(web::resource("/terminal").route(web::get().to(terminal::get_terminal))),
     );
 }

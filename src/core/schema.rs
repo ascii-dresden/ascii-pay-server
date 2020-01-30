@@ -3,8 +3,10 @@ table! {
         id -> Uuid,
         credit -> Int4,
         minimum_credit -> Int4,
-        name -> Nullable<Varchar>,
+        name -> Varchar,
         mail -> Nullable<Varchar>,
+        username -> Nullable<Varchar>,
+        account_number -> Nullable<Varchar>,
         permission -> Int2,
     }
 }
@@ -35,7 +37,6 @@ table! {
 table! {
     authentication_password (account_id) {
         account_id -> Uuid,
-        username -> Varchar,
         password -> Varchar,
     }
 }

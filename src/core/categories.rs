@@ -196,25 +196,4 @@ impl Category {
 
         Ok(category)
     }
-
-    pub fn import(conn: &DbConnection, template: &Category) -> ServiceResult<Category> {
-        use crate::core::schema::category::dsl;
-
-        let mut c = Category {
-            id: generate_uuid(),
-            name: template.name.to_owned(),
-            prices: vec![],
-            current_price: None,
-        };
-
-        diesel::insert_into(dsl::category)
-            .values((dsl::id.eq(&c.id), dsl::name.eq(&c.name)))
-            .execute(conn)?;
-
-        for price in &template.prices {
-            c.add_price(&conn, price.validity_start, price.value)?;
-        }
-
-        Ok(c)
-    }
 }

@@ -29,8 +29,10 @@ pub struct Account {
     pub id: Uuid,
     pub credit: Money,
     pub minimum_credit: Money,
-    pub name: Option<String>,
+    pub name: String,
     pub mail: Option<String>,
+    pub username: Option<String>,
+    pub account_number: Option<String>,
     pub permission: Permission,
 }
 
@@ -121,17 +123,30 @@ where
 
 impl Account {
     /// Create a new account with the given permission level
-    pub fn create(conn: &DbConnection, permission: Permission) -> ServiceResult<Account> {
+    pub fn create(
+        conn: &DbConnection,
+        name: &str,
+        permission: Permission,
+    ) -> ServiceResult<Account> {
         use crate::core::schema::account::dsl;
 
         let a = Account {
             id: generate_uuid(),
             credit: 0,
             minimum_credit: 0,
-            name: None,
+            name: name.to_owned(),
             mail: None,
+            username: None,
+            account_number: None,
             permission,
         };
+
+        if !a.exist_conficting_account(conn)? {
+            return Err(ServiceError::InternalServerError(
+                "Conficting account settings",
+                "The given account settings conflict with the other existing accounts".to_owned(),
+            ));
+        }
 
         diesel::insert_into(dsl::account).values(&a).execute(conn)?;
 
@@ -141,6 +156,13 @@ impl Account {
     /// Save the current account data to the database
     pub fn update(&self, conn: &DbConnection) -> ServiceResult<()> {
         use crate::core::schema::account::dsl;
+
+        if !self.exist_conficting_account(conn)? {
+            return Err(ServiceError::InternalServerError(
+                "Conficting account settings",
+                "The given account settings conflict with the other existing accounts".to_owned(),
+            ));
+        }
 
         diesel::update(dsl::account.find(&self.id))
             .set(self)
@@ -167,20 +189,65 @@ impl Account {
         results.pop().ok_or_else(|| ServiceError::NotFound)
     }
 
-    pub fn import(conn: &DbConnection, template: &Account) -> ServiceResult<Account> {
+    /// Get an account by the `id`
+    pub fn find_by_login(conn: &DbConnection, login: &str) -> ServiceResult<Account> {
         use crate::core::schema::account::dsl;
 
-        let a = Account {
-            id: generate_uuid(),
-            credit: 0,
-            minimum_credit: template.minimum_credit,
-            name: template.name.to_owned(),
-            mail: template.mail.to_owned(),
-            permission: template.permission,
+        let mut results = match Uuid::parse_str(login) {
+            Ok(uuid) => dsl::account
+                .filter(dsl::id.eq(uuid))
+                .load::<Account>(conn)?,
+            Err(_) => dsl::account
+                .filter(
+                    dsl::mail
+                        .eq(login)
+                        .or(dsl::username.eq(login))
+                        .or(dsl::account_number.eq(login)),
+                )
+                .load::<Account>(conn)?,
         };
 
-        diesel::insert_into(dsl::account).values(&a).execute(conn)?;
+        if results.len() > 1 {
+            return Err(ServiceError::NotFound);
+        }
 
-        Ok(a)
+        results.pop().ok_or_else(|| ServiceError::NotFound)
+    }
+
+    fn exist_conficting_account(&self, conn: &DbConnection) -> ServiceResult<bool> {
+        use crate::core::schema::account::dsl;
+
+        if let Some(mail) = &self.mail {
+            let results = dsl::account
+                .filter(dsl::id.ne(self.id).and(dsl::mail.eq(mail)))
+                .load::<Account>(conn)?;
+            if !results.is_empty() {
+                return Ok(false);
+            }
+        }
+
+        if let Some(username) = &self.username {
+            let results = dsl::account
+                .filter(dsl::id.ne(self.id).and(dsl::username.eq(username)))
+                .load::<Account>(conn)?;
+            if !results.is_empty() {
+                return Ok(false);
+            }
+        }
+
+        if let Some(account_number) = &self.account_number {
+            let results = dsl::account
+                .filter(
+                    dsl::id
+                        .ne(self.id)
+                        .and(dsl::account_number.eq(account_number)),
+                )
+                .load::<Account>(conn)?;
+            if !results.is_empty() {
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
     }
 }

@@ -6,21 +6,18 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate block_modes;
 extern crate clap;
-extern crate flate2;
 extern crate handlebars;
 extern crate rpassword;
-extern crate tar;
 extern crate uuid;
 #[macro_use]
 extern crate hex_literal;
 
-use clap::{App, Arg};
+use clap::App;
 use diesel::r2d2::{self, ConnectionManager};
 
 use std::io::{stdin, stdout, Write};
 
 mod api;
-mod backup;
 mod core;
 mod identity_policy;
 mod server;
@@ -57,32 +54,11 @@ async fn init() -> ServiceResult<()> {
     let manager = ConnectionManager::<DbConnection>::new(database_url);
     let pool = r2d2::Pool::builder().build(manager)?;
 
-    let matches = App::new("ascii-pay")
+    let _matches = App::new("ascii-pay")
         .version("1.0")
         .author("Lars Westermann <lars-westermann@live.de>")
         .author("Felix Wittwer <dev@felixwittwer.de>")
-        .arg(
-            Arg::with_name("export")
-                .long("export")
-                .value_name("FILE")
-                .help("Exports the database to the given file")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("import")
-                .long("import")
-                .value_name("FILE")
-                .help("Import the given file to the database")
-                .takes_value(true),
-        )
         .get_matches();
-
-    if let Some(export_file) = matches.value_of("export") {
-        return backup::export(&pool, export_file);
-    }
-    if let Some(import_file) = matches.value_of("import") {
-        return backup::import(&pool, import_file);
-    }
 
     // Check if admin exists, create otherwise
     check_admin_user_exisits(&pool)?;
@@ -126,11 +102,7 @@ fn check_admin_user_exisits(pool: &Pool) -> ServiceResult<()> {
     let admin_with_password_exists = Account::all(&conn)?
         .iter()
         .filter(|a| a.permission.is_admin())
-        .any(|a| {
-            authentication_password::get_usernames(&conn, a)
-                .map(|v| !v.is_empty())
-                .unwrap_or_else(|_| false)
-        });
+        .any(|a| authentication_password::has_password(&conn, a).unwrap_or(false));
 
     if !admin_with_password_exists {
         println!("You seem to have started the server on an empty database. We'll now create the initial superuser.");
@@ -138,10 +110,10 @@ fn check_admin_user_exisits(pool: &Pool) -> ServiceResult<()> {
         let username = read_value("Username: ", false);
         let password = read_value("Password: ", true);
 
-        let mut account = Account::create(&conn, Permission::ADMIN)?;
-        account.name = Some(fullname);
+        let mut account = Account::create(&conn, &fullname, Permission::ADMIN)?;
+        account.username = Some(username);
         account.update(&conn)?;
-        authentication_password::register(&conn, &account, &username, &password)?;
+        authentication_password::register(&conn, &account, &password)?;
     }
 
     Ok(())
