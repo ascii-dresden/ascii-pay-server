@@ -88,7 +88,7 @@ pub async fn get_change_password(
     logged_account: RetrievedAccount,
 ) -> ServiceResult<HttpResponse> {
     let _logged_account = login_required!(logged_account, Permission::DEFAULT, Action::REDIRECT);
-    
+
     let body = HbData::new(&request)
         .with_data("error", &request.query_string().contains("error"))
         .render(&hb, "settings_change_password")?;
@@ -106,21 +106,19 @@ pub async fn post_change_password(
 
     let conn = &pool.get()?;
 
-    if !authentication_password::verify_password(&conn, &logged_account.account, &params.old_password)? {
+    if !authentication_password::verify_password(
+        &conn,
+        &logged_account.account,
+        &params.old_password,
+    )? {
         return Ok(HttpResponse::Found()
-            .header(
-                http::header::LOCATION,
-                "/settings/change-password?error"
-            )
+            .header(http::header::LOCATION, "/settings/change-password?error")
             .finish());
     }
 
     if params.new_password != params.new_password2 {
         return Ok(HttpResponse::Found()
-            .header(
-                http::header::LOCATION,
-                "/settings/change-password?error"
-            )
+            .header(http::header::LOCATION, "/settings/change-password?error")
             .finish());
     }
 
@@ -138,9 +136,8 @@ pub async fn get_revoke_password(
     logged_account: RetrievedAccount,
 ) -> ServiceResult<HttpResponse> {
     let _logged_account = login_required!(logged_account, Permission::DEFAULT, Action::REDIRECT);
-    
-    let body = HbData::new(&request)
-        .render(&hb, "settings_revoke_password")?;
+
+    let body = HbData::new(&request).render(&hb, "settings_revoke_password")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
@@ -171,9 +168,8 @@ pub async fn get_revoke_qr(
     logged_account: RetrievedAccount,
 ) -> ServiceResult<HttpResponse> {
     let _logged_account = login_required!(logged_account, Permission::DEFAULT, Action::REDIRECT);
-    
-    let body = HbData::new(&request)
-        .render(&hb, "settings_revoke_qr")?;
+
+    let body = HbData::new(&request).render(&hb, "settings_revoke_qr")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
@@ -204,9 +200,8 @@ pub async fn get_revoke_nfc(
     logged_account: RetrievedAccount,
 ) -> ServiceResult<HttpResponse> {
     let _logged_account = login_required!(logged_account, Permission::DEFAULT, Action::REDIRECT);
-    
-    let body = HbData::new(&request)
-        .render(&hb, "settings_revoke_nfc")?;
+
+    let body = HbData::new(&request).render(&hb, "settings_revoke_nfc")?;
 
     Ok(HttpResponse::Ok().body(body))
 }

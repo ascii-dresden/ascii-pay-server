@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{Local, NaiveDateTime};
 use diesel::prelude::*;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -66,7 +66,7 @@ pub fn execute(
             account_id: account.id,
             cashier_id: cashier.map(|c| c.id),
             total,
-            date: chrono::Local::now().naive_local(),
+            date: Local::now().naive_local(),
         };
         account.credit = new_credit;
 

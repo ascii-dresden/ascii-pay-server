@@ -7,6 +7,7 @@ use crate::login_required;
 use crate::web::utils::{HbData, Search};
 use actix_multipart::Multipart;
 use actix_web::{http, web, HttpRequest, HttpResponse};
+use chrono::NaiveDateTime;
 use futures::prelude::*;
 use handlebars::Handlebars;
 use std::collections::HashMap;
@@ -21,7 +22,7 @@ pub struct FormProduct {
     pub category: String,
     #[serde(with = "crate::core::naive_date_time_serializer")]
     #[serde(rename = "price-date-create")]
-    pub validity_start: chrono::NaiveDateTime,
+    pub validity_start: NaiveDateTime,
     #[serde(rename = "price-value-create")]
     pub value: f32,
     pub barcode: String,

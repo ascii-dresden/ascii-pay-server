@@ -1,4 +1,4 @@
-use chrono::{NaiveDateTime, Utc};
+use chrono::{Local, NaiveDateTime};
 use diesel::prelude::*;
 use std::fs::{self, File};
 use std::path::Path;
@@ -255,7 +255,7 @@ impl Product {
 
     /// Calculate the `current_price` based on the `prices` vec
     fn calc_current_price(&mut self) {
-        self.current_price = self.get_price_at(&Utc::now().naive_utc());
+        self.current_price = self.get_price_at(&Local::now().naive_local());
     }
 
     pub fn get_price_at(&self, datetime: &NaiveDateTime) -> Option<Money> {
