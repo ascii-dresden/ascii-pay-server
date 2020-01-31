@@ -1,5 +1,6 @@
 use actix_web::{error::ResponseError, Error as ActixError, HttpResponse};
 use derive_more::Display;
+use lettre::smtp::error::Error as LettreError;
 
 pub const AUTH_COOKIE_NAME: &str = "auth";
 
@@ -22,6 +23,9 @@ pub enum ServiceError {
 
     #[display(fmt = "You have insufficient privileges to view this site")]
     InsufficientPrivileges,
+
+    #[display(fmt = "Error sending mail: {}", _0)]
+    MailError(LettreError),
 }
 
 impl ServiceError {
@@ -99,6 +103,12 @@ impl From<block_modes::BlockModeError> for ServiceError {
     }
 }
 
+impl From<LettreError> for ServiceError {
+    fn from(error: LettreError) -> Self {
+        ServiceError::MailError(error)
+    }
+}
+
 /*
 /// nightly - allow `?` on Option<T> to unwrap
 impl From<std::option::NoneError> for ServiceError {
@@ -130,6 +140,12 @@ impl ResponseError for ServiceError {
             ServiceError::Unauthorized => HttpResponse::Unauthorized().json("Unauthorized"),
             ServiceError::InsufficientPrivileges => {
                 HttpResponse::Unauthorized().json("Insufficient Privileges")
+            }
+            ServiceError::MailError(ref mail_err) => {
+                HttpResponse::InternalServerError().json(json!({
+                    "message": "An error occured when trying to send an email.",
+                    "cause": format!("{}", mail_err)
+                }))
             }
         }
     }

@@ -2,9 +2,11 @@ use argonautica::{Hasher, Verifier};
 use chrono::{Duration, NaiveDateTime, Utc};
 use diesel::prelude::*;
 use uuid::Uuid;
+use std::fmt;
 
 use crate::core::schema::{authentication_password, authentication_password_invitation};
 use crate::core::{generate_uuid_str, Account, DbConnection, ServiceError, ServiceResult};
+use crate::core::mail;
 
 /// Represent a username - password authentication for the given account
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset)]
@@ -18,10 +20,17 @@ struct AuthenticationPassword {
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset)]
 #[table_name = "authentication_password_invitation"]
 #[primary_key(account_id)]
-struct InvitationLink {
-    account_id: Uuid,
-    link: String,
-    valid_until: NaiveDateTime,
+pub struct InvitationLink {
+    pub account_id: Uuid,
+    pub link: String,
+    pub valid_until: NaiveDateTime,
+}
+
+impl fmt::Display for InvitationLink {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
+        write!(f, "{base}/register/{link_id}", base = base_url, link_id = self.link)
+    }
 }
 
 pub fn create_invitation_link(conn: &DbConnection, account: &Account) -> ServiceResult<String> {
@@ -37,6 +46,11 @@ pub fn create_invitation_link(conn: &DbConnection, account: &Account) -> Service
     diesel::insert_into(dsl::authentication_password_invitation)
         .values(&a)
         .execute(conn)?;
+
+    // send invite link if account has an associated mail address
+    if account.mail.is_some() {
+        mail::send_invitation_link(&account, &a)?;
+    }
 
     Ok(a.link)
 }

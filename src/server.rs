@@ -83,8 +83,6 @@ pub async fn start_server(pool: Pool) -> ServiceResult<()> {
             .configure(module_web::init)
     })
     .bind(address)?
-    .bind(format!("127.0.0.1:{}", port))?
-    .bind(format!("[::1]:{}", port))?
     .run()
     .await?;
 

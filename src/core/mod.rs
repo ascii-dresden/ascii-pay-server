@@ -6,6 +6,7 @@ pub mod authentication_nfc;
 pub mod authentication_password;
 mod categories;
 mod errors;
+mod mail;
 mod prices;
 mod products;
 mod schema;
