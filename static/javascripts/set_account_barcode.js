@@ -33,7 +33,7 @@ function parseSSE(data) {
             id = "ascii: " + id;
         }
 
-        toast("New nfc card scanned: '" + id + "'", "Apply?", () => {
+        toast("New nfc card scanned: '" + data.content.name + "'<br/>(" + id + ")", "Apply?", () => {
             for (let element of elements) {
                 if (element.name && element.name.startsWith("nfc-new")) {
                     element.value = id;

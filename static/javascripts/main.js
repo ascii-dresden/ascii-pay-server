@@ -222,7 +222,7 @@ function toast(message, actionLabel, actionCallback) {
 
     let toast = document.createElement("div");
     toast.classList.add("container", "grid-lg", "toast", "toast-primary");
-    toast.textContent = message;
+    toast.innerHTML = message;
     container.appendChild(toast);
     
     let close = document.createElement("span");

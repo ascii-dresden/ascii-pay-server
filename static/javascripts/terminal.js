@@ -19,6 +19,9 @@ function parseSSE(data) {
             case "payment-token":
                 load_payment_token(data.content);
                 break;
+            case "payment-timeout":
+                load_payment_timeout();
+                break;
         }
     }
 }
@@ -57,6 +60,7 @@ function load_nfc_card(content) {
     document.getElementById("card-nfc").classList.add("active");
 
     document.getElementById("card-nfc-id").value = content.id;
+    document.getElementById("card-nfc-name").value = content.name;
     document.getElementById("card-nfc-writeable").value = content.writeable;
 }
 
@@ -118,6 +122,17 @@ function load_payment_token(content) {
             btn.classList.remove("btn-error");
         }, 2000);
     });
+}
+
+function load_payment_timeout() {
+    let btn = document.getElementById("card-payment-pay");
+    
+    btn.classList.remove("loading");
+    btn.classList.add("btn-error");
+
+    setTimeout(() => {
+        btn.classList.remove("btn-error");
+    }, 2000);
 }
 
 window.addEventListener('DOMContentLoaded', (event) => {
