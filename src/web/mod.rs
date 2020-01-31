@@ -2,6 +2,7 @@ pub mod accounts;
 pub mod categories;
 pub mod index;
 pub mod products;
+pub mod settings;
 pub mod terminal;
 pub mod transactions;
 pub mod utils;
@@ -116,6 +117,31 @@ pub fn init(config: &mut web::ServiceConfig) {
                 web::resource("/transaction/execute/{account_id}")
                     .route(web::post().to(transactions::post_execute_transaction)),
             )
-            .service(web::resource("/terminal").route(web::get().to(terminal::get_terminal))),
+            .service(web::resource("/terminal").route(web::get().to(terminal::get_terminal)))
+            .service(
+                web::resource("/settings")
+                    .route(web::post().to(settings::post_settings))
+                    .route(web::get().to(settings::get_settings)),
+            )
+            .service(
+                web::resource("/settings/change-password")
+                    .route(web::post().to(settings::post_change_password))
+                    .route(web::get().to(settings::get_change_password)),
+            )
+            .service(
+                web::resource("/settings/revoke-password")
+                    .route(web::post().to(settings::post_revoke_password))
+                    .route(web::get().to(settings::get_revoke_password)),
+            )
+            .service(
+                web::resource("/settings/revoke-qr")
+                    .route(web::post().to(settings::post_revoke_qr))
+                    .route(web::get().to(settings::get_revoke_qr)),
+            )
+            .service(
+                web::resource("/settings/revoke-nfc")
+                    .route(web::post().to(settings::post_revoke_nfc))
+                    .route(web::get().to(settings::get_revoke_nfc)),
+            ),
     );
 }
