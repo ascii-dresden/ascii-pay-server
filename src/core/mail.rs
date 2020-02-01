@@ -46,7 +46,8 @@ This mail has been automatically generated. Please do not reply.",
         // Addresses can be specified by the tuple (email, alias)
         .to((
             account
-                .mail.as_ref()
+                .mail
+                .as_ref()
                 .expect("No mail address submitted to invite send function"),
             &account.name,
         ))
@@ -60,7 +61,11 @@ This mail has been automatically generated. Please do not reply.",
     if credentials.server.ends_with(".local") {
         // dump the mail to the log
         let m: SendableEmail = email.into();
-        println!("{}", m.message_to_string().expect("This was unrealistic to happen"));
+        println!(
+            "{}",
+            m.message_to_string()
+                .expect("This was unrealistic to happen")
+        );
     } else {
         // Open a smtp connection
         let mut mailer = SmtpClient::new_simple(&credentials.server)?
@@ -70,6 +75,28 @@ This mail has been automatically generated. Please do not reply.",
         // Send the email
         let _ = mailer.send(email.into())?;
     }
+
+    Ok(())
+}
+
+/// Sends a test mail to the given receiver.
+pub fn send_test_mail(receiver: String) -> ServiceResult<()> {
+    let credentials = MailCredentials::load_from_environment();
+
+    let mail = EmailBuilder::new()
+        .to(receiver)
+        .from(credentials.sender)
+        .subject("[ascii pay] Test Mail")
+        .text("This is a test mail to verify that the miling system works.")
+        .build()
+        .unwrap();
+
+    let mut mailer = SmtpClient::new_simple(&credentials.server)?
+        .credentials(Credentials::new(credentials.user, credentials.pass))
+        .transport();
+
+    // Send the email
+    let _ = mailer.send(mail.into())?;
 
     Ok(())
 }
