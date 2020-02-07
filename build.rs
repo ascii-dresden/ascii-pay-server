@@ -21,14 +21,22 @@ fn process_files(path: &Path) -> io::Result<()> {
                 // register any scss and sass files found as triggers for a rebuild
                 println!("cargo:rerun-if-changed={}", path.display());
 
-                // run the compilation abd write to css
-                let output_path = path.with_extension("css");
-                match sass_rs::compile_file(path, sass_rs::Options::default()) {
-                    Ok(compiled) => {
-                        let mut css_file = File::create(output_path)?;
-                        css_file.write_all(compiled.as_bytes())?;
+                let is_source_file = if let Some(os_filename) = path.file_name() {
+                    if let Some(filename) = os_filename.to_str() {
+                        !filename.starts_with("_")
+                    } else {false}
+                } else {false};
+
+                if is_source_file {
+                    // run the compilation abd write to css
+                    let output_path = path.with_extension("css");
+                    match sass_rs::compile_file(path, sass_rs::Options::default()) {
+                        Ok(compiled) => {
+                            let mut css_file = File::create(output_path)?;
+                            css_file.write_all(compiled.as_bytes())?;
+                        }
+                        Err(msg) => panic!("Compilation of sass failed: {}", msg),
                     }
-                    Err(msg) => panic!("Compilation of sass failed: {}", msg),
                 }
             }
         }

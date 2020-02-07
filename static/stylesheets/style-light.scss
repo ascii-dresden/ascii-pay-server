@@ -1,0 +1,105 @@
+// Core colors
+$primary-color: #2980b9 !default;
+$primary-color-dark: darken($primary-color, 3%) !default;
+$primary-color-light: lighten($primary-color, 3%) !default;
+$secondary-color: lighten($primary-color, 37.5%) !default;
+$secondary-color-dark: darken($secondary-color, 3%) !default;
+$secondary-color-light: lighten($secondary-color, 3%) !default;
+
+// Gray colors
+$dark-color: #363a3d !default;
+$light-color: #fff !default;
+$gray-color: lighten($dark-color, 55%) !default;
+$gray-color-dark: darken($gray-color, 30%) !default;
+$gray-color-light: lighten($gray-color, 20%) !default;
+
+$border-color: lighten($dark-color, 65%) !default;
+$border-color-dark: darken($border-color, 10%) !default;
+$border-color-light: lighten($border-color, 8%) !default;
+$bg-color: lighten($dark-color, 75%) !default;
+$bg-color-dark: darken($bg-color, 3%) !default;
+$bg-color-light: $light-color !default;
+
+// Control colors
+$success-color: #27ae60 !default;
+$warning-color: #f39c12 !default;
+$error-color: #e74c3c !default;
+
+// Other colors
+$code-color: #16a085 !default;
+$highlight-color: #ffe9b3 !default;
+$body-bg: $bg-color-light !default;
+$body-font-color: lighten($dark-color, 5%) !default;
+$link-color: $primary-color !default;
+$link-color-dark: darken($link-color, 10%) !default;
+$link-color-light: lighten($link-color, 10%) !default;
+
+:root {
+    // Core colors
+    --primary-color: #{$primary-color};
+    --primary-color-dark: #{$primary-color-dark};
+    --primary-color-light: #{$primary-color-light};
+    --secondary-color: #{$secondary-color};
+    --secondary-color-dark: #{$secondary-color-dark};
+    --secondary-color-light: #{$secondary-color-light};
+
+    --primary-color-dark-d2: #{darken($primary-color-dark, 2%)};
+    --primary-color-dark-d4: #{darken($primary-color-dark, 4%)};
+    --primary-color-dark-d5: #{darken($primary-color-dark, 5%)};
+    --primary-color-dark-d7: #{darken($primary-color-dark, 7%)};
+
+    // Gray colors
+    --dark-color: #{$dark-color};
+    --light-color: #{$light-color};
+    --gray-color: #{$gray-color};
+    --gray-color-dark: #{$gray-color-dark};
+    --gray-color-light: #{$gray-color-light};
+
+    --gray-color-dark-d10: #{darken($gray-color-dark, 10%)};
+
+    --border-color: #{$border-color};
+    --border-color-dark: #{$border-color-dark};
+    --border-color-light: #{$border-color-light};
+    --bg-color: #{$bg-color};
+    --bg-color-dark: #{$bg-color-dark};
+    --bg-color-light: #{$bg-color-light};
+
+    // Control colors
+    --success-color: #{$success-color};
+    --warning-color: #{$warning-color};
+    --error-color: #{$error-color};
+
+    --success-color-d2: #{darken($success-color, 2%)};
+    --success-color-d3: #{darken($success-color, 3%)};
+    --success-color-d5: #{darken($success-color, 5%)};
+    --success-color-d7: #{darken($success-color, 7%)};
+    --success-color-d10: #{darken($success-color, 10%)};
+    --success-color-l53: #{darken($success-color, 53%)};
+
+    --warning-color-d2: #{darken($warning-color, 2%)};
+    --warning-color-d3: #{darken($warning-color, 3%)};
+    --warning-color-d5: #{darken($warning-color, 5%)};
+    --warning-color-d7: #{darken($warning-color, 7%)};
+    --warning-color-d10: #{darken($warning-color, 10%)};
+    --warning-color-l53: #{darken($warning-color, 53%)};
+
+    --error-color-d2: #{darken($error-color, 2%)};
+    --error-color-d3: #{darken($error-color, 3%)};
+    --error-color-d5: #{darken($error-color, 5%)};
+    --error-color-d7: #{darken($error-color, 7%)};
+    --error-color-d10: #{darken($error-color, 10%)};
+    --error-color-l53: #{darken($error-color, 53%)};
+
+    // Other colors
+    --code-color: #{$code-color};
+    --highlight-color: #{$highlight-color};
+    --body-bg: #{$body-bg};
+    --body-font-color: #{$body-font-color};
+    --link-color: #{$link-color};
+    --link-color-dark: #{$link-color-dark};
+    --link-color-light: #{$link-color-light};
+
+    --code-color-l42: #{lighten($code-color, 42.5%)};
+    --highlight-color-d15: #{darken($highlight-color, 15%)};
+    --body-font-color-l5: #{lighten($body-font-color, 5%)};
+}
