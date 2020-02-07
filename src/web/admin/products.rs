@@ -75,7 +75,7 @@ impl SearchProduct {
     }
 }
 
-/// GET route for `/products`
+/// GET route for `/admin/products`
 pub async fn get_products(
     hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
@@ -102,12 +102,12 @@ pub async fn get_products(
         .with_account(logged_account)
         .with_data("search", &search)
         .with_data("products", &search_products)
-        .render(&hb, "product_list")?;
+        .render(&hb, "admin_product_list")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
 
-/// GET route for `/product/{product_id}`
+/// GET route for `/admin/product/{product_id}`
 pub async fn get_product_edit(
     hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
@@ -127,12 +127,12 @@ pub async fn get_product_edit(
         .with_account(logged_account)
         .with_data("product", &product)
         .with_data("categories", &all_categories)
-        .render(&hb, "product_edit")?;
+        .render(&hb, "admin_product_edit")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
 
-/// POST route for `/product/{product_id}`
+/// POST route for `/admin/product/{product_id}`
 pub async fn post_product_edit(
     logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
@@ -190,11 +190,11 @@ pub async fn post_product_edit(
     }
 
     Ok(HttpResponse::Found()
-        .header(http::header::LOCATION, "/products")
+        .header(http::header::LOCATION, "/admin/products")
         .finish())
 }
 
-/// GET route for `/product/create`
+/// GET route for `/admin/product/create`
 pub async fn get_product_create(
     hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
@@ -209,12 +209,12 @@ pub async fn get_product_create(
     let body = HbData::new(&request)
         .with_account(logged_account)
         .with_data("categories", &all_categories)
-        .render(&hb, "product_create")?;
+        .render(&hb, "admin_product_create")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
 
-/// POST route for `/product/create`
+/// POST route for `/admin/product/create`
 pub async fn post_product_create(
     logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
@@ -251,12 +251,12 @@ pub async fn post_product_create(
     Ok(HttpResponse::Found()
         .header(
             http::header::LOCATION,
-            format!("/product/{}", server_product.id),
+            format!("/admin/product/{}", server_product.id),
         )
         .finish())
 }
 
-/// GET route for `/product/delete/{product_id}`
+/// GET route for `/admin/product/delete/{product_id}`
 pub async fn get_product_delete(
     _hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
@@ -267,11 +267,11 @@ pub async fn get_product_delete(
     println!("Delete is not supported!");
 
     Ok(HttpResponse::Found()
-        .header(http::header::LOCATION, "/products")
+        .header(http::header::LOCATION, "/admin/products")
         .finish())
 }
 
-/// GET route for `/product/remove-image/{product_id}`
+/// GET route for `/admin/product/remove-image/{product_id}`
 pub async fn get_product_remove_image(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
@@ -286,11 +286,14 @@ pub async fn get_product_remove_image(
     product.remove_image(&conn)?;
 
     Ok(HttpResponse::Found()
-        .header(http::header::LOCATION, format!("/product/{}", &product_id))
+        .header(
+            http::header::LOCATION,
+            format!("/admin/product/{}", &product_id),
+        )
         .finish())
 }
 
-/// POST route for `/product/upload-image/{product_id}`
+/// POST route for `/admin/product/upload-image/{product_id}`
 pub async fn post_product_upload_image(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
@@ -301,7 +304,7 @@ pub async fn post_product_upload_image(
 
     let conn = &pool.get()?;
     let mut product = Product::get(&conn, &Uuid::parse_str(&product_id)?)?;
-    let location = format!("/product/{}", &product_id);
+    let location = format!("/admin/product/{}", &product_id);
 
     save_file(multipart, &conn, &mut product).await?;
     Ok(HttpResponse::Found()

@@ -58,7 +58,7 @@ impl SearchCategory {
     }
 }
 
-/// GET route for `/categories`
+/// GET route for `/admin/categories`
 pub async fn get_categories(
     hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
@@ -85,12 +85,12 @@ pub async fn get_categories(
         .with_account(logged_account)
         .with_data("search", &search)
         .with_data("categories", &search_categories)
-        .render(&hb, "category_list")?;
+        .render(&hb, "admin_category_list")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
 
-/// GET route for `/category/{category_id}`
+/// GET route for `/admin/category/{category_id}`
 pub async fn get_category_edit(
     hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
@@ -107,12 +107,12 @@ pub async fn get_category_edit(
     let body = HbData::new(&request)
         .with_account(logged_account)
         .with_data("category", &category)
-        .render(&hb, "category_edit")?;
+        .render(&hb, "admin_category_edit")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
 
-/// POST route for `/category/{category_id}`
+/// POST route for `/admin/category/{category_id}`
 pub async fn post_category_edit(
     logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
@@ -157,11 +157,11 @@ pub async fn post_category_edit(
     }
 
     Ok(HttpResponse::Found()
-        .header(http::header::LOCATION, "/categories")
+        .header(http::header::LOCATION, "/admin/categories")
         .finish())
 }
 
-/// GET route for `/category/create`
+/// GET route for `/admin/category/create`
 pub async fn get_category_create(
     hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
@@ -171,12 +171,12 @@ pub async fn get_category_create(
 
     let body = HbData::new(&request)
         .with_account(logged_account)
-        .render(&hb, "category_create")?;
+        .render(&hb, "admin_category_create")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
 
-/// POST route for `/category/create`
+/// POST route for `/admin/category/create`
 pub async fn post_category_create(
     logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
@@ -199,12 +199,12 @@ pub async fn post_category_create(
     Ok(HttpResponse::Found()
         .header(
             http::header::LOCATION,
-            format!("/category/{}", server_category.id),
+            format!("/admin/category/{}", server_category.id),
         )
         .finish())
 }
 
-/// GET route for `/category/delete/{category_id}`
+/// GET route for `/admin/category/delete/{category_id}`
 pub async fn get_category_delete(
     _hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
@@ -215,6 +215,6 @@ pub async fn get_category_delete(
     println!("Delete is not supported!");
 
     Ok(HttpResponse::Found()
-        .header(http::header::LOCATION, "/categories")
+        .header(http::header::LOCATION, "/admin/categories")
         .finish())
 }

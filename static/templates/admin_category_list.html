@@ -5,7 +5,7 @@
 
 <body>
     <div class="container grid-lg">
-        {{> _navigation active="categories" }}
+        {{> _admin_navigation active="categories" }}
 
         <h1>Manage categories</h1>
 
@@ -19,7 +19,7 @@
                 </form>
             </div>
             <div class="column col-auto col-ml-auto">
-                <a class="btn" href="/category/create">Create category</a>
+                <a class="btn" href="/admin/category/create">Create category</a>
             </div>
         </div>
 
@@ -37,7 +37,7 @@
                     <td>{{{name_search}}}</td>
                     <td>{{{current_price_search}}}</td>
                     <td>
-                        <a href="/category/{{id}}">Edit</a>
+                        <a href="/admin/category/{{id}}">Edit</a>
                     </td>
                 </tr>
                 {{/each}}

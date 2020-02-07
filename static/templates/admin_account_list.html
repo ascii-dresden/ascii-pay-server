@@ -5,7 +5,7 @@
 
 <body>
     <div class="container grid-lg">
-        {{> _navigation active="accounts" }}
+        {{> _admin_navigation active="accounts" }}
 
         <h1>Manage accounts</h1>
 
@@ -19,7 +19,7 @@
                 </form>
             </div>
             <div class="column col-auto col-ml-auto">
-                <a class="btn" href="/account/create">Create account</a>
+                <a class="btn" href="/admin/account/create">Create account</a>
             </div>
         </div>
 
@@ -39,8 +39,8 @@
                     <td style="text-transform: lowercase;">{{#if (ne permission "DEFAULT")}}{{{permission_search}}}{{/if}}</td>
                     <td>{{{mail_search}}}</td>
                     <td>
-                        <a href="/account/{{id}}">Edit</a>
-                        <a href="/transactions/{{id}}">Transactions</a>
+                        <a href="/admin/account/{{id}}">Edit</a>
+                        <a href="/admin/transactions/{{id}}">Transactions</a>
                     </td>
                 </tr>
                 {{/each}}

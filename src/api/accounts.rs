@@ -1,7 +1,7 @@
 use crate::core::{Account, Permission, Pool, ServiceResult};
 use crate::identity_policy::{Action, RetrievedAccount};
 use crate::login_required;
-use crate::web::accounts::SearchAccount;
+use crate::web::admin::accounts::SearchAccount;
 use crate::web::utils::Search;
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;

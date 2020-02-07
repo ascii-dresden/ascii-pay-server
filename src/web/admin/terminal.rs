@@ -5,7 +5,7 @@ use crate::web::utils::HbData;
 use actix_web::{web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
 
-/// GET route for `/terminal`
+/// GET route for `/admin/terminal`
 pub async fn get_terminal(
     hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
@@ -15,7 +15,7 @@ pub async fn get_terminal(
 
     let body = HbData::new(&request)
         .with_account(logged_account)
-        .render(&hb, "terminal")?;
+        .render(&hb, "admin_terminal")?;
 
     Ok(HttpResponse::Ok().body(body))
 }

@@ -1,5 +1,5 @@
 use crate::core::{Pool, Product, ServiceResult};
-use crate::web::products::SearchProduct;
+use crate::web::admin::products::SearchProduct;
 use crate::web::utils::Search;
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;

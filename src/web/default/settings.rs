@@ -53,7 +53,7 @@ pub async fn get_settings(
         .with_data("has_password", &has_password)
         .with_data("has_qr_code", &has_qr_code)
         .with_data("has_nfc_card", &has_nfc_card)
-        .render(&hb, "settings")?;
+        .render(&hb, "default_settings")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
@@ -91,7 +91,7 @@ pub async fn get_change_password(
 
     let body = HbData::new(&request)
         .with_data("error", &request.query_string().contains("error"))
-        .render(&hb, "settings_change_password")?;
+        .render(&hb, "default_settings_change_password")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
@@ -137,7 +137,7 @@ pub async fn get_revoke_password(
 ) -> ServiceResult<HttpResponse> {
     let _logged_account = login_required!(logged_account, Permission::DEFAULT, Action::REDIRECT);
 
-    let body = HbData::new(&request).render(&hb, "settings_revoke_password")?;
+    let body = HbData::new(&request).render(&hb, "default_settings_revoke_password")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
@@ -169,7 +169,7 @@ pub async fn get_revoke_qr(
 ) -> ServiceResult<HttpResponse> {
     let _logged_account = login_required!(logged_account, Permission::DEFAULT, Action::REDIRECT);
 
-    let body = HbData::new(&request).render(&hb, "settings_revoke_qr")?;
+    let body = HbData::new(&request).render(&hb, "default_settings_revoke_qr")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
@@ -201,7 +201,7 @@ pub async fn get_revoke_nfc(
 ) -> ServiceResult<HttpResponse> {
     let _logged_account = login_required!(logged_account, Permission::DEFAULT, Action::REDIRECT);
 
-    let body = HbData::new(&request).render(&hb, "settings_revoke_nfc")?;
+    let body = HbData::new(&request).render(&hb, "default_settings_revoke_nfc")?;
 
     Ok(HttpResponse::Ok().body(body))
 }

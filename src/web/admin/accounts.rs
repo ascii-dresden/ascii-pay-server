@@ -95,7 +95,7 @@ impl SearchAccount {
     }
 }
 
-/// GET route for `/accounts`
+/// GET route for `/admin/accounts`
 pub async fn get_accounts(
     pool: web::Data<Pool>,
     hb: web::Data<Handlebars<'_>>,
@@ -122,12 +122,12 @@ pub async fn get_accounts(
         .with_account(logged_account)
         .with_data("search", &search)
         .with_data("accounts", &search_accounts)
-        .render(&hb, "account_list")?;
+        .render(&hb, "admin_account_list")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
 
-/// GET route for `/account/{account_id}`
+/// GET route for `/admin/account/{account_id}`
 pub async fn get_account_edit(
     pool: web::Data<Pool>,
     hb: web::Data<Handlebars<'_>>,
@@ -149,7 +149,7 @@ pub async fn get_account_edit(
             display: Some((DisplayType::LINK, format!("/register/{}", invitation_link))),
             action: Some((
                 "Revoke".to_owned(),
-                format!("/account/revoke/{}", &account.id),
+                format!("/admin/account/revoke/{}", &account.id),
             )),
             id: None,
         });
@@ -160,7 +160,7 @@ pub async fn get_account_edit(
             display: Some((DisplayType::TEXT, "Password exists".to_owned())),
             action: Some((
                 "Revoke".to_owned(),
-                format!("/account/revoke/{}", &account.id),
+                format!("/admin/account/revoke/{}", &account.id),
             )),
             id: None,
         });
@@ -171,7 +171,7 @@ pub async fn get_account_edit(
             display: None,
             action: Some((
                 "Create invitation".to_owned(),
-                format!("/account/invite/{}", &account.id),
+                format!("/admin/account/invite/{}", &account.id),
             )),
             id: None,
         });
@@ -186,7 +186,7 @@ pub async fn get_account_edit(
             display: Some((DisplayType::TEXT, barcode)),
             action: Some((
                 "Delete".to_owned(),
-                format!("/account/remove-barcode/{}", &account.id),
+                format!("/admin/account/remove-barcode/{}", &account.id),
             )),
             id: Some(format!("barcode-{}", barcode_id)),
         });
@@ -220,7 +220,7 @@ pub async fn get_account_edit(
             display: Some((DisplayType::TEXT, card_id)),
             action: Some((
                 "Delete".to_owned(),
-                format!("/account/remove-nfc/{}", &account.id),
+                format!("/admin/account/remove-nfc/{}", &account.id),
             )),
             id: Some(format!("nfc-{}", nfc_id)),
         });
@@ -238,12 +238,12 @@ pub async fn get_account_edit(
         .with_account(logged_account)
         .with_data("account", &account)
         .with_data("authentication_methods", &authentication_methods)
-        .render(&hb, "account_edit")?;
+        .render(&hb, "admin_account_edit")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
 
-/// POST route for `/account/{account_id}`
+/// POST route for `/admin/account/{account_id}`
 pub async fn post_account_edit(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
@@ -296,9 +296,9 @@ pub async fn post_account_edit(
     }
 
     let location = if reauth {
-        "/accounts?reauthenticate"
+        "/admin/accounts?reauthenticate"
     } else {
-        "/accounts"
+        "/admin/accounts"
     };
 
     Ok(HttpResponse::Found()
@@ -306,7 +306,7 @@ pub async fn post_account_edit(
         .finish())
 }
 
-/// GET route for `/account/create`
+/// GET route for `/admin/account/create`
 pub async fn get_account_create(
     hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
@@ -316,12 +316,12 @@ pub async fn get_account_create(
 
     let body = HbData::new(&request)
         .with_account(logged_account)
-        .render(&hb, "account_create")?;
+        .render(&hb, "admin_account_create")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
 
-/// POST route for `/account/create`
+/// POST route for `/admin/account/create`
 pub async fn post_account_create(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
@@ -343,12 +343,12 @@ pub async fn post_account_create(
     Ok(HttpResponse::Found()
         .header(
             http::header::LOCATION,
-            format!("/account/{}", server_account.id),
+            format!("/admin/account/{}", server_account.id),
         )
         .finish())
 }
 
-/// GET route for `/account/invite/{account_id}`
+/// GET route for `/admin/account/invite/{account_id}`
 pub async fn invite_get(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
@@ -362,11 +362,14 @@ pub async fn invite_get(
     authentication_password::create_invitation_link(&conn, &account)?;
 
     Ok(HttpResponse::Found()
-        .header(http::header::LOCATION, format!("/account/{}", account.id))
+        .header(
+            http::header::LOCATION,
+            format!("/admin/account/{}", account.id),
+        )
         .finish())
 }
 
-/// GET route for `/account/revoke/{account_id}`
+/// GET route for `/admin/account/revoke/{account_id}`
 pub async fn revoke_get(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
@@ -381,11 +384,14 @@ pub async fn revoke_get(
     authentication_password::remove(&conn, &account)?;
 
     Ok(HttpResponse::Found()
-        .header(http::header::LOCATION, format!("/account/{}", account.id))
+        .header(
+            http::header::LOCATION,
+            format!("/admin/account/{}", account.id),
+        )
         .finish())
 }
 
-/// GET route for `/account/remove-nfc/{account_id}`
+/// GET route for `/admin/account/remove-nfc/{account_id}`
 pub async fn remove_nfc_get(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
@@ -399,11 +405,14 @@ pub async fn remove_nfc_get(
     authentication_nfc::remove(&conn, &account)?;
 
     Ok(HttpResponse::Found()
-        .header(http::header::LOCATION, format!("/account/{}", account.id))
+        .header(
+            http::header::LOCATION,
+            format!("/admin/account/{}", account.id),
+        )
         .finish())
 }
 
-/// GET route for `/account/remove-nfc/{account_id}`
+/// GET route for `/admin/account/remove-nfc/{account_id}`
 pub async fn remove_barcode_get(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
@@ -417,11 +426,14 @@ pub async fn remove_barcode_get(
     authentication_barcode::remove(&conn, &account)?;
 
     Ok(HttpResponse::Found()
-        .header(http::header::LOCATION, format!("/account/{}", account.id))
+        .header(
+            http::header::LOCATION,
+            format!("/admin/account/{}", account.id),
+        )
         .finish())
 }
 
-/// GET route for `/account/delete/{account_id}`
+/// GET route for `/admin/account/delete/{account_id}`
 pub async fn delete_get(
     _hb: web::Data<Handlebars<'_>>,
     logged_account: RetrievedAccount,
@@ -432,6 +444,6 @@ pub async fn delete_get(
     println!("Delete is not supported!");
 
     Ok(HttpResponse::Found()
-        .header(http::header::LOCATION, "/accounts")
+        .header(http::header::LOCATION, "/admin/accounts")
         .finish())
 }

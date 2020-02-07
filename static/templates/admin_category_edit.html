@@ -5,14 +5,14 @@
 
 <body>
     <div class="container grid-lg">
-        {{> _navigation active="categories" }}
+        {{> _admin_navigation active="categories" }}
 
         <div class="columns">
             <div class="column col-6 col-sm-12">
                 <h1>Edit category</h1>
             </div>
             <div class="column col-auto col-ml-auto">
-                <a class="btn" href="/category/create">Create category</a>
+                <a class="btn" href="/admin/category/create">Create category</a>
             </div>
         </div>
 
@@ -82,7 +82,7 @@
             <div class="columns">
                 <div class="column col-8 col-sm-12">
                     <input class="btn btn-primary" type="submit" value="Save" />
-                    <a class="btn" href="/categories">Cancel</a>
+                    <a class="btn" href="/admin/categories">Cancel</a>
                 </div>
                 <div class="column col-ml-auto col-auto">
                     <!-- <a class="btn btn-error" href="/category/delete/{{category.id}}">Delete</a> -->

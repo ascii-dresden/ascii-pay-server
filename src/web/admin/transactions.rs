@@ -65,7 +65,7 @@ impl TransactionProduct {
     }
 }
 
-/// GET route for `/transactions/{account_id}`
+/// GET route for `/admin/transactions/{account_id}`
 pub async fn get_transactions(
     pool: web::Data<Pool>,
     hb: web::Data<Handlebars<'_>>,
@@ -102,12 +102,12 @@ pub async fn get_transactions(
         )
         .with_data("account", &account)
         .with_data("transactions", &list)
-        .render(&hb, "transaction_list")?;
+        .render(&hb, "admin_transaction_list")?;
 
     Ok(HttpResponse::Ok().body(body))
 }
 
-/// POST route for `/transaction/execute/{account_id}`
+/// POST route for `/admin/transaction/execute/{account_id}`
 pub async fn post_execute_transaction(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
@@ -132,12 +132,12 @@ pub async fn post_execute_transaction(
     Ok(HttpResponse::Found()
         .header(
             http::header::LOCATION,
-            format!("/transactions/{}", &account_id),
+            format!("/admin/transactions/{}", &account_id),
         )
         .finish())
 }
 
-/// GET route for `/transaction/{account_id}/{transaction_id}`
+/// GET route for `/admin/transaction/{account_id}/{transaction_id}`
 pub async fn get_transaction_details(
     pool: web::Data<Pool>,
     hb: web::Data<Handlebars<'_>>,
@@ -145,7 +145,6 @@ pub async fn get_transaction_details(
     request: HttpRequest,
     path: web::Path<(String, String)>,
 ) -> ServiceResult<HttpResponse> {
-    println!("call");
     let logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
 
     let conn = &pool.get()?;
@@ -165,7 +164,7 @@ pub async fn get_transaction_details(
         .with_data("account", &account)
         .with_data("transaction", &transaction)
         .with_data("products", &products)
-        .render(&hb, "transaction_details")?;
+        .render(&hb, "admin_transaction_details")?;
 
     Ok(HttpResponse::Ok().body(body))
 }

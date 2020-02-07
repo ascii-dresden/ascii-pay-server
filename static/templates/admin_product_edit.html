@@ -5,14 +5,14 @@
 
 <body>
     <div class="container grid-lg">
-        {{> _navigation active="products" }}
+        {{> _admin_navigation active="products" }}
 
         <div class="columns">
             <div class="column col-6 col-sm-12">
                 <h1>Edit product</h1>
             </div>
             <div class="column col-auto col-ml-auto">
-                <a class="btn" href="/product/create">Create product</a>
+                <a class="btn" href="/admin/product/create">Create product</a>
             </div>
         </div>
 
@@ -106,7 +106,7 @@
             <div class="columns">
                 <div class="column col-8 col-sm-12">
                     <input class="btn btn-primary" type="submit" value="Save" />
-                    <a class="btn" href="/products">Cancel</a>
+                    <a class="btn" href="/admin/products">Cancel</a>
                 </div>
                 <div class="column col-ml-auto col-auto">
                     <!-- <a class="btn btn-error" href="/product/delete/{{product.id}}">Delete</a> -->
@@ -116,7 +116,7 @@
 
         <div class="divider text-center" data-content="OR"></div>
 
-        <form class="form-horizontal" method="POST" enctype="multipart/form-data" action="/product/upload-image/{{product.id}}">
+        <form class="form-horizontal" method="POST" enctype="multipart/form-data" action="/admin/product/upload-image/{{product.id}}">
             <div class="form-group">
                 <div class="col-3 col-sm-12">
                     <label class="form-label" for="image" >Image</label>
@@ -141,7 +141,7 @@
                     <input class="btn btn-primary" type="submit" value="Upload" />
                 </div>
                 <div class="column col-ml-auto col-auto">
-                    <a class="btn btn-error" href="/product/remove-image/{{product.id}}">Remove image</a>
+                    <a class="btn btn-error" href="/admin/product/remove-image/{{product.id}}">Remove image</a>
                 </div>
             </div>
         </form>
