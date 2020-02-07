@@ -6,7 +6,7 @@
 
     <section class="navbar-section">
         {{#if (ne logged_account.permission "DEFAULT")}}
-        <a href="/admin" class="btn btn-link">Administration</a>
+        <a href="/admin" class="btn btn-link">Admin view</a>
         {{/if}}
         <span>{{logged_account.name}}</span>
         <a href="/logout" class="btn btn-link">Logout</a>

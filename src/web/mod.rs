@@ -3,16 +3,16 @@ pub mod default;
 pub mod login;
 pub mod utils;
 
-use actix_files as fs;
-use handlebars::Handlebars;
-use actix_web::{web, HttpRequest, HttpResponse};
-use crate::web::utils::HbData;
 use crate::core::ServiceResult;
+use crate::web::utils::HbData;
+use actix_files as fs;
+use actix_web::{web, HttpRequest, HttpResponse};
+use handlebars::Handlebars;
 
 /// Setup routes for admin ui
 pub fn init(config: &mut web::ServiceConfig) {
     admin::init(config);
-    
+
     config.service(
         web::scope("/")
             // Setup static routes
@@ -42,8 +42,7 @@ pub async fn get_404(
     hb: web::Data<Handlebars<'_>>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let body = HbData::new(&request)
-        .render(&hb, "404")?;
+    let body = HbData::new(&request).render(&hb, "404")?;
 
     Ok(HttpResponse::Ok().body(body))
 }

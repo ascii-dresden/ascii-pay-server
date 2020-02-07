@@ -75,7 +75,8 @@ pub async fn get_transaction_details(
 
     let transaction_id = Uuid::parse_str(&path)?;
 
-    let transaction = transactions::get_by_account_and_id(&conn, &logged_account.account, &transaction_id)?;
+    let transaction =
+        transactions::get_by_account_and_id(&conn, &logged_account.account, &transaction_id)?;
     let products = transaction.get_products(&conn)?;
 
     let products = TransactionProduct::vec_to_transaction_product(products);
