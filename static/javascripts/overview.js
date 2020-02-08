@@ -5,17 +5,22 @@ function init_main_diagram() {
     let ctx = canvas.getContext('2d');
 
     var time_data = [];
-    var value = 0;
 
     for (line of transaction_data) {
-        let t = line.total / 100;
-        value += t;
-
-        let d = moment(line.date)
         time_data.push({
-            x: d,
-            y: value
+            x: moment(line.date),
+            y: line.after_credit / 100
         });
+    }
+
+    if (transaction_data.length > 0) {
+        let line = transaction_data[transaction_data.length - 1];
+        if (line.before_credit === 0) {
+            time_data.push({
+                x: moment(line.date),
+                y: 0
+            });
+        }
     }
 
     var data = {
@@ -51,6 +56,7 @@ function init_main_diagram() {
                 ],
                 yAxes: [
                     {
+                        beginAtZero: true,
                         ticks: {
                             callback: function (value) {
                                 return value.toFixed(2) + "€";
@@ -68,6 +74,7 @@ function init_main_diagram() {
                     }
                 }
             },
+            maintainAspectRatio: false,
             layout: {
                 padding: {
                     top: 30,

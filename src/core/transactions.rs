@@ -17,6 +17,8 @@ pub struct Transaction {
     pub account_id: Uuid,
     pub cashier_id: Option<Uuid>,
     pub total: Money,
+    pub before_credit: Money,
+    pub after_credit: Money,
     pub date: NaiveDateTime,
 }
 
@@ -48,13 +50,14 @@ fn execute_at(
     }
     */
 
-    let mut new_credit = account.credit;
+    let before_credit = account.credit;
+    let mut after_credit = account.credit;
 
     let result = conn.build_transaction().serializable().run(|| {
         let mut account = Account::get(conn, &account.id)?;
-        new_credit = account.credit + total;
+        after_credit = account.credit + total;
 
-        if new_credit < account.minimum_credit && new_credit < account.credit {
+        if after_credit < account.minimum_credit && after_credit < account.credit {
             return Err(ServiceError::InternalServerError(
                 "Transaction error",
                 "The transaction can not be performed. Check the account credit and minimum_credit"
@@ -67,9 +70,11 @@ fn execute_at(
             account_id: account.id,
             cashier_id: cashier.map(|c| c.id),
             total,
+            before_credit,
+            after_credit,
             date,
         };
-        account.credit = new_credit;
+        account.credit = after_credit;
 
         diesel::insert_into(dsl::transaction)
             .values(&a)
@@ -81,7 +86,7 @@ fn execute_at(
     });
 
     if result.is_ok() {
-        account.credit = new_credit;
+        account.credit = after_credit;
     }
 
     result
