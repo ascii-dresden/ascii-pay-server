@@ -4,7 +4,7 @@ use crate::core::{
 };
 use crate::identity_policy::{Action, RetrievedAccount};
 use crate::login_required;
-use crate::web::utils::{HbData, Search};
+use crate::web::utils::{HbData, IsJson, Search};
 use actix_multipart::Multipart;
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use chrono::NaiveDateTime;
@@ -83,7 +83,8 @@ pub async fn get_products(
     query: web::Query<Search>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    let action = request.redirect_type();
+    let logged_account = login_required!(logged_account, Permission::MEMBER, action);
 
     let conn = &pool.get()?;
 
@@ -98,13 +99,17 @@ pub async fn get_products(
         .filter_map(|p| SearchProduct::wrap(p, &lower_search))
         .collect();
 
-    let body = HbData::new(&request)
-        .with_account(logged_account)
-        .with_data("search", &search)
-        .with_data("products", &search_products)
-        .render(&hb, "admin_product_list")?;
+    if request.is_json() {
+        Ok(HttpResponse::Ok().json(search_products))
+    } else {
+        let body = HbData::new(&request)
+            .with_account(logged_account)
+            .with_data("search", &search)
+            .with_data("products", &search_products)
+            .render(&hb, "admin_product_list")?;
 
-    Ok(HttpResponse::Ok().body(body))
+        Ok(HttpResponse::Ok().body(body))
+    }
 }
 
 /// GET route for `/admin/product/{product_id}`

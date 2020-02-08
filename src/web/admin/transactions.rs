@@ -213,3 +213,90 @@ pub mod naive_date_time_option_serializer {
         }
     }
 }
+
+/// GET route for `/admin/transactions/generate/{account_id}/`
+pub async fn get_transaction_generate_random(
+    pool: web::Data<Pool>,
+    hb: web::Data<Handlebars<'_>>,
+    logged_account: RetrievedAccount,
+    request: HttpRequest,
+    path: web::Path<String>,
+) -> ServiceResult<HttpResponse> {
+    let logged_account = login_required!(logged_account, Permission::ADMIN, Action::REDIRECT);
+
+    let conn = &pool.get()?;
+
+    let account_id = Uuid::parse_str(&path)?;
+
+    let account = Account::get(&conn, &account_id)?;
+    let now = Local::now().naive_local();
+
+    let body = HbData::new(&request)
+        .with_account(logged_account)
+        .with_data("account", &account)
+        .with_data(
+            "date",
+            &FromToQuery {
+                from: Some((now - Duration::days(30)).date().and_hms(0, 0, 0)),
+                to: Some(now.date().and_hms(23, 59, 59)),
+            },
+        )
+        .render(&hb, "admin_transaction_generate_random")?;
+
+    Ok(HttpResponse::Ok().body(body))
+}
+
+/// Helper to deserialize from-to queries
+#[derive(Deserialize, Serialize)]
+pub struct GenerateRandomQuery {
+    #[serde(with = "naive_date_time_option_serializer")]
+    #[serde(default = "get_none")]
+    pub from: Option<NaiveDateTime>,
+    #[serde(with = "naive_date_time_option_serializer")]
+    #[serde(default = "get_none")]
+    pub to: Option<NaiveDateTime>,
+    pub avg_up: f32,
+    pub avg_down: f32,
+    pub count_per_day: u32,
+}
+
+/// POST route for `/admin/transactions/generate/{account_id}/`
+pub async fn post_transaction_generate_random(
+    pool: web::Data<Pool>,
+    logged_account: RetrievedAccount,
+    path: web::Path<String>,
+    data: web::Form<GenerateRandomQuery>,
+) -> ServiceResult<HttpResponse> {
+    let _logged_account = login_required!(logged_account, Permission::ADMIN, Action::REDIRECT);
+
+    let conn = &pool.get()?;
+
+    let account_id = Uuid::parse_str(&path)?;
+
+    let mut account = Account::get(&conn, &account_id)?;
+    let now = Local::now().naive_local();
+
+    let from = data
+        .from
+        .unwrap_or_else(|| now - Duration::days(30))
+        .date()
+        .and_hms(0, 0, 0);
+    let to = data.to.unwrap_or_else(|| now).date().and_hms(23, 59, 59);
+
+    transactions::generate_transactions(
+        conn,
+        &mut account,
+        from,
+        to,
+        data.count_per_day,
+        (data.avg_down * 100.0) as Money,
+        (data.avg_up * 100.0) as Money,
+    )?;
+
+    Ok(HttpResponse::Found()
+        .header(
+            http::header::LOCATION,
+            format!("/admin/transactions/{}", &account_id),
+        )
+        .finish())
+}

@@ -90,6 +90,11 @@ pub fn init(config: &mut web::ServiceConfig) {
                     .route(web::get().to(transactions::get_transactions)),
             )
             .service(
+                web::resource("/transactions/generate/{account_id}")
+                    .route(web::post().to(transactions::post_transaction_generate_random))
+                    .route(web::get().to(transactions::get_transaction_generate_random)),
+            )
+            .service(
                 web::resource("/transaction/execute/{account_id}")
                     .route(web::post().to(transactions::post_execute_transaction)),
             )

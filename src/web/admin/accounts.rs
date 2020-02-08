@@ -4,7 +4,7 @@ use crate::core::{
 };
 use crate::identity_policy::{Action, RetrievedAccount};
 use crate::login_required;
-use crate::web::utils::{EmptyToNone, HbData, Search};
+use crate::web::utils::{EmptyToNone, HbData, IsJson, Search};
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
 use uuid::Uuid;
@@ -103,7 +103,8 @@ pub async fn get_accounts(
     query: web::Query<Search>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    let action = request.redirect_type();
+    let logged_account = login_required!(logged_account, Permission::MEMBER, action);
 
     let conn = &pool.get()?;
 
@@ -118,13 +119,17 @@ pub async fn get_accounts(
         .filter_map(|a| SearchAccount::wrap(a, &lower_search))
         .collect();
 
-    let body = HbData::new(&request)
-        .with_account(logged_account)
-        .with_data("search", &search)
-        .with_data("accounts", &search_accounts)
-        .render(&hb, "admin_account_list")?;
+    if request.is_json() {
+        Ok(HttpResponse::Ok().json(search_accounts))
+    } else {
+        let body = HbData::new(&request)
+            .with_account(logged_account)
+            .with_data("search", &search)
+            .with_data("accounts", &search_accounts)
+            .render(&hb, "admin_account_list")?;
 
-    Ok(HttpResponse::Ok().body(body))
+        Ok(HttpResponse::Ok().body(body))
+    }
 }
 
 /// GET route for `/admin/account/{account_id}`
