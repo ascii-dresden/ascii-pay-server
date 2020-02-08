@@ -328,7 +328,7 @@ pub fn generate_transactions(
         let date = start_date + offset;
 
         for time_offset in 0..count_per_day {
-            let offset = 9.0 / (count_per_day as f32) * time_offset as f32;
+            let offset = 9.0 / ((count_per_day - 1) as f32) * time_offset as f32;
 
             let hr = offset as u32;
             let mn = ((offset - hr as f32) * 60.0) as u32;
@@ -337,12 +337,15 @@ pub fn generate_transactions(
 
             let date_time = NaiveDateTime::new(date, time);
 
+            let mut seconds = 0;
+
             while account.credit + avg_down < account.minimum_credit {
                 println!("up");
-                execute_at(conn, account, None, avg_up, date_time)?;
+                execute_at(conn, account, None, avg_up, date_time + Duration::seconds(seconds))?;
+                seconds += 1;
             }
             println!("down");
-            execute_at(conn, account, None, avg_down, date_time)?;
+            execute_at(conn, account, None, avg_down, date_time + Duration::seconds(seconds))?;
         }
     }
 

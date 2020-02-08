@@ -4,15 +4,24 @@ function init_main_diagram() {
     container.appendChild(canvas);
     let ctx = canvas.getContext('2d');
 
+    transaction_data.reverse();
     var time_data = [];
 
     for (line of transaction_data) {
+        console.log(line.before_credit, line.after_credit);
+        time_data.push({
+            x: moment(line.date),
+            y: line.before_credit / 100
+        });
         time_data.push({
             x: moment(line.date),
             y: line.after_credit / 100
         });
     }
 
+
+    console.log(time_data);
+    /*
     if (transaction_data.length > 0) {
         let line = transaction_data[transaction_data.length - 1];
         if (line.before_credit === 0) {
@@ -22,6 +31,7 @@ function init_main_diagram() {
             });
         }
     }
+    */
 
     var data = {
         datasets: [
