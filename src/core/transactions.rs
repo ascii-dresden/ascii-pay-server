@@ -29,11 +29,12 @@ pub struct Transaction {
 /// * 4 Check if the account minimum_credit allows the new credit
 /// * 5 Create and save the transaction (with optional cashier refernece)
 /// * 6 Save the new credit to the account
-pub fn execute(
+fn execute_at(
     conn: &DbConnection,
     account: &mut Account,
     cashier: Option<&Account>,
     total: Money,
+    date: NaiveDateTime,
 ) -> ServiceResult<Transaction> {
     use crate::core::schema::transaction::dsl;
 
@@ -66,7 +67,7 @@ pub fn execute(
             account_id: account.id,
             cashier_id: cashier.map(|c| c.id),
             total,
-            date: Local::now().naive_local(),
+            date,
         };
         account.credit = new_credit;
 
@@ -84,6 +85,24 @@ pub fn execute(
     }
 
     result
+}
+
+/// Execute a transaction on the given `account` with the given `total`
+///
+/// # Internal steps
+/// * 1 Start a sql transaction
+/// * 2 Requery the account credit
+/// * 3 Calculate the new credit
+/// * 4 Check if the account minimum_credit allows the new credit
+/// * 5 Create and save the transaction (with optional cashier refernece)
+/// * 6 Save the new credit to the account
+pub fn execute(
+    conn: &DbConnection,
+    account: &mut Account,
+    cashier: Option<&Account>,
+    total: Money,
+) -> ServiceResult<Transaction> {
+    execute_at(conn, account, cashier, total, Local::now().naive_local())
 }
 
 // Pagination reference: https://github.com/diesel-rs/diesel/blob/v1.3.0/examples/postgres/advanced-blog-cli/src/pagination.rs
@@ -282,4 +301,45 @@ impl Transaction {
 
         Ok(results)
     }
+}
+
+pub fn generate_transactions(
+    conn: &DbConnection,
+    account: &mut Account,
+    from: NaiveDateTime,
+    to: NaiveDateTime,
+    count_per_day: u32,
+    avg_down: Money,
+    avg_up: Money,
+) -> ServiceResult<()> {
+    use chrono::Duration;
+    use chrono::NaiveTime;
+
+    let days = (to - from).num_days();
+    let start_date = from.date();
+
+    for day_offset in 0..days {
+        let offset = Duration::days(day_offset);
+        let date = start_date + offset;
+
+        for time_offset in 0..count_per_day {
+            let offset = 9.0 / (count_per_day as f32) * time_offset as f32;
+
+            let hr = offset as u32;
+            let mn = ((offset - hr as f32) * 60.0) as u32;
+
+            let time = NaiveTime::from_hms(hr, mn, 0);
+
+            let date_time = NaiveDateTime::new(date, time);
+
+            while account.credit + avg_down < account.minimum_credit {
+                println!("up");
+                execute_at(conn, account, None, avg_up, date_time)?;
+            }
+            println!("down");
+            execute_at(conn, account, None, avg_down, date_time)?;
+        }
+    }
+
+    Ok(())
 }

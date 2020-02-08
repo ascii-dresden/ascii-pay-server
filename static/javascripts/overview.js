@@ -4,44 +4,80 @@ function init_main_diagram() {
     container.appendChild(canvas);
     let ctx = canvas.getContext('2d');
 
-    let myChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: ['Red', 'Blue', 'Yellow', 'Green', 'Purple', 'Orange'],
-            datasets: [{
-                label: '# of Votes',
-                data: [12, 19, 3, 5, 2, 3],
-                backgroundColor: [
-                    'rgba(255, 99, 132, 0.2)',
-                    'rgba(54, 162, 235, 0.2)',
-                    'rgba(255, 206, 86, 0.2)',
-                    'rgba(75, 192, 192, 0.2)',
-                    'rgba(153, 102, 255, 0.2)',
-                    'rgba(255, 159, 64, 0.2)'
-                ],
-                borderColor: [
-                    'rgba(255, 99, 132, 1)',
-                    'rgba(54, 162, 235, 1)',
-                    'rgba(255, 206, 86, 1)',
-                    'rgba(75, 192, 192, 1)',
-                    'rgba(153, 102, 255, 1)',
-                    'rgba(255, 159, 64, 1)'
-                ],
-                borderWidth: 1
-            }]
-        },
+    var time_data = [];
+    var value = 0;
+
+    for (line of transaction_data) {
+        let t = line.total / 100;
+        value += t;
+
+        let d = moment(line.date)
+        time_data.push({
+            x: d,
+            y: value
+        });
+    }
+
+    var data = {
+        datasets: [
+            {
+                label: "Scatter Dataset",
+                lineTension: 0,
+                borderColor: "rgba(41, 128, 185,1.0)",
+                backgroundColor: "rgba(41, 128, 185,0.2)",
+                fill: false,
+                data: time_data
+            }
+        ]
+    };
+
+    new Chart(ctx, {
+        type: "line",
+        data: data,
         options: {
+            animation: false,
+            legend: {
+                display: false
+             },
             scales: {
-                yAxes: [{
-                    ticks: {
-                        beginAtZero: true
+                xAxes: [
+                    {
+                        scaleLabel: {
+                            display: true
+                        },
+                        type: "time",
+
                     }
-                }]
+                ],
+                yAxes: [
+                    {
+                        ticks: {
+                            callback: function (value) {
+                                return value.toFixed(2) + "€";
+                            }
+                        }
+                    }
+                ]
+            },
+            tooltips: {
+                callbacks: {
+                    label: function(tooltipItem, chart, x){
+                        var datasetLabel = chart.datasets[tooltipItem.datasetIndex];
+                        console.log(tooltipItem, chart, datasetLabel, x);
+                        return parseFloat(tooltipItem.value).toFixed(2) + "€";
+                    }
+                }
+            },
+            layout: {
+                padding: {
+                    top: 30,
+                }
             }
         }
     });
+
 }
 
-window.addEventListener('DOMContentLoaded', (event) => {
+window.addEventListener('DOMContentLoaded', () => {
     init_main_diagram();
 });
