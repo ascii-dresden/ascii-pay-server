@@ -66,11 +66,14 @@ pub struct HbData {
 
 impl HbData {
     pub fn new(request: &HttpRequest) -> Self {
-        let mut theme = "light";
+        let mut theme = "auto";
         if let Some(header_value) = request.headers().get(COOKIE) {
             if let Ok(header_str) = header_value.to_str() {
                 if header_str.contains("theme=dark") {
                     theme = "dark";
+                }
+                if header_str.contains("theme=light") {
+                    theme = "light";
                 }
             }
         }
