@@ -8,7 +8,6 @@ function init_main_diagram() {
     var time_data = [];
 
     for (line of transaction_data) {
-        console.log(line.before_credit, line.after_credit);
         time_data.push({
             x: moment(line.date),
             y: line.before_credit / 100
@@ -19,8 +18,6 @@ function init_main_diagram() {
         });
     }
 
-
-    console.log(time_data);
     /*
     if (transaction_data.length > 0) {
         let line = transaction_data[transaction_data.length - 1];
@@ -79,7 +76,6 @@ function init_main_diagram() {
                 callbacks: {
                     label: function(tooltipItem, chart, x){
                         var datasetLabel = chart.datasets[tooltipItem.datasetIndex];
-                        console.log(tooltipItem, chart, datasetLabel, x);
                         return parseFloat(tooltipItem.value).toFixed(2) + "€";
                     }
                 }

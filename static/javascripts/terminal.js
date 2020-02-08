@@ -95,7 +95,6 @@ function load_payment_token(content) {
                 btn.classList.remove("btn-success");
             }, 2000);
 
-            console.log(response);
             response.json().then((response) => {
                 load_account(response.account);
             });

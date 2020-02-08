@@ -1,7 +1,6 @@
 use chrono::{Local, NaiveDateTime};
 use diesel::prelude::*;
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use uuid::Uuid;
 
 use crate::core::schema::transaction;
@@ -146,54 +145,81 @@ pub fn get_by_account_and_id(
     results.pop().ok_or_else(|| ServiceError::NotFound)
 }
 
-#[derive(Debug)]
-pub enum ValidationError {
-    Invalid(Money),
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "status")]
+pub enum ValidationResult {
+    Ok,
+    InvalidTransactionBefore {
+        expected_credit: Money,
+        transaction_credit: Money,
+        transaction: Transaction,
+    },
+    InvalidTransactionAfter {
+        expected_credit: Money,
+        transaction_credit: Money,
+        transaction: Transaction,
+    },
+    InvalidSum {
+        expected: Money,
+        actual: Money,
+    },
     NoData,
+    Error,
 }
 
 /// Check if the credit of an account is valid to its transactions
-fn validate_account(
-    conn: &DbConnection,
-    account: &Account,
-) -> ServiceResult<Option<ValidationError>> {
+fn validate_account(conn: &DbConnection, account: &Account) -> ServiceResult<ValidationResult> {
     use crate::core::schema::transaction::dsl;
 
     conn.build_transaction().serializable().run(|| {
         let account = Account::get(conn, &account.id)?;
 
-        let result = dsl::transaction
-            .select(diesel::dsl::sum(dsl::total))
+        let results = dsl::transaction
             .filter(dsl::account_id.eq(&account.id))
-            .first::<Option<i64>>(conn)?;
+            .order(dsl::date.asc())
+            .load::<Transaction>(conn)?;
 
-        if let Some(sum) = result {
-            let sum = i32::try_from(sum).map_err(|error| {
-                ServiceError::InternalServerError("Validation error", format!("{}", error))
-            })?;
-            if sum == account.credit {
-                Ok(None)
-            } else {
-                Ok(Some(ValidationError::Invalid(sum)))
+        let mut last_credit = 0;
+
+        for transaction in results {
+            if last_credit != transaction.before_credit {
+                return Ok(ValidationResult::InvalidTransactionBefore {
+                    expected_credit: last_credit,
+                    transaction_credit: transaction.before_credit,
+                    transaction,
+                });
             }
+            if transaction.before_credit + transaction.total != transaction.after_credit {
+                return Ok(ValidationResult::InvalidTransactionAfter {
+                    expected_credit: last_credit + transaction.total,
+                    transaction_credit: transaction.after_credit,
+                    transaction,
+                });
+            }
+            last_credit += transaction.total;
+        }
+
+        if last_credit != account.credit {
+            Ok(ValidationResult::InvalidSum {
+                expected: last_credit,
+                actual: account.credit,
+            })
         } else {
-            Ok(Some(ValidationError::NoData))
+            Ok(ValidationResult::Ok)
         }
     })
 }
 
 /// List all accounts with validation erros of their credit to their transactions
-pub fn validate_all(conn: &DbConnection) -> ServiceResult<HashMap<Account, ValidationError>> {
+pub fn validate_all(conn: &DbConnection) -> ServiceResult<HashMap<Uuid, ValidationResult>> {
     let accounts = Account::all(conn)?;
 
     let map = accounts
         .into_iter()
         .map(|a| {
-            let r = validate_account(conn, &a).unwrap_or(Some(ValidationError::NoData));
-            (a, r)
+            let r = validate_account(conn, &a).unwrap_or(ValidationResult::Error);
+            (a.id, r)
         })
-        .filter(|(_, r)| r.is_some())
-        .map(|(a, r)| (a, r.expect("Filter removes all none values!")))
         .collect::<HashMap<_, _>>();
 
     Ok(map)
@@ -340,12 +366,22 @@ pub fn generate_transactions(
             let mut seconds = 0;
 
             while account.credit + avg_down < account.minimum_credit {
-                println!("up");
-                execute_at(conn, account, None, avg_up, date_time + Duration::seconds(seconds))?;
+                execute_at(
+                    conn,
+                    account,
+                    None,
+                    avg_up,
+                    date_time + Duration::seconds(seconds),
+                )?;
                 seconds += 1;
             }
-            println!("down");
-            execute_at(conn, account, None, avg_down, date_time + Duration::seconds(seconds))?;
+            execute_at(
+                conn,
+                account,
+                None,
+                avg_down,
+                date_time + Duration::seconds(seconds),
+            )?;
         }
     }
 

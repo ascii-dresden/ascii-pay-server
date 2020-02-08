@@ -300,3 +300,17 @@ pub async fn post_transaction_generate_random(
         )
         .finish())
 }
+
+/// GET route for `/admin/transactions/validate`
+pub async fn get_transactions_validate(
+    pool: web::Data<Pool>,
+    logged_account: RetrievedAccount,
+) -> ServiceResult<HttpResponse> {
+    let _logged_account = login_required!(logged_account, Permission::ADMIN, Action::REDIRECT);
+
+    let conn = &pool.get()?;
+
+    let result = transactions::validate_all(conn)?;
+
+    Ok(HttpResponse::Ok().json(result))
+}
