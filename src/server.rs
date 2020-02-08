@@ -57,7 +57,7 @@ pub async fn start_server(pool: Pool) -> ServiceResult<()> {
 
     // Set handlebars template directory
     handlebars
-        .register_templates_directory(".html", "./static/templates")
+        .register_templates_directory(".handlebars", "./static/templates")
         .unwrap();
 
     // Set handlebars helper function for cent/euro converter
