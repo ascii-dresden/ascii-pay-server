@@ -1,5 +1,6 @@
 pub mod accounts;
 pub mod categories;
+pub mod cron;
 pub mod index;
 pub mod products;
 pub mod terminal;
@@ -116,6 +117,8 @@ pub fn init(config: &mut web::ServiceConfig) {
                 web::resource("/transaction/execute/{account_id}")
                     .route(web::post().to(transactions::post_execute_transaction)),
             )
-            .service(web::resource("/terminal").route(web::get().to(terminal::get_terminal))),
+            .service(web::resource("/terminal").route(web::get().to(terminal::get_terminal)))
+            // Setup cronjob routes
+            .service(web::resource("/admin/cron/reports").route(web::get().to(cron::send_reports))),
     );
 }

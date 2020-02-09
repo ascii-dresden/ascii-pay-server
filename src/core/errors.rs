@@ -1,3 +1,4 @@
+use actix_web::http::header::ToStrError;
 use actix_web::{error::ResponseError, Error as ActixError, HttpResponse};
 use derive_more::Display;
 use lettre::smtp::error::Error as LettreError;
@@ -106,6 +107,15 @@ impl From<block_modes::BlockModeError> for ServiceError {
 impl From<LettreError> for ServiceError {
     fn from(error: LettreError) -> Self {
         ServiceError::MailError(error)
+    }
+}
+
+impl From<ToStrError> for ServiceError {
+    fn from(error: ToStrError) -> Self {
+        ServiceError::BadRequest(
+            "Request contained invalid CRON_SECRET header value",
+            format!("{}", error),
+        )
     }
 }
 

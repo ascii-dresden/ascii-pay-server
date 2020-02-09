@@ -6,6 +6,7 @@ use lettre_email::EmailBuilder;
 
 struct MailCredentials {
     pub sender: String,
+    pub sender_name: String,
     pub server: String,
     pub user: String,
     pub pass: String,
@@ -15,14 +16,13 @@ impl MailCredentials {
     fn load_from_environment() -> Self {
         MailCredentials {
             sender: std::env::var("MAIL_SENDER").expect("MAIL_SENDER must be set."),
+            sender_name: std::env::var("MAIL_SENDER_NAME").expect("MAIL_SENDER_NAME must be set."),
             server: std::env::var("MAIL_URL").expect("MAIL_URL must be set"),
             user: std::env::var("MAIL_USER").expect("MAIL_USER must be set"),
             pass: std::env::var("MAIL_PASSWORD").expect("MAIL_PASSWORD must be set"),
         }
     }
 }
-
-// TODO: Adjust error type
 
 pub fn send_invitation_link(account: &Account, invite: &InvitationLink) -> ServiceResult<()> {
     let credentials = MailCredentials::load_from_environment();
@@ -51,8 +51,7 @@ This mail has been automatically generated. Please do not reply.",
                 .expect("No mail address submitted to invite send function"),
             &account.name,
         ))
-        // ... or by an address only
-        .from(credentials.sender)
+        .from((credentials.sender, credentials.sender_name))
         .subject("[ascii pay] You have been invited to the ascii-pay service")
         .text(mail_text)
         .build()
@@ -77,6 +76,13 @@ This mail has been automatically generated. Please do not reply.",
     }
 
     Ok(())
+}
+
+/// Send a generated monthly report to the user
+pub fn send_report_mail(account: &Account, report: String) -> ServiceResult<()> {
+    let credentials = MailCredentials::load_from_environment();
+
+    todo!()
 }
 
 /// Sends a test mail to the given receiver.
