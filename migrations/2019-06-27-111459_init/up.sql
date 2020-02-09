@@ -6,7 +6,8 @@ CREATE TABLE "account" (
   "mail" VARCHAR(64),
   "username" VARCHAR(64),
   "account_number" VARCHAR(64),
-  "permission" SMALLINT NOT NULL
+  "permission" SMALLINT NOT NULL,
+  "receives_monthly_report" BOOLEAN DEFAULT 'f' NOT NULL
 );
 
 CREATE TABLE "authentication_barcode" (

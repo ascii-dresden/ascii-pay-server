@@ -82,7 +82,7 @@ This mail has been automatically generated. Please do not reply.",
 pub fn send_report_mail(account: &Account, report: String) -> ServiceResult<()> {
     let credentials = MailCredentials::load_from_environment();
 
-    todo!()
+    Ok(())
 }
 
 /// Sends a test mail to the given receiver.

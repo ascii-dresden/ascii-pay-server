@@ -34,6 +34,8 @@ pub struct Account {
     pub username: Option<String>,
     pub account_number: Option<String>,
     pub permission: Permission,
+    /// Whether the user want's to receive a monthly report about his/her/* account activities
+    pub receives_monthly_report: bool,
 }
 
 /// Represents the permission level of an account
@@ -139,6 +141,7 @@ impl Account {
             username: None,
             account_number: None,
             permission,
+            receives_monthly_report: false,
         };
 
         if !a.exist_conficting_account(conn)? {
