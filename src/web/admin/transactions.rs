@@ -90,6 +90,7 @@ pub async fn get_transactions(
     let to = query.to.unwrap_or_else(|| now).date().and_hms(23, 59, 59);
 
     let list = transactions::get_by_account(&conn, &account, &from, &to)?;
+    let list_str = serde_json::to_string(&list).unwrap_or_else(|_| "[]".to_owned());
 
     let body = HbData::new(&request)
         .with_account(logged_account)
@@ -102,6 +103,7 @@ pub async fn get_transactions(
         )
         .with_data("account", &account)
         .with_data("transactions", &list)
+        .with_data("transactions_str", &list_str)
         .render(&hb, "admin_transaction_list")?;
 
     Ok(HttpResponse::Ok().body(body))

@@ -359,7 +359,7 @@ pub fn generate_transactions(
             let hr = offset as u32;
             let mn = ((offset - hr as f32) * 60.0) as u32;
 
-            let time = NaiveTime::from_hms(hr, mn, 0);
+            let time = NaiveTime::from_hms(9 + hr, mn, 0);
 
             let date_time = NaiveDateTime::new(date, time);
 
