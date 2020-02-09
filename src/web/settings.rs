@@ -48,6 +48,7 @@ pub async fn get_settings(
     let has_qr_code =
         !authentication_barcode::get_barcodes(&conn, &logged_account.account)?.is_empty();
     let has_nfc_card = !authentication_nfc::get_nfcs(&conn, &logged_account.account)?.is_empty();
+    let has_mail_address = logged_account.account.mail.is_some();
     let receives_monthly_report = logged_account.account.receives_monthly_report;
 
     let body = HbData::new(&request)
@@ -55,6 +56,7 @@ pub async fn get_settings(
         .with_data("has_password", &has_password)
         .with_data("has_qr_code", &has_qr_code)
         .with_data("has_nfc_card", &has_nfc_card)
+        .with_data("has_mail_address", &has_mail_address)
         .with_data("receives_monthly_report", &receives_monthly_report)
         .render(&hb, "settings")?;
 
@@ -76,9 +78,12 @@ pub async fn post_settings(
     let mut server_account = Account::get(&conn, &logged_account.account.id)?;
 
     server_account.name = account.name.clone();
-    server_account.mail = account.mail.empty_to_none();
+    let new_mail = account.mail.empty_to_none();
+
+    // only enable monthly reports when mail address is existent
+    server_account.receives_monthly_report = new_mail.is_some() && (account.receives_monthly_report == Some("on".to_string()));
+    server_account.mail = new_mail;
     server_account.username = account.username.empty_to_none();
-    server_account.receives_monthly_report = account.receives_monthly_report == Some("on".to_string());
 
     server_account.update(&conn)?;
 

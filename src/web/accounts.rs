@@ -141,6 +141,7 @@ pub async fn get_account_edit(
     let conn = &pool.get()?;
 
     let account = Account::get(&conn, &Uuid::parse_str(&account_id)?)?;
+    let has_mail_address = account.mail.is_some();
 
     let mut authentication_methods: Vec<AuthenticationMethod> = vec![];
 
@@ -239,6 +240,7 @@ pub async fn get_account_edit(
         .with_account(logged_account)
         .with_data("account", &account)
         .with_data("authentication_methods", &authentication_methods)
+        .with_data("has_mail_address", &has_mail_address)
         .render(&hb, "account_edit")?;
 
     Ok(HttpResponse::Ok().body(body))
@@ -265,12 +267,15 @@ pub async fn post_account_edit(
     let mut server_account = Account::get(&conn, &Uuid::parse_str(&account_id)?)?;
 
     server_account.name = account.name.clone();
-    server_account.mail = account.mail.empty_to_none();
+    let new_mail = account.mail.empty_to_none();
+
+    // only enable monthly reports when mail address is existent
+    server_account.receives_monthly_report = new_mail.is_some() && (account.receives_monthly_report == Some("on".to_string()));
+    server_account.mail = new_mail;
     server_account.username = account.username.empty_to_none();
     server_account.account_number = account.account_number.empty_to_none();
     server_account.permission = account.permission;
     server_account.minimum_credit = (account.minimum_credit * 100.0) as Money;
-    server_account.receives_monthly_report = account.receives_monthly_report == Some("on".to_string());
 
     server_account.update(&conn)?;
 
