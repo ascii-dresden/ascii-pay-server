@@ -25,12 +25,12 @@ pub async fn send_reports(
     let accounts = Account::all(conn)?;
 
     // assemble reports per user and send them via mail to them.
-    // for acc in accounts {
-    //     if acc.receives_monthly_report {
-    //         // TODO: generate report
-    //         unimplemented!()
-    //     }
-    // }
+    for acc in accounts {
+        if acc.receives_monthly_report {
+            // TODO: generate report
+            unimplemented!()
+        }
+    }
 
 
 

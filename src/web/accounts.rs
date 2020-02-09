@@ -20,6 +20,7 @@ pub struct FormAccount {
     pub account_number: String,
     pub minimum_credit: f32,
     pub permission: Permission,
+    pub receives_monthly_report: Option<String>,
     #[serde(flatten)]
     pub extra: HashMap<String, String>,
 }
@@ -269,6 +270,7 @@ pub async fn post_account_edit(
     server_account.account_number = account.account_number.empty_to_none();
     server_account.permission = account.permission;
     server_account.minimum_credit = (account.minimum_credit * 100.0) as Money;
+    server_account.receives_monthly_report = account.receives_monthly_report == Some("on".to_string());
 
     server_account.update(&conn)?;
 

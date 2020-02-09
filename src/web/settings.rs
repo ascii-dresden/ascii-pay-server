@@ -13,6 +13,7 @@ pub struct FormSettings {
     pub name: String,
     pub mail: String,
     pub username: String,
+    pub receives_monthly_report: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -47,13 +48,17 @@ pub async fn get_settings(
     let has_qr_code =
         !authentication_barcode::get_barcodes(&conn, &logged_account.account)?.is_empty();
     let has_nfc_card = !authentication_nfc::get_nfcs(&conn, &logged_account.account)?.is_empty();
+    let receives_monthly_report = logged_account.account.receives_monthly_report;
 
     let body = HbData::new(&request)
         .with_account(logged_account)
         .with_data("has_password", &has_password)
         .with_data("has_qr_code", &has_qr_code)
         .with_data("has_nfc_card", &has_nfc_card)
+        .with_data("receives_monthly_report", &receives_monthly_report)
         .render(&hb, "settings")?;
+
+    // TODO: Checkbox is not checked although checking it works already
 
     Ok(HttpResponse::Ok().body(body))
 }
@@ -73,6 +78,7 @@ pub async fn post_settings(
     server_account.name = account.name.clone();
     server_account.mail = account.mail.empty_to_none();
     server_account.username = account.username.empty_to_none();
+    server_account.receives_monthly_report = account.receives_monthly_report == Some("on".to_string());
 
     server_account.update(&conn)?;
 
