@@ -1,5 +1,5 @@
 use argonautica::{Hasher, Verifier};
-use chrono::{Duration, NaiveDateTime, Utc};
+use chrono::{Duration, Local, NaiveDateTime};
 use diesel::prelude::*;
 use uuid::Uuid;
 use std::fmt;
@@ -39,7 +39,7 @@ pub fn create_invitation_link(conn: &DbConnection, account: &Account) -> Service
     let a = InvitationLink {
         account_id: account.id,
         link: generate_uuid_str(),
-        valid_until: Utc::now().naive_utc() + Duration::days(1),
+        valid_until: Local::now().naive_local() + Duration::days(1),
     };
 
     revoke_invitation_link(&conn, &account)?;
@@ -158,12 +158,34 @@ pub fn get(conn: &DbConnection, login: &str, password: &str) -> ServiceResult<Ac
     Ok(a)
 }
 
+pub fn verify_password(
+    conn: &DbConnection,
+    account: &Account,
+    password: &str,
+) -> ServiceResult<bool> {
+    use crate::core::schema::authentication_password::dsl;
+
+    let mut results = dsl::authentication_password
+        .filter(dsl::account_id.eq(account.id))
+        .load::<AuthenticationPassword>(conn)?;
+
+    let entry = results.pop().ok_or_else(|| ServiceError::NotFound)?;
+
+    Ok(verify(&entry.password, password)?)
+}
+
 lazy_static::lazy_static! {
 pub  static ref SECRET_KEY: String = std::env::var("SECRET_KEY").unwrap_or_else(|_| "0123".repeat(8));
 }
 
 /// Create the hash version of a password
 fn hash_password(password: &str) -> ServiceResult<String> {
+    if password.is_empty() {
+        return Err(ServiceError::BadRequest(
+            "Empty password",
+            "Password should not be empty".to_owned(),
+        ));
+    }
     Hasher::default()
         .with_password(password)
         .with_secret_key(SECRET_KEY.as_str())
@@ -176,6 +198,9 @@ fn hash_password(password: &str) -> ServiceResult<String> {
 
 /// Verify a password to its hash version
 fn verify(hash: &str, password: &str) -> ServiceResult<bool> {
+    if password.is_empty() {
+        return Ok(false);
+    }
     Verifier::default()
         .with_hash(hash)
         .with_password(password)

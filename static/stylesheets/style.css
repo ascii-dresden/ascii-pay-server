@@ -19,3 +19,6 @@ b {
   margin-top: 1rem; }
   .card-hidden.active {
     display: block; }
+
+.card-top-padding {
+  margin-top: 1rem; }

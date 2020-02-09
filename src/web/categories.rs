@@ -5,6 +5,7 @@ use crate::identity_policy::{Action, RetrievedAccount};
 use crate::login_required;
 use crate::web::utils::{HbData, Search};
 use actix_web::{http, web, HttpRequest, HttpResponse};
+use chrono::NaiveDateTime;
 use handlebars::Handlebars;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -15,7 +16,7 @@ pub struct FormCategory {
     pub name: String,
     #[serde(with = "crate::core::naive_date_time_serializer")]
     #[serde(rename = "price-date-create")]
-    pub validity_start: chrono::NaiveDateTime,
+    pub validity_start: NaiveDateTime,
     #[serde(rename = "price-value-create")]
     pub value: f32,
     #[serde(flatten)]

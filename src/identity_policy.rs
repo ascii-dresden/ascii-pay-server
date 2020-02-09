@@ -5,6 +5,7 @@ use actix_identity::Identity;
 use actix_identity::IdentityPolicy;
 use actix_web::dev::{Payload, ServiceRequest, ServiceResponse};
 use actix_web::{web, Error, FromRequest, HttpRequest};
+use chrono::Duration;
 use futures::future::{err, ok, Ready};
 use futures::prelude::*;
 
@@ -63,7 +64,7 @@ impl DbIdentityPolicy {
                 .name(AUTH_COOKIE_NAME)
                 .path("/")
                 .domain(&domain)
-                .max_age_time(chrono::Duration::days(1))
+                .max_age_time(Duration::days(1))
                 .secure(false),
         }
     }

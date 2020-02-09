@@ -5,6 +5,7 @@ use aes::Aes128;
 use block_modes::block_padding::Pkcs7;
 use block_modes::{BlockMode, Cbc};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use chrono::{Local, NaiveDateTime};
 use rand_core::RngCore;
 use std::io::Cursor;
 
@@ -148,7 +149,7 @@ fn generate_challenge() -> ServiceResult<String> {
     let mut buffer: Vec<u8> = Vec::new();
 
     // Generate current timestamp to validate challenge
-    let now = chrono::Utc::now().naive_utc().timestamp();
+    let now = Local::now().naive_local().timestamp();
     buffer.write_i64::<LittleEndian>(now)?;
 
     // Generate random challange
@@ -179,8 +180,8 @@ fn verify_challenge(challenge: &str) -> ServiceResult<bool> {
     let mut cursor = Cursor::new(buffer);
 
     let timestamp = cursor.read_i64::<LittleEndian>()?;
-    let now = chrono::Utc::now().naive_utc();
-    let challenge_time = chrono::NaiveDateTime::from_timestamp(timestamp, 0);
+    let now = Local::now().naive_local();
+    let challenge_time = NaiveDateTime::from_timestamp(timestamp, 0);
 
     // Check timestamp
     if (now - challenge_time).num_minutes() >= 2 {
