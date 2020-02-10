@@ -1,7 +1,7 @@
-use crate::core::{Category, Money, Permission, Pool, ServiceError, ServiceResult};
+use crate::core::{Category, Permission, Pool, ServiceError, ServiceResult};
 use crate::identity_policy::{Action, RetrievedAccount};
 use crate::login_required;
-use crate::web::admin::categories::{FormCategory, SearchCategory};
+use crate::web::admin::categories::SearchCategory;
 use crate::web::utils::Search;
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
@@ -34,7 +34,7 @@ pub async fn get_categories(
 pub async fn put_categories(
     logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
-    category: web::Json<FormCategory>,
+    category: web::Json<Category>,
 ) -> ServiceResult<HttpResponse> {
     let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
 
@@ -42,13 +42,7 @@ pub async fn put_categories(
 
     let mut server_category = Category::create(&conn, &category.name)?;
 
-    if category.value != 0.0 {
-        server_category.add_price(
-            &conn,
-            category.validity_start,
-            (category.value * 100.0) as Money,
-        )?;
-    }
+    server_category.update_prices(&conn, &category.prices)?;
 
     Ok(HttpResponse::Created().json(json!({
         "id": server_category.id
@@ -74,45 +68,26 @@ pub async fn get_category(
 pub async fn post_category(
     logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
-    category: web::Json<FormCategory>,
-    category_id: web::Path<String>,
+    category: web::Json<Category>,
+    category_id: web::Path<Uuid>,
 ) -> ServiceResult<HttpResponse> {
     let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
 
     if *category_id != category.id {
         return Err(ServiceError::BadRequest(
             "Id missmage",
-            "The category id of the url and the form do not match!".to_owned(),
+            "The category id of the url and the json do not match!".to_owned(),
         ));
     }
 
     let conn = &pool.get()?;
 
-    let mut server_category = Category::get(&conn, &Uuid::parse_str(&category_id)?)?;
+    let mut server_category = Category::get(&conn, &category_id)?;
 
     server_category.name = category.name.clone();
-
     server_category.update(&conn)?;
 
-    let mut delete_indeces = category
-        .extra
-        .keys()
-        .filter_map(|k| k.trim_start_matches("delete-price-").parse::<usize>().ok())
-        .collect::<Vec<usize>>();
-
-    delete_indeces.sort_by(|a, b| b.cmp(a));
-
-    for index in delete_indeces.iter() {
-        server_category.remove_price(&conn, server_category.prices[*index].validity_start)?;
-    }
-
-    if category.value != 0.0 {
-        server_category.add_price(
-            &conn,
-            category.validity_start,
-            (category.value * 100.0) as Money,
-        )?;
-    }
+    server_category.update_prices(&conn, &category.prices)?;
 
     Ok(HttpResponse::Ok().finish())
 }

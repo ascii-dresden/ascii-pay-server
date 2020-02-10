@@ -134,6 +134,32 @@ impl Category {
         Ok(())
     }
 
+    pub fn update_prices(
+        &mut self,
+        conn: &DbConnection,
+        new_prices: &[Price],
+    ) -> ServiceResult<()> {
+        use crate::core::schema::category_price::dsl;
+
+        diesel::delete(dsl::category_price.filter(dsl::category_id.eq(&self.id))).execute(conn)?;
+        self.prices.clear();
+
+        for p in new_prices {
+            diesel::insert_into(dsl::category_price)
+                .values((
+                    dsl::category_id.eq(&self.id),
+                    dsl::validity_start.eq(&p.validity_start),
+                    dsl::value.eq(&p.value),
+                ))
+                .execute(conn)?;
+
+            self.prices.push(p.clone());
+        }
+
+        self.calc_current_price();
+        Ok(())
+    }
+
     /// Load the prices for this category
     ///
     /// This updates the `prices` vec and the `current_price`

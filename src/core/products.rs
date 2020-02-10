@@ -216,6 +216,32 @@ impl Product {
         Ok(())
     }
 
+    pub fn update_prices(
+        &mut self,
+        conn: &DbConnection,
+        new_prices: &[Price],
+    ) -> ServiceResult<()> {
+        use crate::core::schema::product_price::dsl;
+
+        diesel::delete(dsl::product_price.filter(dsl::product_id.eq(&self.id))).execute(conn)?;
+        self.prices.clear();
+
+        for p in new_prices {
+            diesel::insert_into(dsl::product_price)
+                .values((
+                    dsl::product_id.eq(&self.id),
+                    dsl::validity_start.eq(&p.validity_start),
+                    dsl::value.eq(&p.value),
+                ))
+                .execute(conn)?;
+
+            self.prices.push(p.clone());
+        }
+
+        self.calc_current_price();
+        Ok(())
+    }
+
     fn load_category(&mut self, conn: &DbConnection) -> ServiceResult<()> {
         self.category = match &self.category {
             Some(category) => Some(Category::get(&conn, &category.id)?),

@@ -1,11 +1,11 @@
 use crate::core::{
-    authentication_barcode, authentication_nfc, Account, Money, Permission, Pool, ServiceError,
+    authentication_barcode, authentication_nfc, Account, Permission, Pool, ServiceError,
     ServiceResult,
 };
 use crate::identity_policy::{Action, RetrievedAccount};
 use crate::login_required;
-use crate::web::admin::accounts::{FormAccount, SearchAccount};
-use crate::web::utils::{EmptyToNone, Search};
+use crate::web::admin::accounts::SearchAccount;
+use crate::web::utils::Search;
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
 
@@ -37,7 +37,7 @@ pub async fn get_accounts(
 pub async fn put_accounts(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
-    account: web::Json<FormAccount>,
+    account: web::Json<Account>,
 ) -> ServiceResult<HttpResponse> {
     let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
 
@@ -45,10 +45,12 @@ pub async fn put_accounts(
 
     let mut server_account = Account::create(&conn, &account.name, account.permission)?;
 
-    server_account.mail = account.mail.empty_to_none();
-    server_account.username = account.username.empty_to_none();
-    server_account.account_number = account.account_number.empty_to_none();
-    server_account.minimum_credit = (account.minimum_credit * 100.0) as Money;
+    server_account.minimum_credit = account.minimum_credit.clone();
+    server_account.name = account.name.clone();
+    server_account.mail = account.mail.clone();
+    server_account.username = account.username.clone();
+    server_account.account_number = account.account_number.clone();
+    server_account.permission = account.permission;
 
     server_account.update(&conn)?;
 
@@ -76,53 +78,30 @@ pub async fn get_account(
 pub async fn post_account(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
-    account: web::Json<FormAccount>,
-    account_id: web::Path<String>,
+    account: web::Json<Account>,
+    account_id: web::Path<Uuid>,
 ) -> ServiceResult<HttpResponse> {
     let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
 
     if *account_id != account.id {
         return Err(ServiceError::BadRequest(
             "Id missmage",
-            "The product id of the url and the form do not match!".to_owned(),
+            "The account id of the url and the json do not match!".to_owned(),
         ));
     }
 
     let conn = &pool.get()?;
 
-    let mut server_account = Account::get(&conn, &Uuid::parse_str(&account_id)?)?;
+    let mut server_account = Account::get(&conn, &account_id)?;
 
+    server_account.minimum_credit = account.minimum_credit.clone();
     server_account.name = account.name.clone();
-    server_account.mail = account.mail.empty_to_none();
-    server_account.username = account.username.empty_to_none();
-    server_account.account_number = account.account_number.empty_to_none();
+    server_account.mail = account.mail.clone();
+    server_account.username = account.username.clone();
+    server_account.account_number = account.account_number.clone();
     server_account.permission = account.permission;
-    server_account.minimum_credit = (account.minimum_credit * 100.0) as Money;
 
     server_account.update(&conn)?;
-
-    let mut _reauth = false;
-
-    for (key, value) in &account.extra {
-        if value.trim().is_empty() {
-            continue;
-        }
-
-        if key.starts_with("barcode-new") {
-            authentication_barcode::register(&conn, &server_account, value).ok();
-        }
-        if key.starts_with("nfc-new") {
-            let mut writeable = false;
-            let value = if value.starts_with("ascii:") {
-                writeable = true;
-                value.replace("ascii:", "").trim().to_owned()
-            } else {
-                value.clone()
-            };
-            authentication_nfc::register(&conn, &server_account, &value, writeable).ok();
-            _reauth = true;
-        }
-    }
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -138,4 +117,80 @@ pub async fn delete_account(
     println!("Delete is not supported!");
 
     Ok(HttpResponse::MethodNotAllowed().finish())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AccountBarcode {
+    pub barcode: String,
+}
+#[derive(Debug, Deserialize)]
+pub struct AccountNfc {
+    pub nfc: String,
+    pub writeable: bool,
+}
+
+/// PUT route for `/api/v1/account/{account_id}/barcode`
+pub async fn put_account_barcode(
+    pool: web::Data<Pool>,
+    logged_account: RetrievedAccount,
+    data: web::Json<AccountBarcode>,
+    account_id: web::Path<Uuid>,
+) -> ServiceResult<HttpResponse> {
+    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+
+    let conn = &pool.get()?;
+    let server_account = Account::get(&conn, &account_id)?;
+
+    authentication_barcode::register(&conn, &server_account, &data.barcode)?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+/// DELETE route for `/api/v1/account/{account_id}/barcode`
+pub async fn delete_account_barcode(
+    pool: web::Data<Pool>,
+    logged_account: RetrievedAccount,
+    account_id: web::Path<Uuid>,
+) -> ServiceResult<HttpResponse> {
+    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+
+    let conn = &pool.get()?;
+    let server_account = Account::get(&conn, &account_id)?;
+
+    authentication_barcode::remove(&conn, &server_account)?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+/// PUT route for `/api/v1/account/{account_id}/nfc`
+pub async fn put_account_nfc(
+    pool: web::Data<Pool>,
+    logged_account: RetrievedAccount,
+    data: web::Json<AccountNfc>,
+    account_id: web::Path<Uuid>,
+) -> ServiceResult<HttpResponse> {
+    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+
+    let conn = &pool.get()?;
+    let server_account = Account::get(&conn, &account_id)?;
+
+    authentication_nfc::register(&conn, &server_account, &data.nfc, data.writeable)?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+/// DELETE route for `/api/v1/account/{account_id}/nfc`
+pub async fn delete_account_nfc(
+    pool: web::Data<Pool>,
+    logged_account: RetrievedAccount,
+    account_id: web::Path<Uuid>,
+) -> ServiceResult<HttpResponse> {
+    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+
+    let conn = &pool.get()?;
+    let server_account = Account::get(&conn, &account_id)?;
+
+    authentication_nfc::remove(&conn, &server_account)?;
+
+    Ok(HttpResponse::Ok().finish())
 }

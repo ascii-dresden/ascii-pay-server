@@ -27,6 +27,16 @@ pub fn init(config: &mut web::ServiceConfig) {
                     .route(web::put().to(accounts::put_accounts)),
             )
             .service(
+                web::resource("/account/{account_id}/barcode")
+                    .route(web::put().to(accounts::put_account_barcode))
+                    .route(web::delete().to(accounts::delete_account_barcode)),
+            )
+            .service(
+                web::resource("/account/{account_id}/nfc")
+                    .route(web::put().to(accounts::put_account_nfc))
+                    .route(web::delete().to(accounts::delete_account_nfc)),
+            )
+            .service(
                 web::resource("/account/{account_id}")
                     .route(web::get().to(accounts::get_account))
                     .route(web::post().to(accounts::post_account))
