@@ -105,9 +105,8 @@ pub fn send_test_mail(receiver: String) -> ServiceResult<()> {
         .to(receiver)
         .from(credentials.sender)
         .subject("[ascii pay] Test Mail")
-        .text("This is a test mail to verify that the miling system works.")
-        .build()
-        .unwrap();
+        .text("This is a test mail to verify that the mailing system works.")
+        .build()?;
 
     let mut mailer = SmtpClient::new_simple(&credentials.server)?
         .credentials(Credentials::new(credentials.user, credentials.pass))
