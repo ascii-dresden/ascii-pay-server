@@ -24,23 +24,8 @@ impl MailCredentials {
     }
 }
 
-pub fn send_invitation_link(account: &Account, invite: &InvitationLink) -> ServiceResult<()> {
+fn send_standard_mail(account: &Account, subj: &str, message: String) -> ServiceResult<()> {
     let credentials = MailCredentials::load_from_environment();
-
-    let mail_text = format!("Hello {user},
-
-you have been invited to create an account in the ascii-pay system. You can use the following link to commence account creation.
-Please note that your invitation will expire at {date}.
-
-{link}
-
-The Ascii Pay System
-
-----
-This mail has been automatically generated. Please do not reply.",
-        user = account.name,
-        date = invite.valid_until.format("%d.%m.%Y %H:%M"),
-        link = invite);
 
     let email = EmailBuilder::new()
         // Addresses can be specified by the tuple (email, alias)
@@ -48,12 +33,12 @@ This mail has been automatically generated. Please do not reply.",
             account
                 .mail
                 .as_ref()
-                .expect("No mail address submitted to invite send function"),
+                .expect("No mail address provided"),
             &account.name,
         ))
         .from((credentials.sender, credentials.sender_name))
-        .subject("[ascii pay] You have been invited to the ascii-pay service")
-        .text(mail_text)
+        .subject(subj)
+        .text(message)
         .build()
         .unwrap();
 
@@ -78,11 +63,28 @@ This mail has been automatically generated. Please do not reply.",
     Ok(())
 }
 
-/// Send a generated monthly report to the user
-pub fn send_report_mail(account: &Account, report: String) -> ServiceResult<()> {
-    let credentials = MailCredentials::load_from_environment();
+pub fn send_invitation_link(account: &Account, invite: &InvitationLink) -> ServiceResult<()> {
+    let mail_text = format!("Hello {user},
 
-    Ok(())
+you have been invited to create an account in the ascii-pay system. You can use the following link to commence account creation.
+Please note that your invitation will expire at {date}.
+
+{link}
+
+The Ascii Pay System
+
+----
+This mail has been automatically generated. Please do not reply.",
+        user = account.name,
+        date = invite.valid_until.format("%d.%m.%Y %H:%M"),
+        link = invite);
+
+    send_standard_mail(account, "[ascii pay] You have been invited to the ascii-pay service", mail_text)
+}
+
+/// Send a generated monthly report to the user
+pub fn send_report_mail(account: &Account, subject: String, report: String) -> ServiceResult<()> {
+    send_standard_mail(account, &subject , report)
 }
 
 /// Sends a test mail to the given receiver.
