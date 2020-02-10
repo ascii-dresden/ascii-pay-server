@@ -1,5 +1,6 @@
 use crate::core::{
     transactions, Account, DbConnection, Money, Permission, Pool, Product, ServiceResult,
+    Transaction,
 };
 use crate::identity_policy::{Action, RetrievedAccount};
 use crate::login_required;
@@ -37,6 +38,12 @@ pub struct TransactionProduct {
     pub product: Option<Product>,
     pub amount: i32,
     pub current_price: Option<Money>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TransactionWithProducts {
+    pub transaction: Transaction,
+    pub products: Vec<TransactionProduct>,
 }
 
 impl TransactionProduct {
@@ -89,7 +96,18 @@ pub async fn get_transactions(
         .and_hms(0, 0, 0);
     let to = query.to.unwrap_or_else(|| now).date().and_hms(23, 59, 59);
 
-    let list = transactions::get_by_account(&conn, &account, &from, &to)?;
+    let list: Vec<TransactionWithProducts> =
+        transactions::get_by_account(&conn, &account, &from, &to)?
+            .into_iter()
+            .map(|t| {
+                let prods = t.get_products(&conn).unwrap_or_else(|_| Vec::new());
+                let l = TransactionProduct::vec_to_transaction_product(prods);
+                TransactionWithProducts {
+                    transaction: t,
+                    products: l,
+                }
+            })
+            .collect();
     let list_str = serde_json::to_string(&list).unwrap_or_else(|_| "[]".to_owned());
 
     let body = HbData::new(&request)

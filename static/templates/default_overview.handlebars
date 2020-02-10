@@ -46,6 +46,7 @@
             <thead>
                 <tr>
                     <th>Date</th>
+                    <th>Products</th>
                     <th>Total</th>
                     <th>Action</th>
                 </tr>
@@ -53,10 +54,11 @@
             <tbody>
                 {{#each transactions}}
                 <tr>
-                    <td>{{format_datetime date}}</td>
-                    <td class="{{#if (lt total 0)}}text-error{{/if}}{{#if (gt total 0)}}text-success{{/if}}">{{currency total}}</td>
+                    <td>{{format_datetime transaction.date}}</td>
+                    <td>{{#each products}}{{amount}} × "{{product.name}}", {{/each}}</td>
+                    <td class="{{#if (lt transaction.total 0)}}text-error{{/if}}{{#if (gt transaction.total 0)}}text-success{{/if}}">{{currency transaction.total}}</td>
                     <td>
-                        <a href="/transaction/{{id}}">Details</a>
+                        <a href="/transaction/{{transaction.id}}">Details</a>
                     </td>
                 </tr>
                 {{/each}}

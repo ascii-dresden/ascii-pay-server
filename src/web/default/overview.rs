@@ -1,7 +1,9 @@
 use crate::core::{transactions, Permission, Pool, ServiceResult};
 use crate::identity_policy::{Action, RetrievedAccount};
 use crate::login_required;
-use crate::web::admin::transactions::{naive_date_time_option_serializer, TransactionProduct};
+use crate::web::admin::transactions::{
+    naive_date_time_option_serializer, TransactionProduct, TransactionWithProducts,
+};
 use crate::web::utils::HbData;
 use actix_web::{web, HttpRequest, HttpResponse};
 use chrono::{Duration, Local, NaiveDateTime};
@@ -44,7 +46,18 @@ pub async fn get_overview(
         .and_hms(0, 0, 0);
     let to = query.to.unwrap_or_else(|| now).date().and_hms(23, 59, 59);
 
-    let list = transactions::get_by_account(&conn, &logged_account.account, &from, &to)?;
+    let list: Vec<TransactionWithProducts> =
+        transactions::get_by_account(&conn, &logged_account.account, &from, &to)?
+            .into_iter()
+            .map(|t| {
+                let prods = t.get_products(&conn).unwrap_or_else(|_| Vec::new());
+                let l = TransactionProduct::vec_to_transaction_product(prods);
+                TransactionWithProducts {
+                    transaction: t,
+                    products: l,
+                }
+            })
+            .collect();
     let list_str = serde_json::to_string(&list).unwrap_or_else(|_| "[]".to_owned());
 
     let body = HbData::new(&request)
