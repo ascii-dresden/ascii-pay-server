@@ -119,6 +119,12 @@ impl From<ToStrError> for ServiceError {
     }
 }
 
+impl From<lettre_email::error::Error> for ServiceError {
+    fn from(error: lettre_email::error::Error) -> Self {
+        ServiceError::InternalServerError("Mail construction error", format!("{}", error))
+    }
+}
+
 /*
 /// nightly - allow `?` on Option<T> to unwrap
 impl From<std::option::NoneError> for ServiceError {

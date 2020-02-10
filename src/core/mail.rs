@@ -1,5 +1,5 @@
 use crate::core::authentication_password::InvitationLink;
-use crate::core::{Account, ServiceResult};
+use crate::core::{Account, ServiceError, ServiceResult};
 use lettre::smtp::authentication::Credentials;
 use lettre::{SendableEmail, SmtpClient, Transport};
 use lettre_email::EmailBuilder;
@@ -27,6 +27,15 @@ impl MailCredentials {
 fn send_standard_mail(account: &Account, subj: &str, message: String) -> ServiceResult<()> {
     let credentials = MailCredentials::load_from_environment();
 
+    let mail_address = if let Some(m) = account.mail.as_ref() {
+        m
+    } else {
+        return Err(ServiceError::InternalServerError(
+            "No Mail address provided",
+            String::from("A mail sending context was called, but no mail address was provided."),
+        ));
+    };
+
     let email = EmailBuilder::new()
         // Addresses can be specified by the tuple (email, alias)
         .to((
@@ -36,8 +45,7 @@ fn send_standard_mail(account: &Account, subj: &str, message: String) -> Service
         .from((credentials.sender, credentials.sender_name))
         .subject(subj)
         .text(message)
-        .build()
-        .unwrap();
+        .build()?;
 
     if credentials.server.ends_with(".local") {
         // dump the mail to the log
