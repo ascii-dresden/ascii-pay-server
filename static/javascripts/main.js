@@ -263,7 +263,7 @@ function parseGlobalSSE(data) {
         return;
     }
     if (data && data.type === "product") {
-        let path = "/product/" + data.content.id;
+        let path = "/admin/product/" + data.content.id;
         if (window.location.pathname !== path) {
             var p = ""
             if (data.content.current_price) {
@@ -275,7 +275,7 @@ function parseGlobalSSE(data) {
         }
     }
     if (data && data.type === "account") {
-        let path = "/account/" + data.content.id;
+        let path = "/admin/account/" + data.content.id;
         if (window.location.pathname !== path) {
             toast("Found account: '" + data.content.name + "'", "Edit?", () => {
                 window.location = path;
