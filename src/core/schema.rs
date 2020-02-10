@@ -8,6 +8,7 @@ table! {
         username -> Nullable<Varchar>,
         account_number -> Nullable<Varchar>,
         permission -> Int2,
+        receives_monthly_report -> Bool,
     }
 }
 

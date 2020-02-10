@@ -68,6 +68,16 @@
                     </div>
                 </div>
             </div>
+            {{#if has_mail_address}}
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="receives_monthly_report">Monthly Digest</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <input type="checkbox" class="form-checkbox" name="receives_monthly_report" {{#if (eq receives_monthly_report true)}}checked{{/if}} />
+                </div>
+            </div>
+            {{/if}}
 
             {{#if has_password}}
             <div class="form-group">
