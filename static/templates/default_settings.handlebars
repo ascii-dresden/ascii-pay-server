@@ -71,10 +71,13 @@
             {{#if has_mail_address}}
             <div class="form-group">
                 <div class="col-3 col-sm-12">
-                    <label class="form-label" for="receives_monthly_report">Monthly Digest</label>
+                    <label class="form-label">Monthly Digest</label>
                 </div>
                 <div class="col-9 col-sm-12">
-                    <input type="checkbox" class="form-checkbox" name="receives_monthly_report" {{#if (eq receives_monthly_report true)}}checked{{/if}} />
+                    <label class="form-switch" for="receives_monthly_report">
+                        <input type="checkbox" name="receives_monthly_report" id="receives_monthly_report" {{#if (eq receives_monthly_report true)}}checked{{/if}} />
+                        <i class="form-icon"></i> Send me a monthly overview of my transactions
+                    </label>
                 </div>
             </div>
             {{/if}}
