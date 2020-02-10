@@ -1,10 +1,10 @@
 pub mod accounts;
 pub mod categories;
+pub mod cron;
 pub mod dashboard;
 pub mod products;
 pub mod terminal;
 pub mod transactions;
-pub mod cron;
 
 use actix_web::web;
 

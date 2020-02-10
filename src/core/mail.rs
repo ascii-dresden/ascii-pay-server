@@ -30,10 +30,7 @@ fn send_standard_mail(account: &Account, subj: &str, message: String) -> Service
     let email = EmailBuilder::new()
         // Addresses can be specified by the tuple (email, alias)
         .to((
-            account
-                .mail
-                .as_ref()
-                .expect("No mail address provided"),
+            account.mail.as_ref().expect("No mail address provided"),
             &account.name,
         ))
         .from((credentials.sender, credentials.sender_name))
@@ -79,12 +76,16 @@ This mail has been automatically generated. Please do not reply.",
         date = invite.valid_until.format("%d.%m.%Y %H:%M"),
         link = invite);
 
-    send_standard_mail(account, "[ascii pay] You have been invited to the ascii-pay service", mail_text)
+    send_standard_mail(
+        account,
+        "[ascii pay] You have been invited to the ascii-pay service",
+        mail_text,
+    )
 }
 
 /// Send a generated monthly report to the user
 pub fn send_report_mail(account: &Account, subject: String, report: String) -> ServiceResult<()> {
-    send_standard_mail(account, &subject , report)
+    send_standard_mail(account, &subject, report)
 }
 
 // TODO: Needs a route!

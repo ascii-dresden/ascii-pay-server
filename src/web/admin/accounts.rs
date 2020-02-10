@@ -275,7 +275,8 @@ pub async fn post_account_edit(
     let new_mail = account.mail.empty_to_none();
 
     // only enable monthly reports when mail address is existent
-    server_account.receives_monthly_report = new_mail.is_some() && (account.receives_monthly_report == Some("on".to_string()));
+    server_account.receives_monthly_report =
+        new_mail.is_some() && (account.receives_monthly_report == Some("on".to_string()));
     server_account.mail = new_mail;
     server_account.username = account.username.empty_to_none();
     server_account.account_number = account.account_number.empty_to_none();

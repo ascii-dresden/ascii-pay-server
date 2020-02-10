@@ -1,12 +1,14 @@
 //! Module for tasks that are to be run via cronjob.
-use crate::core::{Account, DbConnection, Pool, ServiceError, ServiceResult, transactions};
+use crate::core::mail::send_report_mail;
+use crate::core::{transactions, Account, DbConnection, Pool, ServiceError, ServiceResult};
 use actix_web::{web, HttpRequest, HttpResponse};
 use chrono::{Datelike, Local};
-use crate::core::mail::send_report_mail;
-
 
 /// Prepares a transaction report for a given user. If the user did not do any transactions in a month, `None` is returned.
-fn generate_report(conn: &DbConnection, account: &Account) -> ServiceResult<Option<(String, String)>> {
+fn generate_report(
+    conn: &DbConnection,
+    account: &Account,
+) -> ServiceResult<Option<(String, String)>> {
     // get the duration for the report
     let now = Local::today().naive_local().and_hms(0, 0, 0);
     let start = if now.month() == 1 {

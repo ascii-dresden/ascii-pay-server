@@ -1,12 +1,12 @@
 use argonautica::{Hasher, Verifier};
 use chrono::{Duration, Local, NaiveDateTime};
 use diesel::prelude::*;
-use uuid::Uuid;
 use std::fmt;
+use uuid::Uuid;
 
+use crate::core::mail;
 use crate::core::schema::{authentication_password, authentication_password_invitation};
 use crate::core::{generate_uuid_str, Account, DbConnection, ServiceError, ServiceResult};
-use crate::core::mail;
 
 /// Represent a username - password authentication for the given account
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset)]
@@ -28,8 +28,14 @@ pub struct InvitationLink {
 
 impl fmt::Display for InvitationLink {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
-        write!(f, "{base}/register/{link_id}", base = base_url, link_id = self.link)
+        let base_url =
+            std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
+        write!(
+            f,
+            "{base}/register/{link_id}",
+            base = base_url,
+            link_id = self.link
+        )
     }
 }
 
