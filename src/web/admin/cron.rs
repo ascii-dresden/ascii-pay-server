@@ -12,16 +12,16 @@ fn generate_report(
     // get the duration for the report
     let now = Local::today().naive_local().and_hms(0, 0, 0);
     let start = if now.month() == 1 {
-        now.with_month(now.month() - 1)
-            .expect("Math rules changed overnight, send help.")
-            .with_day(1)
-            .expect("lol")
-    } else {
         // special-case the jump from jan -> dec
         now.with_year(now.year() - 1)
             .expect("Math rules changed overnight, send help.")
             .with_month(12)
             .expect("lol")
+            .with_day(1)
+            .expect("lol")
+    } else {
+        now.with_month(now.month() - 1)
+            .expect("Math rules changed overnight, send help.")
             .with_day(1)
             .expect("lol")
     };
