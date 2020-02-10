@@ -341,7 +341,9 @@ impl Product {
     pub fn all(conn: &DbConnection) -> ServiceResult<Vec<Product>> {
         use crate::core::schema::product::dsl;
 
-        let mut results = dsl::product.load::<Product>(conn)?;
+        let mut results = dsl::product
+            .order(dsl::name.desc())
+            .load::<Product>(conn)?;
 
         for p in &mut results {
             p.load_category(conn)?;

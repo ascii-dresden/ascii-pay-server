@@ -199,7 +199,9 @@ impl Category {
     pub fn all(conn: &DbConnection) -> ServiceResult<Vec<Category>> {
         use crate::core::schema::category::dsl;
 
-        let mut results = dsl::category.load::<Category>(conn)?;
+        let mut results = dsl::category
+            .order(dsl::name.desc())
+            .load::<Category>(conn)?;
 
         for p in &mut results {
             p.load_prices(conn)?;

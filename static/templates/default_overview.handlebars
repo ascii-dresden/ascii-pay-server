@@ -55,7 +55,7 @@
                 {{#each transactions}}
                 <tr>
                     <td>{{format_datetime transaction.date}}</td>
-                    <td>{{#each products}}{{amount}} × "{{product.name}}", {{/each}}</td>
+                    <td>{{#each products}}<span class="chip">{{amount}} × {{product.name}}</span>{{/each}}</td>
                     <td class="{{#if (lt transaction.total 0)}}text-error{{/if}}{{#if (gt transaction.total 0)}}text-success{{/if}}">{{currency transaction.total}}</td>
                     <td>
                         <a href="/transaction/{{transaction.id}}">Details</a>
