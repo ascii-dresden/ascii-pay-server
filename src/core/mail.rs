@@ -39,7 +39,7 @@ fn send_standard_mail(account: &Account, subj: &str, message: String) -> Service
     let email = EmailBuilder::new()
         // Addresses can be specified by the tuple (email, alias)
         .to((
-            account.mail.as_ref().expect("No mail address provided"),
+            mail_address,
             &account.name,
         ))
         .from((credentials.sender, credentials.sender_name))
