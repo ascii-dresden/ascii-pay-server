@@ -9,12 +9,12 @@ function init_main_diagram() {
 
     for (line of transaction_data) {
         time_data.push({
-            x: moment(line.date),
-            y: line.before_credit / 100
+            x: moment(line.transaction.date),
+            y: line.transaction.before_credit / 100
         });
         time_data.push({
-            x: moment(line.date),
-            y: line.after_credit / 100
+            x: moment(line.transaction.date),
+            y: line.transaction.after_credit / 100
         });
     }
 

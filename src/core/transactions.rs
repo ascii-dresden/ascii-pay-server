@@ -345,9 +345,13 @@ pub fn generate_transactions(
 ) -> ServiceResult<()> {
     use chrono::Duration;
     use chrono::NaiveTime;
+    use rand::seq::SliceRandom;
 
     let days = (to - from).num_days();
     let start_date = from.date();
+
+    let products = Product::all(conn)?;
+    let mut rng = rand::thread_rng();
 
     for day_offset in 0..days {
         let offset = Duration::days(day_offset);
@@ -365,7 +369,26 @@ pub fn generate_transactions(
 
             let mut seconds = 0;
 
-            while account.credit + avg_down < account.minimum_credit {
+            let mut price = 0;
+            let mut transaction_products: HashMap<Product, i32> = HashMap::new();
+            while price < avg_down.abs() {
+                let p = products.choose(&mut rng);
+
+                if let Some(p) = p {
+                    let pr = p.current_price;
+
+                    if let Some(pr) = pr {
+                        price += pr;
+                    }
+
+                    let amount = transaction_products.get(p).copied().unwrap_or(0) + 1;
+                    transaction_products.insert(p.clone(), amount);
+                } else {
+                    price = avg_down;
+                }
+            }
+
+            while account.credit - price < account.minimum_credit {
                 execute_at(
                     conn,
                     account,
@@ -375,12 +398,21 @@ pub fn generate_transactions(
                 )?;
                 seconds += 1;
             }
-            execute_at(
+
+            let transaction = execute_at(
                 conn,
                 account,
                 None,
-                avg_down,
+                -price,
                 date_time + Duration::seconds(seconds),
+            )?;
+
+            transaction.add_products(
+                conn,
+                transaction_products
+                    .into_iter()
+                    .map(|(k, v)| (k, v))
+                    .collect(),
             )?;
         }
     }
