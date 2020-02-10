@@ -11,6 +11,7 @@ actix-web = "2.0"
 actix-files = "0.2"
 actix-multipart = "0.2"
 actix-rt = "1.0"
+actix-http = "1.0"
 handlebars = {version = "3.0", features = ["dir_source"]}
 argonautica = "0.2"
 chrono = {version = "0.4", features = ["serde"]}

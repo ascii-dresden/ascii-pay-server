@@ -19,8 +19,8 @@ function parseSSE(data) {
             case "payment-token":
                 load_payment_token(data.content);
                 break;
-            case "payment-timeout":
-                load_payment_timeout();
+            case "timeout":
+                load_timeout();
                 break;
         }
     }
@@ -95,7 +95,6 @@ function load_payment_token(content) {
                 btn.classList.remove("btn-success");
             }, 2000);
 
-            console.log(response);
             response.json().then((response) => {
                 load_account(response.account);
             });
@@ -124,7 +123,7 @@ function load_payment_token(content) {
     });
 }
 
-function load_payment_timeout() {
+function load_timeout() {
     let btn = document.getElementById("card-payment-pay");
     
     btn.classList.remove("loading");

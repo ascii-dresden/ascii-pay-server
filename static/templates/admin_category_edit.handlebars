@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+
+{{> _head title="Edit category" }}
+
+<body>
+    <div class="container grid-lg">
+        {{> _admin_navigation active="categories" }}
+
+        <div class="columns">
+            <div class="column col-6 col-sm-12">
+                <h1>Edit category</h1>
+            </div>
+            <div class="column col-auto col-ml-auto">
+                <a class="btn" href="/admin/category/create">Create category</a>
+            </div>
+        </div>
+
+        <form class="form-horizontal" method="POST">
+            <input type="hidden" name="id" value="{{category.id}}" readonly/>
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="name">Name</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <input class="form-input" type="text" name="name" value="{{category.name}}"/>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label">Prices</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Validity start</th>
+                                <th>Price</th>
+                                <th>Delete</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{#each category.prices}}
+                            <tr>
+                                <td>
+                                    
+                                    <input class="form-input" type="date" value="{{validity_start}}" readonly />
+                                </td>
+                                <td>
+                                    <div class="input-group">
+                                        <input class="form-input money-input" type="text" value="{{currency value}}" readonly />
+                                        <span class="input-group-addon">€</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <label class="form-checkbox is-error">
+                                        <input type="checkbox" name="delete-price-{{@index}}">
+                                        <i class="form-icon"></i>
+                                    </label>
+                                </td>
+                            </tr>
+                            {{/each}}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td>
+                                    <input class="form-input" name="price-date-create" type="date" value="1900-01-01" />
+                                </td>
+                                <td>
+                                    <div class="input-group">
+                                        <input class="form-input money-input" name="price-value-create" type="text" value="0.00" />
+                                        <span class="input-group-addon">€</span>
+                                    </div>
+                                </td>
+                                <td>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            <div class="columns">
+                <div class="column col-8 col-sm-12">
+                    <input class="btn btn-primary" type="submit" value="Save" />
+                    <a class="btn" href="/admin/categories">Cancel</a>
+                </div>
+                <div class="column col-ml-auto col-auto">
+                    <!-- <a class="btn btn-error" href="/category/delete/{{category.id}}">Delete</a> -->
+                </div>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

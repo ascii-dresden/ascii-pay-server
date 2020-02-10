@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use actix_http::httpmessage::HttpMessage;
 use actix_web::http::header::COOKIE;
 use actix_web::web::HttpRequest;
 use handlebars::{Handlebars, RenderError};
@@ -7,7 +8,7 @@ use serde::ser::Serialize;
 use serde_json::value::Value;
 
 use crate::core::Account;
-use crate::identity_policy::LoggedAccount;
+use crate::identity_policy::{Action, LoggedAccount};
 
 /// Helper to convert empty strings to `None` values
 pub trait EmptyToNone<T> {
@@ -17,14 +18,8 @@ pub trait EmptyToNone<T> {
 impl EmptyToNone<String> for Option<String> {
     fn empty_to_none(&self) -> Option<String> {
         match self {
+            Some(s) => s.empty_to_none(),
             None => None,
-            Some(s) => {
-                if s.is_empty() {
-                    None
-                } else {
-                    Some(s.clone())
-                }
-            }
         }
     }
 }
@@ -35,6 +30,23 @@ impl EmptyToNone<String> for String {
         } else {
             Some(self.clone())
         }
+    }
+}
+
+pub trait IsJson {
+    fn is_json(&self) -> bool;
+
+    fn redirect_type(&self) -> Action {
+        if self.is_json() {
+            Action::FORBIDDEN
+        } else {
+            Action::REDIRECT
+        }
+    }
+}
+impl IsJson for HttpRequest {
+    fn is_json(&self) -> bool {
+        self.content_type() == "application/json"
     }
 }
 
@@ -54,11 +66,14 @@ pub struct HbData {
 
 impl HbData {
     pub fn new(request: &HttpRequest) -> Self {
-        let mut theme = "light";
+        let mut theme = "auto";
         if let Some(header_value) = request.headers().get(COOKIE) {
             if let Ok(header_str) = header_value.to_str() {
                 if header_str.contains("theme=dark") {
                     theme = "dark";
+                }
+                if header_str.contains("theme=light") {
+                    theme = "light";
                 }
             }
         }

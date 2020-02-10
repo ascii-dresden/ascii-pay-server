@@ -44,6 +44,8 @@ CREATE TABLE "transaction" (
   "account_id" UUID NOT NULL,
   "cashier_id" UUID,
   "total" INT NOT NULL,
+  "before_credit" INT NOT NULL,
+  "after_credit" INT NOT NULL,
   "date" TIMESTAMP NOT NULL
 );
 

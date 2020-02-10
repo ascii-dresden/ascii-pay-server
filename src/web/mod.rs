@@ -1,18 +1,18 @@
-pub mod accounts;
-pub mod categories;
-pub mod cron;
-pub mod index;
-pub mod products;
-pub mod settings;
-pub mod terminal;
-pub mod transactions;
+pub mod admin;
+pub mod default;
+pub mod login;
 pub mod utils;
 
+use crate::core::ServiceResult;
+use crate::web::utils::HbData;
 use actix_files as fs;
-use actix_web::web;
+use actix_web::{web, HttpRequest, HttpResponse};
+use handlebars::Handlebars;
 
 /// Setup routes for admin ui
 pub fn init(config: &mut web::ServiceConfig) {
+    admin::init(config);
+
     config.service(
         web::scope("/")
             // Setup static routes
@@ -20,131 +20,29 @@ pub fn init(config: &mut web::ServiceConfig) {
             .service(fs::Files::new("/javascripts", "static/javascripts/"))
             .service(fs::Files::new("/images", "static/images/"))
             .service(fs::Files::new("/product/image", "img/"))
-            // Setup index/login routes
-            .service(web::resource("").route(web::get().to(index::get_index)))
+            // Setup login routes
             .service(
                 web::resource("/login")
-                    .route(web::post().to(index::post_login))
-                    .route(web::get().to(index::get_login)),
+                    .route(web::post().to(login::post_login))
+                    .route(web::get().to(login::get_login)),
             )
-            .service(web::resource("/logout").route(web::get().to(index::get_logout)))
+            .service(web::resource("/logout").route(web::get().to(login::get_logout)))
             .service(
                 web::resource("/register/{invitation_id}")
-                    .route(web::post().to(index::post_register))
-                    .route(web::get().to(index::get_register)),
+                    .route(web::post().to(login::post_register))
+                    .route(web::get().to(login::get_register)),
             )
-            // Setup account mangement related routes
-            .service(web::resource("/accounts").route(web::get().to(accounts::get_accounts)))
-            .service(
-                web::resource("/account/create")
-                    .route(web::post().to(accounts::post_account_create))
-                    .route(web::get().to(accounts::get_account_create)),
-            )
-            .service(
-                web::resource("/account/delete/{account_id}")
-                    .route(web::get().to(accounts::delete_get)),
-            )
-            .service(
-                web::resource("/account/invite/{account_id}")
-                    .route(web::get().to(accounts::invite_get)),
-            )
-            .service(
-                web::resource("/account/revoke/{account_id}")
-                    .route(web::get().to(accounts::revoke_get)),
-            )
-            .service(
-                web::resource("/account/remove-nfc/{account_id}")
-                    .route(web::get().to(accounts::remove_nfc_get)),
-            )
-            .service(
-                web::resource("/account/remove-barcode/{account_id}")
-                    .route(web::get().to(accounts::remove_barcode_get)),
-            )
-            .service(
-                web::resource("/account/{account_id}")
-                    .route(web::post().to(accounts::post_account_edit))
-                    .route(web::get().to(accounts::get_account_edit)),
-            )
-            // Setup product mangement related routes
-            .service(web::resource("/products").route(web::get().to(products::get_products)))
-            .service(
-                web::resource("/product/create")
-                    .route(web::post().to(products::post_product_create))
-                    .route(web::get().to(products::get_product_create)),
-            )
-            .service(
-                web::resource("/product/delete/{product_id}")
-                    .route(web::get().to(products::get_product_delete)),
-            )
-            .service(
-                web::resource("/product/remove-image/{product_id}")
-                    .route(web::get().to(products::get_product_remove_image)),
-            )
-            .service(
-                web::resource("/product/upload-image/{product_id}")
-                    .route(web::post().to(products::post_product_upload_image)),
-            )
-            .service(
-                web::resource("/product/{product_id}")
-                    .route(web::post().to(products::post_product_edit))
-                    .route(web::get().to(products::get_product_edit)),
-            )
-            // Setup categories mangement related routes
-            .service(web::resource("/categories").route(web::get().to(categories::get_categories)))
-            .service(
-                web::resource("/category/create")
-                    .route(web::post().to(categories::post_category_create))
-                    .route(web::get().to(categories::get_category_create)),
-            )
-            .service(
-                web::resource("/category/delete/{category_id}")
-                    .route(web::get().to(categories::get_category_delete)),
-            )
-            .service(
-                web::resource("/category/{category_id}")
-                    .route(web::post().to(categories::post_category_edit))
-                    .route(web::get().to(categories::get_category_edit)),
-            )
-            // Setup transaction mangement related routes
-            .service(
-                web::resource("/transactions/{account_id}")
-                    .route(web::get().to(transactions::get_transactions)),
-            )
-            .service(
-                web::resource("/transaction/{account_id}/{transaction_id}")
-                    .route(web::get().to(transactions::get_transaction_details)),
-            )
-            .service(
-                web::resource("/transaction/execute/{account_id}")
-                    .route(web::post().to(transactions::post_execute_transaction)),
-            )
-            .service(web::resource("/terminal").route(web::get().to(terminal::get_terminal)))
-            .service(
-                web::resource("/settings")
-                    .route(web::post().to(settings::post_settings))
-                    .route(web::get().to(settings::get_settings)),
-            )
-            .service(
-                web::resource("/settings/change-password")
-                    .route(web::post().to(settings::post_change_password))
-                    .route(web::get().to(settings::get_change_password)),
-            )
-            .service(
-                web::resource("/settings/revoke-password")
-                    .route(web::post().to(settings::post_revoke_password))
-                    .route(web::get().to(settings::get_revoke_password)),
-            )
-            .service(
-                web::resource("/settings/revoke-qr")
-                    .route(web::post().to(settings::post_revoke_qr))
-                    .route(web::get().to(settings::get_revoke_qr)),
-            )
-            .service(
-                web::resource("/settings/revoke-nfc")
-                    .route(web::post().to(settings::post_revoke_nfc))
-                    .route(web::get().to(settings::get_revoke_nfc)),
-            )
-            // Setup cronjob routes
-            .service(web::resource("/admin/cron/reports").route(web::get().to(cron::send_reports))),
+            .configure(default::init)
+            .default_service(web::get().to(get_404)),
     );
+}
+
+/// GET route for 404 error.
+pub async fn get_404(
+    hb: web::Data<Handlebars<'_>>,
+    request: HttpRequest,
+) -> ServiceResult<HttpResponse> {
+    let body = HbData::new(&request).render(&hb, "404")?;
+
+    Ok(HttpResponse::Ok().body(body))
 }

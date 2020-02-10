@@ -47,8 +47,12 @@ function updateTable(json) {
 
 function query(search) {
     component = encodeURIComponent(search).replace("%20", "+");
-    window.history.replaceState(null, "", "/products?search=" + component);
-    fetch("/api/v1/products?search=" + component)
+    window.history.replaceState(null, "", "/admin/products?search=" + component);
+    fetch("/admin/products?search=" + component, {
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
     .then((response) => {
         if (!response.ok) {
             throw new Error('HTTP error, status = ' + response.status);

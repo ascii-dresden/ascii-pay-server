@@ -103,6 +103,8 @@ table! {
         account_id -> Uuid,
         cashier_id -> Nullable<Uuid>,
         total -> Int4,
+        before_credit -> Int4,
+        after_credit -> Int4,
         date -> Timestamp,
     }
 }

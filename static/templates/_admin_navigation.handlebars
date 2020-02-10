@@ -1,0 +1,15 @@
+<header class="navbar">
+    <section class="navbar-section">
+        <a href="/admin" class="btn btn-link{{#if (eq active "dashboard")}} active{{/if}}">Dashboard</a>
+        <a href="/admin/accounts" class="btn btn-link{{#if (eq active "accounts")}} active{{/if}}">Accounts</a>
+        <a href="/admin/products" class="btn btn-link{{#if (eq active "products")}} active{{/if}}">Products</a>
+        <a href="/admin/categories" class="btn btn-link{{#if (eq active "categories")}} active{{/if}}">Categories</a>
+        <a href="/admin/terminal" class="btn btn-link hidden{{#if (eq active "terminal")}} active{{/if}}">Terminal</a>
+    </section>
+
+    <section class="navbar-section">
+        <a href="/" class="btn btn-link">User view</a>
+        <span>{{logged_account.name}}</span>
+        <a href="/logout" class="btn btn-link">Logout</a>
+    </section>
+</header>

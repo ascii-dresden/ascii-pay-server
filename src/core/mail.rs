@@ -87,6 +87,7 @@ pub fn send_report_mail(account: &Account, subject: String, report: String) -> S
     send_standard_mail(account, &subject , report)
 }
 
+// TODO: Needs a route!
 /// Sends a test mail to the given receiver.
 pub fn send_test_mail(receiver: String) -> ServiceResult<()> {
     let credentials = MailCredentials::load_from_environment();

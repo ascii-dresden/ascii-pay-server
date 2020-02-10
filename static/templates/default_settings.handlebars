@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+
+{{> _head title="Settings" }}
+
+<body>
+    <div class="container grid-lg">
+        {{> _default_navigation active="settings" }}
+
+        <div class="columns">
+            <div class="column col-6 col-sm-12">
+                <h1>Settings</h1>
+            </div>
+        </div>
+
+        <form class="form-horizontal" method="POST">
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="name">Name</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <input class="form-input" type="text" name="name" value="{{logged_account.name}}" />
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="mail">Mail</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <input class="form-input" type="text" name="mail" value="{{logged_account.mail}}" />
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="username">Username</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <input class="form-input" type="text" name="username" value="{{logged_account.username}}" />
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="account_number">Account Number</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <input class="form-input" type="text" name="account_number" value="{{logged_account.account_number}}" readonly/>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="credit">Credit</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <div class="input-group">
+                        <input class="form-input money-input" type="text" name="credit" value="{{currency logged_account.credit}}" readonly />
+                        <span class="input-group-addon">€</span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="minimum_credit">Minimum credit</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <div class="input-group">
+                        <input class="form-input money-input" type="text" name="minimum_credit" value="{{currency logged_account.minimum_credit}}" readonly/>
+                        <span class="input-group-addon">€</span>
+                    </div>
+                </div>
+            </div>
+            {{#if has_mail_address}}
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label" for="receives_monthly_report">Monthly Digest</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <input type="checkbox" class="form-checkbox" name="receives_monthly_report" {{#if (eq receives_monthly_report true)}}checked{{/if}} />
+                </div>
+            </div>
+            {{/if}}
+
+            {{#if has_password}}
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label">Password authentication</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <a class="btn" href="/settings/change-password">Change password</a>
+                    <a class="btn btn-error" href="/settings/revoke-password">Revoke password</a>
+                </div>
+            </div>
+            {{/if}}
+            {{#if has_qr_code}}
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label">QR code authentication</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <a class="btn btn-error" href="/settings/revoke-qr">Revoke QR code</a>
+                </div>
+            </div>
+            {{/if}}
+            {{#if has_nfc_card}}
+            <div class="form-group">
+                <div class="col-3 col-sm-12">
+                    <label class="form-label">NFC card authentication</label>
+                </div>
+                <div class="col-9 col-sm-12">
+                    <a class="btn btn-error" href="/settings/revoke-nfc">Revoke NFC card</a>
+                </div>
+            </div>
+            {{/if}}
+
+            <div class="columns">
+                <div class="column col-8 col-sm-12">
+                    <input class="btn btn-primary" type="submit" value="Save" />
+                    <a class="btn" href="/">Cancel</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
