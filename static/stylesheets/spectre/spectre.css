@@ -2218,7 +2218,7 @@ summary.accordion-header::-webkit-details-marker {
       margin-bottom: 0; }
 
 .toast {
-  background: rgba(var(--dark-color), 0.95);
+  background: var(--dark-color);
   border-color: var(--dark-color);
   border: 0.05rem solid var(--dark-color);
   border-radius: 0.1rem;
@@ -2227,16 +2227,16 @@ summary.accordion-header::-webkit-details-marker {
   padding: 0.4rem;
   width: 100%; }
   .toast.toast-primary {
-    background: rgba(var(--primary-color), 0.95);
+    background: var(--primary-color);
     border-color: var(--primary-color); }
   .toast.toast-success {
-    background: rgba(var(--success-color), 0.95);
+    background: var(--success-color);
     border-color: var(--success-color); }
   .toast.toast-warning {
-    background: rgba(var(--warning-color), 0.95);
+    background: var(--warning-color);
     border-color: var(--warning-color); }
   .toast.toast-error {
-    background: rgba(var(--error-color), 0.95);
+    background: var(--error-color);
     border-color: var(--error-color); }
   .toast a {
     color: var(--light-color);
