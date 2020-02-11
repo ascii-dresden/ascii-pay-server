@@ -48,7 +48,7 @@
             <thead>
                 <tr>
                     <th>Date</th>
-                    <th>Products</th>
+                    <th class="hide-xs">Products</th>
                     <th>Total</th>
                     <th>Action</th>
                 </tr>
@@ -57,7 +57,7 @@
                 {{#each transactions}}
                 <tr>
                     <td>{{format_datetime transaction.date}}</td>
-                    <td>{{#each products}}<span class="chip">{{amount}} × {{product.name}}</span>{{/each}}</td>
+                    <td class="hide-xs">{{#each products}}<span class="chip">{{amount}} × {{product.name}}</span>{{/each}}</td class="hide-xs">
                     <td
                         class="{{#if (lt transaction.total 0)}}text-error{{/if}}{{#if (gt transaction.total 0)}}text-success{{/if}}">
                         {{currency transaction.total}}</td>

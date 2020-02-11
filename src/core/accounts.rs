@@ -179,7 +179,7 @@ impl Account {
         use crate::core::schema::account::dsl;
 
         let results = dsl::account
-            .order(dsl::name.desc())
+            .order(dsl::name.asc())
             .load::<Account>(conn)?;
 
         Ok(results)

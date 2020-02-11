@@ -200,7 +200,7 @@ impl Category {
         use crate::core::schema::category::dsl;
 
         let mut results = dsl::category
-            .order(dsl::name.desc())
+            .order(dsl::name.asc())
             .load::<Category>(conn)?;
 
         for p in &mut results {
