@@ -40,6 +40,19 @@
 
         <div id="main-diagram">
             <script>
+                let transaction_start = new Date("{{date.from}}");
+                transaction_start.setHours(0);
+                transaction_start.setMinutes(0);
+                transaction_start.setSeconds(0);
+                transaction_start.setMilliseconds(0);
+
+                let transaction_end = new Date("{{date.to}}");
+                transaction_end.setHours(0);
+                transaction_end.setMinutes(0);
+                transaction_end.setSeconds(0);
+                transaction_end.setMilliseconds(0);
+                transaction_end.setDate(transaction_end.getDate() + 1);
+
                 let transaction_data = {{{ transactions_str }}};
             </script>
         </div>
@@ -57,7 +70,8 @@
                 {{#each transactions}}
                 <tr>
                     <td>{{format_datetime transaction.date}}</td>
-                    <td class="hide-xs">{{#each products}}<span class="chip">{{amount}} × {{product.name}}</span>{{/each}}</td class="hide-xs">
+                    <td class="hide-xs">{{#each products}}<span class="chip">{{amount}} ×
+                            {{product.name}}</span>{{/each}}</td class="hide-xs">
                     <td
                         class="{{#if (lt transaction.total 0)}}text-error{{/if}}{{#if (gt transaction.total 0)}}text-success{{/if}}">
                         {{currency transaction.total}}</td>

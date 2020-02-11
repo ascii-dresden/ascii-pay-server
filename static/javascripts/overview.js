@@ -7,34 +7,40 @@ function init_main_diagram() {
     transaction_data.reverse();
     var time_data = [];
 
-    for (line of transaction_data) {
+    let start = new Date(transaction_start);
+    start.setDate(start.getDate() - 1);
+    let end = new Date(transaction_end);
+    end.setDate(end.getDate() + 1);
+
+    if (transaction_data.length > 0) {
+        let line = transaction_data[0];
         time_data.push({
-            x: moment(line.transaction.date),
+            x: moment(start),
             y: line.transaction.before_credit / 100
         });
+    }
+
+    for (line of transaction_data) {
         time_data.push({
             x: moment(line.transaction.date),
             y: line.transaction.after_credit / 100
         });
     }
 
-    /*
     if (transaction_data.length > 0) {
         let line = transaction_data[transaction_data.length - 1];
-        if (line.before_credit === 0) {
-            time_data.push({
-                x: moment(line.date),
-                y: 0
-            });
-        }
+        time_data.push({
+            x: moment(end),
+            y: line.transaction.after_credit / 100
+        });
     }
-    */
 
     var data = {
         datasets: [
             {
-                label: "Scatter Dataset",
+                label: "Overview",
                 lineTension: 0,
+                steppedLine: true,
                 borderColor: "rgba(41, 128, 185,1.0)",
                 backgroundColor: "rgba(41, 128, 185,0.2)",
                 fill: false,
@@ -58,7 +64,10 @@ function init_main_diagram() {
                             display: true
                         },
                         type: "time",
-
+                        ticks: {
+                            min: transaction_start,
+                            max: transaction_end
+                        }
                     }
                 ],
                 yAxes: [
