@@ -50,7 +50,7 @@ function init_main_diagram() {
             animation: false,
             legend: {
                 display: false
-             },
+            },
             scales: {
                 xAxes: [
                     {
@@ -74,7 +74,7 @@ function init_main_diagram() {
             },
             tooltips: {
                 callbacks: {
-                    label: function(tooltipItem, chart, x){
+                    label: function (tooltipItem, chart, x) {
                         var datasetLabel = chart.datasets[tooltipItem.datasetIndex];
                         return parseFloat(tooltipItem.value).toFixed(2) + "€";
                     }

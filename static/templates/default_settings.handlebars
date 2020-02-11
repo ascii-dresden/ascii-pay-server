@@ -43,7 +43,8 @@
                     <label class="form-label" for="account_number">Account Number</label>
                 </div>
                 <div class="col-9 col-sm-12">
-                    <input class="form-input" type="text" name="account_number" value="{{logged_account.account_number}}" readonly/>
+                    <input class="form-input" type="text" name="account_number"
+                        value="{{logged_account.account_number}}" readonly />
                 </div>
             </div>
             <div class="form-group">
@@ -52,7 +53,8 @@
                 </div>
                 <div class="col-9 col-sm-12">
                     <div class="input-group">
-                        <input class="form-input money-input" type="text" name="credit" value="{{currency logged_account.credit}}" readonly />
+                        <input class="form-input money-input" type="text" name="credit"
+                            value="{{currency logged_account.credit}}" readonly />
                         <span class="input-group-addon">€</span>
                     </div>
                 </div>
@@ -63,7 +65,8 @@
                 </div>
                 <div class="col-9 col-sm-12">
                     <div class="input-group">
-                        <input class="form-input money-input" type="text" name="minimum_credit" value="{{currency logged_account.minimum_credit}}" readonly/>
+                        <input class="form-input money-input" type="text" name="minimum_credit"
+                            value="{{currency logged_account.minimum_credit}}" readonly />
                         <span class="input-group-addon">€</span>
                     </div>
                 </div>
@@ -75,7 +78,8 @@
                 </div>
                 <div class="col-9 col-sm-12">
                     <label class="form-switch" for="receives_monthly_report">
-                        <input type="checkbox" name="receives_monthly_report" id="receives_monthly_report" {{#if (eq receives_monthly_report true)}}checked{{/if}} />
+                        <input type="checkbox" name="receives_monthly_report" id="receives_monthly_report"
+                            {{#if (eq receives_monthly_report true)}}checked{{/if}} />
                         <i class="form-icon"></i> Send me a monthly overview of my transactions
                     </label>
                 </div>
@@ -123,4 +127,5 @@
         </form>
     </div>
 </body>
+
 </html>

@@ -125,7 +125,7 @@ function load_payment_token(content) {
 
 function load_timeout() {
     let btn = document.getElementById("card-payment-pay");
-    
+
     btn.classList.remove("loading");
     btn.classList.add("btn-error");
 
@@ -159,7 +159,7 @@ window.addEventListener('DOMContentLoaded', (event) => {
                 })
             }).catch((reason) => {
                 btn.classList.add("btn-error");
-        
+
                 setTimeout(() => {
                     btn.classList.remove("btn-error");
                 }, 2000);

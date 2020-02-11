@@ -5,7 +5,7 @@ function parseSSE(data) {
         if (data.content.code.startsWith("https://pay.ascii.coffee?code=")) {
             let account_number = data.content.code
                 .replace("https://pay.ascii.coffee?code=", "")
-                .replace(/-/g," ");
+                .replace(/-/g, " ");
 
             toast("New account number scanned: '" + account_number + "'", "Apply?", () => {
                 for (let element of elements) {

@@ -13,7 +13,8 @@
             <div class="column col-6 col-sm-12">
                 <form method="GET">
                     <div class="input-group">
-                        <input type="text" class="form-input" id="search-input" name="search" placeholder="Search..." value="{{search}}">
+                        <input type="text" class="form-input" id="search-input" name="search" placeholder="Search..."
+                            value="{{search}}">
                         <input type="submit" value="Search" class="btn btn-primary input-group-btn" />
                     </div>
                 </form>
@@ -35,8 +36,10 @@
             <tbody id="search-results">
                 {{#each accounts}}
                 <tr>
-                    <td>{{#if name_search}}{{{name_search}}}{{else}}<span class="text-gray">{{{id_search}}}</span>{{/if}}</td>
-                    <td style="text-transform: lowercase;">{{#if (ne permission "DEFAULT")}}{{{permission_search}}}{{/if}}</td>
+                    <td>{{#if name_search}}{{{name_search}}}{{else}}<span
+                            class="text-gray">{{{id_search}}}</span>{{/if}}</td>
+                    <td style="text-transform: lowercase;">
+                        {{#if (ne permission "DEFAULT")}}{{{permission_search}}}{{/if}}</td>
                     <td>{{{mail_search}}}</td>
                     <td>
                         <a href="/admin/account/{{id}}">Edit</a>
@@ -50,4 +53,5 @@
 
     <script src="/javascripts/live_search_accounts.js"></script>
 </body>
+
 </html>

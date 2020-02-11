@@ -35,7 +35,7 @@ function generateRow(json) {
 function updateTable(json) {
     tbody = document.getElementById("search-results");
 
-    while(tbody.firstChild){
+    while (tbody.firstChild) {
         tbody.removeChild(tbody.firstChild);
     }
 
@@ -52,15 +52,13 @@ function query(search) {
         headers: {
             'Content-Type': 'application/json'
         }
-    })
-    .then((response) => {
+    }).then((response) => {
         if (!response.ok) {
             throw new Error('HTTP error, status = ' + response.status);
         }
 
         return response.json();
-    })
-    .then((json) => {
+    }).then((json) => {
         updateTable(json);
     });
 }
@@ -68,11 +66,11 @@ function query(search) {
 window.addEventListener('DOMContentLoaded', (event) => {
     input = document.getElementById("search-input");
 
-    input.addEventListener("change", (event) => { 
-        query(input.value) 
+    input.addEventListener("change", (event) => {
+        query(input.value)
     });
 
-    input.addEventListener("keyup", (event) => { 
-        query(input.value) 
+    input.addEventListener("keyup", (event) => {
+        query(input.value)
     });
 });

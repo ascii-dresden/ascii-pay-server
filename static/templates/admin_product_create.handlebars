@@ -10,14 +10,14 @@
         <h1>Edit product</h1>
 
         <form class="form-horizontal" method="POST">
-            <input type="hidden" name="id" value="" readonly/>
-            <input type="hidden" name="credit" value="0" readonly/>
+            <input type="hidden" name="id" value="" readonly />
+            <input type="hidden" name="credit" value="0" readonly />
             <div class="form-group">
                 <div class="col-3 col-sm-12">
                     <label class="form-label" for="name">Name</label>
                 </div>
                 <div class="col-9 col-sm-12">
-                    <input class="form-input" type="text" name="name" value=""/>
+                    <input class="form-input" type="text" name="name" value="" />
                 </div>
             </div>
             <div class="form-group">
@@ -28,7 +28,8 @@
                     <select class="form-select" name="category">
                         <option value="" selected>---</option>
                         {{#each categories}}
-                            <option value="{{id}}">{{name}}{{#if current_price}} - ({{currency current_price}}€){{/if}}</option>
+                        <option value="{{id}}">{{name}}{{#if current_price}} - ({{currency current_price}}€){{/if}}
+                        </option>
                         {{/each}}
                     </select>
                 </div>
@@ -39,7 +40,7 @@
                     <label class="form-label" for="barcode">Barcode</label>
                 </div>
                 <div class="col-9 col-sm-12">
-                    <input class="form-input barcode-target" type="text" name="barcode" value=""/>
+                    <input class="form-input barcode-target" type="text" name="barcode" value="" />
                 </div>
             </div>
 
@@ -65,7 +66,8 @@
                                 </td>
                                 <td>
                                     <div class="input-group">
-                                        <input class="form-input money-input" name="price-value-create" type="text" value="0.00" />
+                                        <input class="form-input money-input" name="price-value-create" type="text"
+                                            value="0.00" />
                                         <span class="input-group-addon">€</span>
                                     </div>
                                 </td>
@@ -83,4 +85,5 @@
 
     <script src="/javascripts/set_product_barcode.js"></script>
 </body>
+
 </html>

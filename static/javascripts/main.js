@@ -17,7 +17,7 @@ function initMoneyInput(input) {
         // Ignore read only inputs
         return;
     }
-    
+
     // Select content on focus
     input.addEventListener("focus", (event) => {
         input.select();
@@ -54,11 +54,11 @@ function initMoneyInput(input) {
                         // PageDown - Decrease by 1.00€
                         value = (Math.ceil(value) - 1);
                         break;
-                    case 38: 
+                    case 38:
                         // ArrowUp - Increase by 0.10€
                         value = (Math.floor(value * 10) + 1) / 10;
                         break;
-                    case 40: 
+                    case 40:
                         // ArrowDown - Decrease by 0.10€
                         value = (Math.ceil(value * 10) - 1) / 10;
                         break;
@@ -80,7 +80,7 @@ function initMoneyInput(input) {
             if (startPos != endPos) {
                 // Replace selection.
                 input.value = input.value.slice(0, startPos) + event.key + input.value.slice(endPos);
-                
+
                 input.setSelectionRange(startPos + 1, startPos + 1);
                 event.preventDefault();
             } else if (caretPosition === length && input.value.match(/-?[0-9]{2}/)) {
@@ -190,7 +190,7 @@ function initSSE(onmessage) {
         eventHandlers.push(onmessage)
 
         const evtSource = new EventSource("/events");
-        evtSource.onmessage = function(event) {
+        evtSource.onmessage = function (event) {
             try {
                 let data = JSON.parse(event.data);
                 for (let on of eventHandlers) {
@@ -201,7 +201,7 @@ function initSSE(onmessage) {
             }
         }
 
-        evtSource.onopen = function(event) {
+        evtSource.onopen = function (event) {
             for (let entry of document.querySelectorAll(".navbar .hidden")) {
                 entry.classList.remove("hidden");
             }
@@ -224,7 +224,7 @@ function toast(message, actionLabel, actionCallback) {
     toast.classList.add("container", "grid-lg", "toast", "toast-primary");
     toast.innerHTML = message;
     container.appendChild(toast);
-    
+
     let close = document.createElement("span");
     close.classList.add("btn", "btn-clear", "float-right");
     close.addEventListener("click", () => {
@@ -267,7 +267,7 @@ function parseGlobalSSE(data) {
         if (window.location.pathname !== path) {
             var p = ""
             if (data.content.current_price) {
-                p = " ("+(data.content.current_price / 100).toFixed(2)+"€)"
+                p = " (" + (data.content.current_price / 100).toFixed(2) + "€)"
             }
             toast("Found product: '" + data.content.name + "'" + p, "Edit?", () => {
                 window.location = path;
