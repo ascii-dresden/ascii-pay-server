@@ -45,7 +45,7 @@ pub async fn put_accounts(
 
     let mut server_account = Account::create(&conn, &account.name, account.permission)?;
 
-    server_account.minimum_credit = account.minimum_credit.clone();
+    server_account.minimum_credit = account.minimum_credit;
     server_account.name = account.name.clone();
     server_account.mail = account.mail.clone();
     server_account.username = account.username.clone();
@@ -94,7 +94,7 @@ pub async fn post_account(
 
     let mut server_account = Account::get(&conn, &account_id)?;
 
-    server_account.minimum_credit = account.minimum_credit.clone();
+    server_account.minimum_credit = account.minimum_credit;
     server_account.name = account.name.clone();
     server_account.mail = account.mail.clone();
     server_account.username = account.username.clone();

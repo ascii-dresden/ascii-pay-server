@@ -178,9 +178,7 @@ impl Account {
     pub fn all(conn: &DbConnection) -> ServiceResult<Vec<Account>> {
         use crate::core::schema::account::dsl;
 
-        let results = dsl::account
-            .order(dsl::name.asc())
-            .load::<Account>(conn)?;
+        let results = dsl::account.order(dsl::name.asc()).load::<Account>(conn)?;
 
         Ok(results)
     }
