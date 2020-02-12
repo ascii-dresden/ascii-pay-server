@@ -1,3 +1,59 @@
+function main_diagram_tooltip(tooltip) {
+    console.log(tooltip);
+
+    let container = document.getElementById("main-diagram");
+    var tooltipContainer = document.getElementById("main-diagram-tooltip");
+    if (!tooltipContainer) {
+        tooltipContainer = document.createElement("div");
+        tooltipContainer.id = "main-diagram-tooltip";
+        tooltipContainer.classList.add("diagram-tooltip")
+        container.appendChild(tooltipContainer);
+    }
+
+    if (tooltip.body) {
+        let index = tooltip.body[0].lines[0];
+        let line = transaction_data[index];
+
+        let total = parseFloat(line.transaction.total / 100).toFixed(2) + "€";
+        let before = parseFloat(line.transaction.before_credit / 100).toFixed(2) + "€";
+        let after = parseFloat(line.transaction.after_credit / 100).toFixed(2) + "€"
+
+        var products = "";
+        for (let prod of line.products) {
+            products += `<span class="chip">${prod.amount} × ${prod.product.name}</span>`;
+        }
+
+        tooltipContainer.innerHTML = `<h5>${line.transaction.date}</h5>
+        <table>
+        <tr>
+            <td>Total</td>
+            <td>${total}</td>
+        </tr>
+        <tr>
+            <td>Balance</td>
+            <td>${before} → ${after}</td>
+        </tr>
+        <tr>
+            <td>Products</td>
+            <td>${products}</td>
+        </tr>
+        </table>`;
+
+        tooltipContainer.style.left = (container.offsetLeft + tooltip.caretX) + "px";
+        tooltipContainer.style.top = (container.offsetTop + tooltip.caretY) + "px";
+
+        if (tooltip.xAlign === "right") {
+            tooltipContainer.classList.add("right");
+        } else {
+            tooltipContainer.classList.add("left");
+        }
+
+        tooltipContainer.classList.add("active");
+    } else {
+        tooltipContainer.classList.remove("active", "right", "left");
+    }
+}
+
 function init_main_diagram() {
     let container = document.getElementById("main-diagram");
     let canvas = document.createElement("canvas");
@@ -83,11 +139,14 @@ function init_main_diagram() {
             },
             tooltips: {
                 callbacks: {
-                    label: function (tooltipItem, chart, x) {
-                        var datasetLabel = chart.datasets[tooltipItem.datasetIndex];
-                        return parseFloat(tooltipItem.value).toFixed(2) + "€";
+                    label: function (tooltipItem) {
+                        return tooltipItem.index - 1;
                     }
-                }
+                },
+                enabled: false,
+                mode: 'index',
+                position: 'nearest',
+                custom: main_diagram_tooltip
             },
             maintainAspectRatio: false,
             layout: {
