@@ -1,9 +1,9 @@
 use crate::core::{Category, Permission, Pool, Product, ServiceError, ServiceResult};
 use crate::identity_policy::{Action, RetrievedAccount};
-use crate::login_required;
+use crate::login_or_client_cert_required;
 use crate::web::admin::products::SearchProduct;
 use crate::web::utils::Search;
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpRequest, HttpResponse};
 use uuid::Uuid;
 
 /// GET route for `/api/v1/products`
@@ -11,8 +11,14 @@ pub async fn get_products(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
     query: web::Query<Search>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+    let _logged_account = login_or_client_cert_required!(
+        request,
+        logged_account,
+        Permission::MEMBER,
+        Action::FORBIDDEN
+    );
     let conn = &pool.get()?;
 
     let search = match &query.search {
@@ -34,8 +40,14 @@ pub async fn put_products(
     logged_account: RetrievedAccount,
     pool: web::Data<Pool>,
     product: web::Json<Product>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+    let _logged_account = login_or_client_cert_required!(
+        request,
+        logged_account,
+        Permission::MEMBER,
+        Action::FORBIDDEN
+    );
 
     let conn = &pool.get()?;
 
@@ -62,8 +74,14 @@ pub async fn get_product(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
     product_id: web::Path<String>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+    let _logged_account = login_or_client_cert_required!(
+        request,
+        logged_account,
+        Permission::MEMBER,
+        Action::FORBIDDEN
+    );
     let conn = &pool.get()?;
 
     let product = Product::get(&conn, &Uuid::parse_str(&product_id)?)?;
@@ -77,8 +95,14 @@ pub async fn post_product(
     pool: web::Data<Pool>,
     product: web::Json<Product>,
     product_id: web::Path<Uuid>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+    let _logged_account = login_or_client_cert_required!(
+        request,
+        logged_account,
+        Permission::MEMBER,
+        Action::FORBIDDEN
+    );
 
     if *product_id != product.id {
         return Err(ServiceError::BadRequest(
@@ -112,8 +136,14 @@ pub async fn post_product(
 pub async fn delete_product(
     logged_account: RetrievedAccount,
     _product_id: web::Path<String>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+    let _logged_account = login_or_client_cert_required!(
+        request,
+        logged_account,
+        Permission::MEMBER,
+        Action::FORBIDDEN
+    );
 
     println!("Delete is not supported!");
 

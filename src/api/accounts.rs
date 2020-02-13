@@ -3,10 +3,10 @@ use crate::core::{
     ServiceResult,
 };
 use crate::identity_policy::{Action, RetrievedAccount};
-use crate::login_required;
+use crate::login_or_client_cert_required;
 use crate::web::admin::accounts::SearchAccount;
 use crate::web::utils::Search;
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpRequest, HttpResponse};
 use uuid::Uuid;
 
 /// GET route for `/api/v1/accounts`
@@ -14,8 +14,14 @@ pub async fn get_accounts(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
     query: web::Query<Search>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+    let _logged_account = login_or_client_cert_required!(
+        request,
+        logged_account,
+        Permission::MEMBER,
+        Action::FORBIDDEN
+    );
 
     let conn = &pool.get()?;
 
@@ -38,8 +44,14 @@ pub async fn put_accounts(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
     account: web::Json<Account>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+    let _logged_account = login_or_client_cert_required!(
+        request,
+        logged_account,
+        Permission::MEMBER,
+        Action::FORBIDDEN
+    );
 
     let conn = &pool.get()?;
 
@@ -64,8 +76,14 @@ pub async fn get_account(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
     account_id: web::Path<String>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+    let _logged_account = login_or_client_cert_required!(
+        request,
+        logged_account,
+        Permission::MEMBER,
+        Action::FORBIDDEN
+    );
 
     let conn = &pool.get()?;
 
@@ -80,8 +98,14 @@ pub async fn post_account(
     logged_account: RetrievedAccount,
     account: web::Json<Account>,
     account_id: web::Path<Uuid>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+    let _logged_account = login_or_client_cert_required!(
+        request,
+        logged_account,
+        Permission::MEMBER,
+        Action::FORBIDDEN
+    );
 
     if *account_id != account.id {
         return Err(ServiceError::BadRequest(
@@ -111,8 +135,14 @@ pub async fn delete_account(
     _pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
     _account_id: web::Path<String>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+    let _logged_account = login_or_client_cert_required!(
+        request,
+        logged_account,
+        Permission::MEMBER,
+        Action::FORBIDDEN
+    );
 
     println!("Delete is not supported!");
 
@@ -135,8 +165,14 @@ pub async fn put_account_barcode(
     logged_account: RetrievedAccount,
     data: web::Json<AccountBarcode>,
     account_id: web::Path<Uuid>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+    let _logged_account = login_or_client_cert_required!(
+        request,
+        logged_account,
+        Permission::MEMBER,
+        Action::FORBIDDEN
+    );
 
     let conn = &pool.get()?;
     let server_account = Account::get(&conn, &account_id)?;
@@ -151,8 +187,14 @@ pub async fn delete_account_barcode(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
     account_id: web::Path<Uuid>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+    let _logged_account = login_or_client_cert_required!(
+        request,
+        logged_account,
+        Permission::MEMBER,
+        Action::FORBIDDEN
+    );
 
     let conn = &pool.get()?;
     let server_account = Account::get(&conn, &account_id)?;
@@ -168,8 +210,14 @@ pub async fn put_account_nfc(
     logged_account: RetrievedAccount,
     data: web::Json<AccountNfc>,
     account_id: web::Path<Uuid>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+    let _logged_account = login_or_client_cert_required!(
+        request,
+        logged_account,
+        Permission::MEMBER,
+        Action::FORBIDDEN
+    );
 
     let conn = &pool.get()?;
     let server_account = Account::get(&conn, &account_id)?;
@@ -184,8 +232,14 @@ pub async fn delete_account_nfc(
     pool: web::Data<Pool>,
     logged_account: RetrievedAccount,
     account_id: web::Path<Uuid>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::FORBIDDEN);
+    let _logged_account = login_or_client_cert_required!(
+        request,
+        logged_account,
+        Permission::MEMBER,
+        Action::FORBIDDEN
+    );
 
     let conn = &pool.get()?;
     let server_account = Account::get(&conn, &account_id)?;

@@ -33,7 +33,10 @@ fn send_standard_mail(account: &Account, subj: &str, message: String) -> Service
     } else {
         // Open a smtp connection
         let mut mailer = SmtpClient::new_simple(&env::MAIL_SERVER)?
-            .credentials(Credentials::new(env::MAIL_USER.clone(), env::MAIL_PASS.clone()))
+            .credentials(Credentials::new(
+                env::MAIL_USER.clone(),
+                env::MAIL_PASS.clone(),
+            ))
             .transport();
 
         // Send the email
@@ -82,7 +85,10 @@ pub fn send_test_mail(receiver: String) -> ServiceResult<()> {
         .build()?;
 
     let mut mailer = SmtpClient::new_simple(&env::MAIL_SERVER)?
-        .credentials(Credentials::new(env::MAIL_USER.clone(), env::MAIL_PASS.clone()))
+        .credentials(Credentials::new(
+            env::MAIL_USER.clone(),
+            env::MAIL_PASS.clone(),
+        ))
         .transport();
 
     // Send the email

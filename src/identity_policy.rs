@@ -43,6 +43,61 @@ macro_rules! login_required {
         }
     };
 }
+#[macro_export]
+macro_rules! login_or_client_cert_required {
+    ($request:ident, $account:ident, $permission:path, $action:path) => {
+        if crate::identity_policy::is_client_cert_present($request) {
+            None
+        } else {
+            if let RetrievedAccount::Acc(acc) = $account {
+                // if a logged account has been retrieved successfully, check its validity
+                if acc.account.permission >= $permission {
+                    Some(acc)
+                } else {
+                    return Ok(actix_web::HttpResponse::Forbidden().finish());
+                }
+            } else {
+                // no retrieved session is equal to no session -> login
+                match $action {
+                    Action::FORBIDDEN => {
+                        return Ok(actix_web::HttpResponse::Forbidden().finish());
+                    }
+                    Action::REDIRECT => {
+                        return Ok(HttpResponse::Found()
+                            .header(actix_web::http::header::LOCATION, "/login")
+                            .finish());
+                    }
+                }
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! client_cert_required {
+    ($request:ident, $action:path) => {
+        if !crate::identity_policy::is_client_cert_present($request) {
+            match $action {
+                Action::FORBIDDEN => {
+                    return Ok(actix_web::HttpResponse::Forbidden().finish());
+                }
+                Action::REDIRECT => {
+                    return Ok(HttpResponse::Found()
+                        .header(actix_web::http::header::LOCATION, "/login")
+                        .finish());
+                }
+            }
+        }
+    };
+}
+
+pub fn is_client_cert_present(request: HttpRequest) -> bool {
+    if let Some(auth_header) = request.headers().get("X-Client-Cert") {
+        auth_header.to_str().unwrap_or_else(|_| "") == "true"
+    } else {
+        false
+    }
+}
 
 /// IdentitiyPolicy that wraps the `CookieIdentityPolicy`
 pub struct DbIdentityPolicy {

@@ -1,8 +1,11 @@
+use crate::client_cert_required;
 use crate::core::{
     authentication_barcode, authentication_nfc, generate_uuid, transactions, Account, DbConnection,
     Pool, Product, ServiceError, ServiceResult, Session, Transaction,
 };
-use actix_web::{web, HttpResponse};
+use crate::identity_policy::Action;
+
+use actix_web::{web, HttpRequest, HttpResponse};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -98,7 +101,10 @@ pub struct PaymentResponse {
 pub async fn post_transaction_token(
     pool: web::Data<Pool>,
     token_request: web::Json<TokenRequest>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
+    client_cert_required!(request, Action::FORBIDDEN);
+
     let conn = &pool.get()?;
 
     let result = match &token_request.method {
@@ -146,7 +152,10 @@ pub async fn post_transaction_token(
 pub async fn post_transaction_payment(
     pool: web::Data<Pool>,
     payment_request: web::Json<PaymentRequest>,
+    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
+    client_cert_required!(request, Action::FORBIDDEN);
+
     let conn = &pool.get()?;
 
     let token = Token::parse(&conn, &payment_request.token)?;
