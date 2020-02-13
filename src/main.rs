@@ -24,7 +24,7 @@ mod server;
 mod web;
 
 use crate::core::{
-    authentication_password, Account, DbConnection, Permission, Pool, ServiceResult,
+    authentication_password, env, Account, DbConnection, Permission, Pool, ServiceResult,
 };
 use server::start_server;
 
@@ -50,8 +50,7 @@ async fn init() -> ServiceResult<()> {
     env_logger::init();
 
     // Setup database connection
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let manager = ConnectionManager::<DbConnection>::new(database_url);
+    let manager = ConnectionManager::<DbConnection>::new(env::DATABASE_URL.as_str());
     let pool = r2d2::Pool::builder().build(manager)?;
 
     let _matches = App::new("ascii-pay")

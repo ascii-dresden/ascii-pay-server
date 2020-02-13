@@ -1,32 +1,10 @@
 use crate::core::authentication_password::InvitationLink;
-use crate::core::{Account, ServiceError, ServiceResult};
+use crate::core::{env, Account, ServiceError, ServiceResult};
 use lettre::smtp::authentication::Credentials;
 use lettre::{SendableEmail, SmtpClient, Transport};
 use lettre_email::EmailBuilder;
 
-struct MailCredentials {
-    pub sender: String,
-    pub sender_name: String,
-    pub server: String,
-    pub user: String,
-    pub pass: String,
-}
-
-impl MailCredentials {
-    fn load_from_environment() -> Self {
-        MailCredentials {
-            sender: std::env::var("MAIL_SENDER").expect("MAIL_SENDER must be set."),
-            sender_name: std::env::var("MAIL_SENDER_NAME").expect("MAIL_SENDER_NAME must be set."),
-            server: std::env::var("MAIL_URL").expect("MAIL_URL must be set"),
-            user: std::env::var("MAIL_USER").expect("MAIL_USER must be set"),
-            pass: std::env::var("MAIL_PASSWORD").expect("MAIL_PASSWORD must be set"),
-        }
-    }
-}
-
 fn send_standard_mail(account: &Account, subj: &str, message: String) -> ServiceResult<()> {
-    let credentials = MailCredentials::load_from_environment();
-
     let mail_address = if let Some(m) = account.mail.as_ref() {
         m
     } else {
@@ -39,12 +17,12 @@ fn send_standard_mail(account: &Account, subj: &str, message: String) -> Service
     let email = EmailBuilder::new()
         // Addresses can be specified by the tuple (email, alias)
         .to((mail_address, &account.name))
-        .from((credentials.sender, credentials.sender_name))
+        .from((env::MAIL_SENDER.as_str(), env::MAIL_SENDER_NAME.as_str()))
         .subject(subj)
         .text(message)
         .build()?;
 
-    if credentials.server.ends_with(".local") {
+    if env::MAIL_SERVER.as_str().ends_with(".local") {
         // dump the mail to the log
         let m: SendableEmail = email.into();
         println!(
@@ -54,8 +32,8 @@ fn send_standard_mail(account: &Account, subj: &str, message: String) -> Service
         );
     } else {
         // Open a smtp connection
-        let mut mailer = SmtpClient::new_simple(&credentials.server)?
-            .credentials(Credentials::new(credentials.user, credentials.pass))
+        let mut mailer = SmtpClient::new_simple(&env::MAIL_SERVER)?
+            .credentials(Credentials::new(env::MAIL_USER.clone(), env::MAIL_PASS.clone()))
             .transport();
 
         // Send the email
@@ -96,17 +74,15 @@ pub fn send_report_mail(account: &Account, subject: String, report: String) -> S
 // TODO: Needs a route!
 /// Sends a test mail to the given receiver.
 pub fn send_test_mail(receiver: String) -> ServiceResult<()> {
-    let credentials = MailCredentials::load_from_environment();
-
     let mail = EmailBuilder::new()
         .to(receiver)
-        .from(credentials.sender)
+        .from(env::MAIL_SENDER.as_str())
         .subject("[ascii pay] Test Mail")
         .text("This is a test mail to verify that the mailing system works.")
         .build()?;
 
-    let mut mailer = SmtpClient::new_simple(&credentials.server)?
-        .credentials(Credentials::new(credentials.user, credentials.pass))
+    let mut mailer = SmtpClient::new_simple(&env::MAIL_SERVER)?
+        .credentials(Credentials::new(env::MAIL_USER.clone(), env::MAIL_PASS.clone()))
         .transport();
 
     // Send the email

@@ -1,6 +1,6 @@
 //! Module for tasks that are to be run via cronjob.
 use crate::core::mail::send_report_mail;
-use crate::core::{transactions, Account, DbConnection, Pool, ServiceError, ServiceResult};
+use crate::core::{env, transactions, Account, DbConnection, Pool, ServiceError, ServiceResult};
 use actix_web::{web, HttpRequest, HttpResponse};
 use chrono::{Datelike, Local};
 use std::cmp::max;
@@ -168,7 +168,7 @@ pub async fn send_reports(
     // expects secret to be transmitted in Header of get request
     // verify correct secret transmission
     if let Some(auth_header) = request.headers().get("X-Cron-Auth") {
-        let cron_secret = std::env::var("CRON_SECRET").expect("CRON_SECRET must be set.");
+        let cron_secret = env::CRON_SECRET.as_str();
         if cron_secret != auth_header.to_str()? {
             return Err(ServiceError::Unauthorized);
         }

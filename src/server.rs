@@ -4,7 +4,7 @@ use chrono::NaiveDateTime;
 use handlebars::{Context, Handlebars, Helper, Output, RenderContext, RenderError};
 
 use crate::api as module_api;
-use crate::core::{Pool, ServiceResult};
+use crate::core::{env, Pool, ServiceResult};
 use crate::identity_policy::DbIdentityPolicy;
 use crate::web as module_web;
 
@@ -45,13 +45,8 @@ fn format_datetime_helper(
 /// Start a new actix server with the given database pool
 pub async fn start_server(pool: Pool) -> ServiceResult<()> {
     // Read config params from env
-    let host = std::env::var("HOST").unwrap_or_else(|_| "localhost".to_string());
-    let port = std::env::var("PORT")
-        .unwrap_or_else(|_| "".to_string())
-        .parse::<u16>()
-        .unwrap_or(8080);
 
-    let address = format!("{}:{}", &host, port);
+    let address = format!("{}:{}", env::HOST.as_str(), *env::PORT);
 
     let mut handlebars = Handlebars::new();
 

@@ -4,12 +4,6 @@ use uuid::Uuid;
 
 use crate::core::{generate_uuid, DbConnection, Money, Price, ServiceError, ServiceResult, DB};
 
-// Encryption key for cookies
-lazy_static::lazy_static! {
-pub static ref IMAGE_PATH: String = std::env::var("IMAGE_PATH")
-    .unwrap_or_else(|_| "img/".to_owned());
-}
-
 /// Represent a category
 #[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone)]
 pub struct Category {

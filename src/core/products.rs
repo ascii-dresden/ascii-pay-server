@@ -6,14 +6,8 @@ use uuid::Uuid;
 
 use crate::core::schema::product_barcode;
 use crate::core::{
-    generate_uuid, Category, DbConnection, Money, Price, ServiceError, ServiceResult, DB,
+    env, generate_uuid, Category, DbConnection, Money, Price, ServiceError, ServiceResult, DB,
 };
-
-// Encryption key for cookies
-lazy_static::lazy_static! {
-pub static ref IMAGE_PATH: String = std::env::var("IMAGE_PATH")
-    .unwrap_or_else(|_| "img/".to_owned());
-}
 
 /// Represent a product
 #[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone)]
@@ -308,8 +302,8 @@ impl Product {
         let name = format!("{}.{}", generate_uuid(), file_extension);
         self.image = Some(name.clone());
 
-        fs::create_dir_all(IMAGE_PATH.clone())?;
-        let file = File::create(format!("{}/{}", IMAGE_PATH.clone(), name))?;
+        fs::create_dir_all(env::IMAGE_PATH.as_str())?;
+        let file = File::create(format!("{}/{}", env::IMAGE_PATH.as_str(), name))?;
 
         diesel::update(dsl::product.find(&self.id))
             .set(dsl::image.eq(&self.image))
@@ -322,7 +316,7 @@ impl Product {
         use crate::core::schema::product::dsl;
 
         if let Some(name) = self.image.clone() {
-            let p = format!("{}/{}", IMAGE_PATH.clone(), name);
+            let p = format!("{}/{}", env::IMAGE_PATH.as_str(), name);
 
             if Path::new(&p).exists() {
                 fs::remove_file(p)?;

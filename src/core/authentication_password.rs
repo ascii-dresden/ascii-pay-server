@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::core::mail;
 use crate::core::schema::{authentication_password, authentication_password_invitation};
-use crate::core::{generate_uuid_str, Account, DbConnection, ServiceError, ServiceResult};
+use crate::core::{env, generate_uuid_str, Account, DbConnection, ServiceError, ServiceResult};
 
 /// Represent a username - password authentication for the given account
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset)]
@@ -28,12 +28,10 @@ pub struct InvitationLink {
 
 impl fmt::Display for InvitationLink {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let base_url =
-            std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
         write!(
             f,
             "{base}/register/{link_id}",
-            base = base_url,
+            base = env::BASE_URL.as_str(),
             link_id = self.link
         )
     }
@@ -180,10 +178,6 @@ pub fn verify_password(
     Ok(verify(&entry.password, password)?)
 }
 
-lazy_static::lazy_static! {
-pub  static ref SECRET_KEY: String = std::env::var("SECRET_KEY").unwrap_or_else(|_| "0123".repeat(8));
-}
-
 /// Create the hash version of a password
 fn hash_password(password: &str) -> ServiceResult<String> {
     if password.is_empty() {
@@ -194,7 +188,7 @@ fn hash_password(password: &str) -> ServiceResult<String> {
     }
     Hasher::default()
         .with_password(password)
-        .with_secret_key(SECRET_KEY.as_str())
+        .with_secret_key(env::PASSWORD_SALT.as_str())
         .hash()
         .map_err(|err| {
             dbg!(&err);
@@ -210,7 +204,7 @@ fn verify(hash: &str, password: &str) -> ServiceResult<bool> {
     Verifier::default()
         .with_hash(hash)
         .with_password(password)
-        .with_secret_key(SECRET_KEY.as_str())
+        .with_secret_key(env::PASSWORD_SALT.as_str())
         .verify()
         .map_err(|err| ServiceError::InternalServerError("Hash password", format!("{}", err)))
 }

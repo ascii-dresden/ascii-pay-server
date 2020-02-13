@@ -10,13 +10,8 @@ use futures::future::{err, ok, Ready};
 use futures::prelude::*;
 
 use crate::core::{
-    Account, DbConnection, Pool, ServiceError, ServiceResult, Session, AUTH_COOKIE_NAME,
+    env, Account, DbConnection, Pool, ServiceError, ServiceResult, Session, AUTH_COOKIE_NAME,
 };
-
-// Encryption key for cookies
-lazy_static::lazy_static! {
-static ref SECRET_KEY: String = std::env::var("SECRET_KEY").unwrap_or_else(|_| "0123".repeat(8));
-}
 
 pub enum Action {
     FORBIDDEN,
@@ -57,13 +52,11 @@ pub struct DbIdentityPolicy {
 impl DbIdentityPolicy {
     /// Create a new instance
     pub fn new() -> DbIdentityPolicy {
-        let domain = std::env::var("DOMAIN").unwrap_or_else(|_| "localhost".to_string());
-
         DbIdentityPolicy {
-            cookie_policy: CookieIdentityPolicy::new(SECRET_KEY.as_bytes())
+            cookie_policy: CookieIdentityPolicy::new(env::COOKIE_ENCRYPTION_KEY.as_bytes())
                 .name(AUTH_COOKIE_NAME)
                 .path("/")
-                .domain(&domain)
+                .domain(env::DOMAIN.as_str())
                 .max_age_time(Duration::days(1))
                 .secure(false),
         }

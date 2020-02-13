@@ -5,6 +5,7 @@ pub mod authentication_barcode;
 pub mod authentication_nfc;
 pub mod authentication_password;
 mod categories;
+pub mod env;
 mod errors;
 pub mod mail;
 mod prices;
