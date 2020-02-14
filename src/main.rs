@@ -7,7 +7,6 @@ extern crate serde_json;
 extern crate block_modes;
 extern crate clap;
 extern crate handlebars;
-extern crate rpassword;
 extern crate uuid;
 #[macro_use]
 extern crate hex_literal;
@@ -15,17 +14,14 @@ extern crate hex_literal;
 use clap::App;
 use diesel::r2d2::{self, ConnectionManager};
 
-use std::io::{stdin, stdout, Write};
-
 mod api;
 mod core;
 mod identity_policy;
+mod init_server;
 mod server;
 mod web;
 
-use crate::core::{
-    authentication_password, env, Account, DbConnection, Permission, Pool, ServiceResult,
-};
+use crate::core::{authentication_password, env, Account, DbConnection, Pool, ServiceResult};
 use server::start_server;
 
 #[actix_rt::main]
@@ -43,7 +39,6 @@ async fn main() -> ServiceResult<()> {
     std::process::exit(exit_code);
 }
 
-// For later ref: https://gill.net.in/posts/auth-microservice-rust-actix-web1.0-diesel-complete-tutorial/
 async fn init() -> ServiceResult<()> {
     dotenv::dotenv().ok();
     std::env::set_var("RUST_LOG", "actix_web=info,actix_server=info");
@@ -60,7 +55,7 @@ async fn init() -> ServiceResult<()> {
         .get_matches();
 
     // Check if admin exists, create otherwise
-    check_admin_user_exisits(&pool)?;
+    check_admin_user_exisits(&pool).await?;
 
     // Setup web server
     start_server(pool).await?;
@@ -68,34 +63,8 @@ async fn init() -> ServiceResult<()> {
     Ok(())
 }
 
-/// Read a value from stdin
-///
-/// # Arguments
-/// * `prompt` - A prompt that descripes the required input
-/// * `hide_input` - Specifies if the input value is visible or hidden
-fn read_value(prompt: &str, hide_input: bool) -> String {
-    if hide_input {
-        loop {
-            let p1 = rpassword::prompt_password_stdout(prompt).unwrap();
-            let p2 = rpassword::prompt_password_stdout(prompt).unwrap();
-
-            if p1 == p2 {
-                return p1;
-            } else {
-                println!("Passwords do not match, retry.");
-            }
-        }
-    } else {
-        print!("{}", prompt);
-        stdout().flush().unwrap();
-        let mut value = String::new();
-        stdin().read_line(&mut value).unwrap();
-        value.trim().to_owned()
-    }
-}
-
 /// Check if a initial user exists. Otherwise create a new one
-fn check_admin_user_exisits(pool: &Pool) -> ServiceResult<()> {
+async fn check_admin_user_exisits(pool: &Pool) -> ServiceResult<()> {
     let conn = &pool.get().unwrap();
 
     let admin_with_password_exists = Account::all(&conn)?
@@ -105,14 +74,10 @@ fn check_admin_user_exisits(pool: &Pool) -> ServiceResult<()> {
 
     if !admin_with_password_exists {
         println!("You seem to have started the server on an empty database. We'll now create the initial superuser.");
-        let fullname = read_value("Fullname: ", false);
-        let username = read_value("Username: ", false);
-        let password = read_value("Password: ", true);
+        init_server::start_server(pool).await?;
 
-        let mut account = Account::create(&conn, &fullname, Permission::ADMIN)?;
-        account.username = Some(username);
-        account.update(&conn)?;
-        authentication_password::register(&conn, &account, &password)?;
+        println!("Init server finished, continue to normal server");
+        std::thread::sleep(std::time::Duration::from_secs(1));
     }
 
     Ok(())

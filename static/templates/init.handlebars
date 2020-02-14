@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+
+{{> _head title="Init" }}
+
+<body>
+    <div class="container grid-lg">
+        <div class="col-6 col-mx-auto col-sm-12">
+            <div class="card card-top-padding">
+                <div class="card-header">
+                    <div class="card-title h1">
+                        <img src="/images/ascii-pay-logo-wide.svg">
+                    </div>
+                </div>
+                <form method="POST" action="/">
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label class="form-label" for="fullname">Full name</label>
+                            <input class="form-input" type="text" name="fullname" autofocus />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="username">Username</label>
+                            <input class="form-input" type="text" name="username" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" class="form-label" for="password">Password</label>
+                            <input class="form-input" type="password" name="password" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" class="form-label" for="password2">Retype password</label>
+                            <input class="form-input" type="password" name="password2" />
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <input class="btn btn-primary" type="submit" value="Init server" />
+                    </div>
+                    <div class="card-footer">
+                        {{#if error}}<div class="toast toast-error">Incorrect username or password!</div>{{/if}}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
