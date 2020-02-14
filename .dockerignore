@@ -2,12 +2,5 @@ dist/
 .github/
 .vscode/
 backup/
-migrations/
-src/
-target/debug/
-target/rls/
-target/release/.fingerprint/
-target/release/build/
-target/release/deps/
-target/release/examples/
-target/release/incremental/
+target/
+Dockerfile
