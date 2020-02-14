@@ -19,11 +19,6 @@ docker-compose --file docker-compose.release.yml up -d db
 # Create db schema
 diesel migration run
 
-# Start dev server
-cargo run
-
-# Enter admin user and exit program
-
 # Stop db
 docker-compose --file docker-compose.release.yml down
 
@@ -31,6 +26,7 @@ docker-compose --file docker-compose.release.yml down
 docker-compose --file docker-compose.release.yml up -d
 
 # ascii pay server is not accessible via port 8080
+# Add admin user and reload page
 
 # Stop service
 docker-compose --file docker-compose.release.yml down
