@@ -1,6 +1,7 @@
 dist/
 .github/
 .vscode/
+backup/
 migrations/
 src/
 target/debug/

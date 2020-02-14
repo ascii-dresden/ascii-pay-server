@@ -7,3 +7,4 @@
 .vscode/
 static/templates/**/*.css
 postgres/
+backup/
