@@ -93,7 +93,7 @@ macro_rules! client_cert_required {
 
 pub fn is_client_cert_present(request: HttpRequest) -> bool {
     if let Some(auth_header) = request.headers().get("X-Client-Cert") {
-        auth_header.to_str().unwrap_or_else(|_| "") == "true"
+        auth_header.to_str().unwrap_or_else(|_| "") == env::API_ACCESS_KEY.as_str()
     } else {
         false
     }

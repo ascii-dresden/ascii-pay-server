@@ -51,6 +51,13 @@ lazy_static::lazy_static! {
 }
 
 lazy_static::lazy_static! {
+    /// Access key for api routes.
+    ///
+    /// Field name: `API_ACCESS_KEY`
+    pub static ref API_ACCESS_KEY: String = std::env::var("API_ACCESS_KEY").unwrap_or_else(|_| "true".to_owned());
+}
+
+lazy_static::lazy_static! {
     /// Server path to store uploaded images.
     ///
     /// Field name: `IMAGE_PATH`
