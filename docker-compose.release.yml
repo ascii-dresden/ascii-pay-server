@@ -20,7 +20,9 @@ services:
     depends_on:
       - db
   db:
-    image: "postgres"
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.db
     container_name: "ascii-pay-postgres-dist"
     environment:
       - POSTGRES_USER=ascii

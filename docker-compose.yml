@@ -1,7 +1,9 @@
 version: "3"
 services:
   db:
-    image: "postgres"
+    build:
+      dockerfile: ./docker/Dockerfile.db
+      context: .
     container_name: "ascii-pay-postgres"
     environment:
       - POSTGRES_USER=ascii
