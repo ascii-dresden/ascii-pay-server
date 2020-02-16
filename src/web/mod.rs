@@ -3,6 +3,9 @@ pub mod default;
 pub mod login;
 pub mod utils;
 
+// TODO: REMOVE FOR PRODUCTION!
+pub mod proxy;
+
 use crate::core::ServiceResult;
 use crate::web::utils::HbData;
 use actix_files as fs;

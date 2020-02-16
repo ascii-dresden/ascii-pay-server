@@ -8,6 +8,9 @@ use crate::core::{env, Pool, ServiceResult};
 use crate::identity_policy::DbIdentityPolicy;
 use crate::web as module_web;
 
+// TODO: REMOVE FOR PRODUCTION!
+use crate::web::proxy as module_proxy;
+
 /// Helper function for handlebars. Converts cents to euros
 fn currency_helper(
     helper: &Helper,
@@ -62,10 +65,15 @@ pub async fn start_server(pool: Pool) -> ServiceResult<()> {
     // Move handlebars reference to actix
     let handlebars_ref = web::Data::new(handlebars);
 
+    // TODO: REMOVE FOR PRODUCTION!
+    let broadcaster = module_proxy::setup();
+
     HttpServer::new(move || {
         App::new()
             // Move database pool
             .data(pool.clone())
+            // TODO: REMOVE FOR PRODUCTION!
+            .data(broadcaster.clone())
             // Set handlebars reference
             .app_data(handlebars_ref.clone())
             // Logger
@@ -74,6 +82,8 @@ pub async fn start_server(pool: Pool) -> ServiceResult<()> {
             .wrap(IdentityService::new(DbIdentityPolicy::new()))
             // Register api module
             .configure(module_api::init)
+            // TODO: REMOVE FOR PRODUCTION!
+            .configure(module_proxy::init)
             // Register admin ui module
             .configure(module_web::init)
     })
