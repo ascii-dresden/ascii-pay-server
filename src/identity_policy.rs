@@ -107,13 +107,15 @@ pub struct DbIdentityPolicy {
 impl DbIdentityPolicy {
     /// Create a new instance
     pub fn new() -> DbIdentityPolicy {
+        let secure = env::BASE_URL.as_str().starts_with("https");
+        
         DbIdentityPolicy {
             cookie_policy: CookieIdentityPolicy::new(env::COOKIE_ENCRYPTION_KEY.as_bytes())
                 .name(AUTH_COOKIE_NAME)
                 .path("/")
                 .domain(env::DOMAIN.as_str())
                 .max_age_time(Duration::days(1))
-                .secure(false),
+                .secure(secure),
         }
     }
 
