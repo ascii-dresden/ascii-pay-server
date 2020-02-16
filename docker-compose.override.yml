@@ -1,0 +1,6 @@
+# development configuration only
+version: "3"
+services:
+  db:
+    ports:
+      - "54320:5432"

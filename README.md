@@ -1,33 +1,22 @@
 # ascii-pay
 
-## Run
+## Run for development
 
 ```bash
-docker-compose up -d
+# Run only the database
+docker-compose up db -d
 cargo run
 ```
 
 ## Release build
 
 ```bash
-# Build relase binary
-cargo build --release
-
-# Start db for inital setup
-docker-compose --file docker-compose.release.yml up -d db
-
-# Create db schema
-diesel migration run
-
-# Stop db
-docker-compose --file docker-compose.release.yml down
-
-# Start service
-docker-compose --file docker-compose.release.yml up -d
+# Starts database & service, performs initial migration if database doesn't exist yet
+docker-compose up -f docker-compose.yml -f docker-compose.release.yml up -d
 
 # ascii pay server is not accessible via port 8080
 # Add admin user and reload page
 
 # Stop service
-docker-compose --file docker-compose.release.yml down
+docker-compose down
 ```
