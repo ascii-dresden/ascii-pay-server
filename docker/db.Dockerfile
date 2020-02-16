@@ -1,4 +1,4 @@
-FROM postgres
+FROM postgres:12.2-alpine
 
 COPY ./migrations /migrations
 WORKDIR /migrations
