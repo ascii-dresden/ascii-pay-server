@@ -14,7 +14,7 @@ cargo run
 # Starts database & service, performs initial migration if database doesn't exist yet
 docker-compose up -f docker-compose.yml -f docker-compose.release.yml up -d
 
-# ascii pay server is not accessible via port 8080
+# ascii pay server is now accessible via port 8080
 # Add admin user and reload page
 
 # Stop service

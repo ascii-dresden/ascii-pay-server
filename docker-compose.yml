@@ -13,7 +13,7 @@ services:
       - MAIL_USER=username
       - MAIL_PASSWORD=password
       - CRON_SECRET=12345678
-      - IMAGE_PATH="./dist/img/"
+      - IMAGE_PATH="./img/"
     ports:
       - "8080:8080"
     volumes:
