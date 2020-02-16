@@ -2,7 +2,9 @@
 version: "3"
 services:
   web:
-    build: .
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
     container_name: "ascii-pay-server-dist"
     environment:
       - HOST=0.0.0.0
@@ -23,7 +25,7 @@ services:
   db:
     build:
       context: .
-      dockerfile: docker/Dockerfile.db
+      dockerfile: docker/db.Dockerfile
     container_name: "ascii-pay-postgres-dist"
     environment:
       - POSTGRES_USER=ascii
