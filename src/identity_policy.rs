@@ -108,7 +108,7 @@ impl DbIdentityPolicy {
     /// Create a new instance
     pub fn new() -> DbIdentityPolicy {
         let secure = env::BASE_URL.as_str().starts_with("https");
-        
+
         DbIdentityPolicy {
             cookie_policy: CookieIdentityPolicy::new(env::COOKIE_ENCRYPTION_KEY.as_bytes())
                 .name(AUTH_COOKIE_NAME)
