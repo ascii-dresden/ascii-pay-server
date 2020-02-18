@@ -145,6 +145,23 @@ pub fn get_nfcs(conn: &DbConnection, account: &Account) -> ServiceResult<Vec<Aut
     Ok(results)
 }
 
+/// Calculate CRC as descipted in ISO 14443.
+#[allow(non_snake_case)]
+fn crc_checksum(value: &[u8]) -> [u8; 2] {
+    let mut wCrc = 0x6363;
+    for b in value {
+        let br = ((wCrc & 0xFF) as u8) ^ b;
+        let br = br ^ (br << 4);
+        let br_long = br as u32;
+        wCrc = (wCrc >> 8) ^ (br_long << 8) ^ (br_long << 3) ^ (br_long >> 4);
+    }
+
+    [((wCrc) & 0xFF) as u8, ((wCrc >> 8) & 0xFF) as u8]
+}
+
+/// Create a new challenge. A challenge contains the current timestamp, 
+/// a random byte sequence and a crc checksum. 
+/// Afterwords, the challenge is signed/encrypted with aes/cbc.
 fn generate_challenge() -> ServiceResult<String> {
     let mut buffer: Vec<u8> = Vec::new();
 
@@ -152,10 +169,13 @@ fn generate_challenge() -> ServiceResult<String> {
     let now = Local::now().naive_local().timestamp();
     buffer.write_i64::<LittleEndian>(now)?;
 
-    // Generate random challange
+    // Generate random challenge
     let mut data = [0u8; 16];
     rand::thread_rng().fill_bytes(&mut data);
     buffer.extend(&data);
+
+    // Checksum to verfiy integrity
+    buffer.extend(&crc_checksum(&buffer));
 
     type Aes128Cbc = Cbc<Aes128, Pkcs7>;
     let key = hex!("000102030405060708090a0b0c0d0e0f");
@@ -168,40 +188,65 @@ fn generate_challenge() -> ServiceResult<String> {
     Ok(base64::encode(&ciphertext))
 }
 
+/// Verify if a challenge is valid. First it decrypts the challenge 
+/// and verifies the integrity with the crc checksum.
+/// Afterwords it checks if the timestamp is not older than 2 minutes.
 fn verify_challenge(challenge: &str) -> ServiceResult<bool> {
     let ciphertext = base64::decode(challenge)?;
 
+    // Verify integrity
     type Aes128Cbc = Cbc<Aes128, Pkcs7>;
     let key = hex!("000102030405060708090a0b0c0d0e0f");
     let iv = hex!("f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff");
     let cipher = Aes128Cbc::new_var(&key, &iv)?;
 
     let buffer = cipher.decrypt_vec(&ciphertext)?;
+
+    let checksum = crc_checksum(&buffer[0..24]);
+    if buffer[24..26] != checksum {
+        return Ok(false);
+    }
+
     let mut cursor = Cursor::new(buffer);
 
     let timestamp = cursor.read_i64::<LittleEndian>()?;
     let now = Local::now().naive_local();
     let challenge_time = NaiveDateTime::from_timestamp(timestamp, 0);
 
-    // Check timestamp
+    // Check timestamp, if older than 2 minutes it is invalid
     if (now - challenge_time).num_minutes() >= 2 {
         return Ok(false);
     }
 
-    // TODO verify random bytes
-
     Ok(true)
 }
 
-fn create_response(_secret: &str, challenge: &str) -> ServiceResult<String> {
-    // TODO
-    Ok(challenge.to_owned())
+/// Create the response for the given challenge and card secret.
+/// The challenge is base64 encoded.
+/// 
+/// To create the response each byte of the challenge is xor-ed with the secret.
+/// If the challenge is longer than the secret, than the secret will repeat itself.
+/// 
+/// The result is base64 encoded.
+fn create_response(secret: &[u8], challenge: &str) -> ServiceResult<String> {
+    let challenge = base64::decode(challenge)?;
+
+    let mut response: Vec<u8> = Vec::with_capacity(challenge.len());
+
+    for (i, c) in challenge.iter().enumerate() {
+        response.push(c | secret[i % secret.len()]);
+    }
+
+    Ok(base64::encode(&response))
 }
 
-fn verify_challenge_response(secret: &str, challenge: &str, response: &str) -> ServiceResult<bool> {
+/// Convienient function that verifies the validity of the challange 
+/// and afterwords checks if the response matches the challenge.
+fn verify_challenge_response(secret: &[u8], challenge: &str, response: &str) -> ServiceResult<bool> {
     Ok(verify_challenge(challenge)? && create_response(secret, challenge)? == response)
 }
 
+/// Convert byte sequence to space separated hex string.
 fn bytes_to_string(bytes: &[u8]) -> String {
     bytes
         .iter()
@@ -210,12 +255,16 @@ fn bytes_to_string(bytes: &[u8]) -> String {
         .join(" ")
 }
 
-fn str_to_bytes(s: &str) -> Vec<u8> {
-    s.split(' ')
-        .map(|x| u8::from_str_radix(x, 16).unwrap_or(0))
-        .collect()
+/// Convert space separate hex string to byte vector.
+fn str_to_bytes(s: &str) -> ServiceResult<Vec<u8>> {
+    fn m(x: &str) -> ServiceResult<u8> {
+        Ok(u8::from_str_radix(x, 16)?)
+    }
+
+    s.split(' ').map(m).collect()
 }
 
+/// Generate a random byte sequence of length `length`.
 fn generate_key(length: usize) -> Vec<u8> {
     let mut data = vec![0u8; length];
     rand::thread_rng().fill_bytes(&mut data);
@@ -290,6 +339,7 @@ pub fn get_challenge_response(
     let entry = results.pop().ok_or_else(|| ServiceError::NotFound)?;
 
     if let Some(secret) = entry.secret {
+        let secret = str_to_bytes(&secret)?;
         if verify_challenge_response(&secret, challenge, response)? {
             let account = Account::get(conn, &entry.account_id)?;
             return Ok(account);
@@ -300,5 +350,24 @@ pub fn get_challenge_response(
             "Illegal secret",
             "No secret is required for this card!".to_owned(),
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_challenge_response() -> ServiceResult<()> {
+        let secret = generate_key(16);
+        let challenge = generate_challenge()?;
+
+        let response = create_response(&secret, &challenge)?;
+        assert_eq!(
+            verify_challenge_response(&secret, &challenge, &response)?,
+            true
+        );
+
+        Ok(())
     }
 }

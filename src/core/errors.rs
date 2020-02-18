@@ -125,6 +125,12 @@ impl From<lettre_email::error::Error> for ServiceError {
     }
 }
 
+impl From<std::num::ParseIntError> for ServiceError {
+    fn from(error: std::num::ParseIntError) -> Self {
+        ServiceError::BadRequest("Illegal number string", format!("{}", error))
+    }
+}
+
 /*
 /// nightly - allow `?` on Option<T> to unwrap
 impl From<std::option::NoneError> for ServiceError {
