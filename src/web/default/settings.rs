@@ -236,3 +236,20 @@ pub async fn post_revoke_nfc(
         .header(http::header::LOCATION, "/settings")
         .finish())
 }
+
+/// GET route for `/settings/theme/{theme}`
+pub async fn get_theme(
+    theme: web::Path<String>,
+) -> ServiceResult<HttpResponse> {
+    let expires = time::now() + time::Duration::days(365);
+
+    Ok(HttpResponse::Found()
+        .header(http::header::LOCATION, "/settings")
+        .cookie(
+            http::Cookie::build("theme", theme.into_inner())
+                .path("/")
+                .expires(expires)
+                .finish(),
+        )
+        .finish())
+}

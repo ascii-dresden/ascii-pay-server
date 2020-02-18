@@ -1,3 +1,54 @@
+class Color {
+    constructor(value) {
+        if (value.startsWith('--')) {
+            let name = value;
+            value = getComputedStyle(document.documentElement)
+                .getPropertyValue(name).trim();
+        }
+
+        if (value.startsWith('#')) {
+            if (value.length == 4) {
+                this.red = parseInt(value.substr(1, 1), 16) * 16;
+                this.green = parseInt(value.substr(2, 1), 16) * 16;
+                this.blue = parseInt(value.substr(3, 1), 16) * 16;
+            } else {
+                this.red = parseInt(value.substr(1, 2), 16);
+                this.green = parseInt(value.substr(3, 2), 16);
+                this.blue = parseInt(value.substr(5, 2), 16);
+            }
+            this.alpha = 1.0
+        } else {
+            value = input.split("(")[1].split(")")[0].split(",");
+            this.red = parseInt(value[0]);
+            this.green = parseInt(value[1]);
+            this.blue = parseInt(value[2]);
+            if (value.length > 3) {
+                this.alpha = parseFloat(value[3]);
+            } else {
+                this.alpha = 1.0
+            }
+        }
+    }
+
+    toString(alpha) {
+        if (!alpha) {
+            alpha = this.alpha;
+        }
+
+        if (this.alpha >= 1.0) {
+            var red = this.red.toString(16);
+            red = red.length == 1 ? "0" + red : red;
+            var green = this.green.toString(16);
+            green = green.length == 1 ? "0" + green : green;
+            var blue = this.blue.toString(16);
+            blue = blue.length == 1 ? "0" + blue : blue;
+            return '#' + red + green + blue;
+        } else {
+            return 'rgba(' + [this.red, this.green, this.blue, this.alpha].join(', ') + ')';
+        }
+    }
+}
+
 function main_diagram_tooltip(tooltip) {
     console.log(tooltip);
 
@@ -70,26 +121,35 @@ function init_main_diagram() {
 
     if (transaction_data.length > 0) {
         let line = transaction_data[0];
+        let y = line.transaction.before_credit / 100;
         time_data.push({
             x: moment(start),
-            y: line.transaction.before_credit / 100
+            y: y
         });
     }
 
     for (line of transaction_data) {
+        let y = line.transaction.before_credit / 100;
         time_data.push({
             x: moment(line.transaction.date),
-            y: line.transaction.after_credit / 100
+            y: y
         });
     }
 
     if (transaction_data.length > 0) {
         let line = transaction_data[transaction_data.length - 1];
+        let y = line.transaction.before_credit / 100;
         time_data.push({
             x: moment(end),
-            y: line.transaction.after_credit / 100
+            y: y
         });
     }
+
+    let primaryColor = new Color('--primary-color');
+    let gridColor = new Color('--border-color');
+    let textColor = new Color('--gray-color-dark');
+
+    Chart.defaults.global.defaultFontColor = textColor.toString(0.3);
 
     var data = {
         datasets: [
@@ -97,8 +157,8 @@ function init_main_diagram() {
                 label: "Overview",
                 lineTension: 0,
                 steppedLine: true,
-                borderColor: "rgba(41, 128, 185,1.0)",
-                backgroundColor: "rgba(41, 128, 185,0.2)",
+                borderColor: primaryColor.toString(),
+                backgroundColor: primaryColor.toString(0.2),
                 fill: false,
                 data: time_data
             }
@@ -119,6 +179,11 @@ function init_main_diagram() {
                         scaleLabel: {
                             display: true
                         },
+                        gridLines: {
+                          color: gridColor.toString(),
+                          zeroLineColor: textColor.toString()
+                        },
+                        color: textColor.toString(),
                         type: "time",
                         ticks: {
                             min: transaction_start,
@@ -129,6 +194,11 @@ function init_main_diagram() {
                 yAxes: [
                     {
                         beginAtZero: true,
+                        gridLines: {
+                          color: gridColor.toString(),
+                          zeroLineColor: textColor.toString()
+                        },
+                        color: textColor.toString(),
                         ticks: {
                             callback: function (value) {
                                 return value.toFixed(2) + "€";

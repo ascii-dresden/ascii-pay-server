@@ -125,6 +125,21 @@
                 </div>
             </div>
         </form>
+
+        <p></p>
+
+        <div class="columns">
+            <div class="column col-12">
+                <h2>Device theme</h2>
+            </div>
+            <div class="column col-12">
+                <div class="btn-group">
+                    <a href="/settings/theme/auto" class="btn{{#if (eq theme "auto")}} btn-primary{{/if}}">Automatic</a>
+                    <a href="/settings/theme/light" class="btn{{#if (eq theme "light")}} btn-primary{{/if}}">Light</a>
+                    <a href="/settings/theme/dark" class="btn{{#if (eq theme "dark")}} btn-primary{{/if}}">Dark</a>
+                </div>
+            </div>
+        </div>
     </div>
 </body>
 

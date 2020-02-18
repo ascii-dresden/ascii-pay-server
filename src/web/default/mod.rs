@@ -12,11 +12,6 @@ pub fn init(config: &mut web::ServiceConfig) {
                 .route(web::get().to(overview::get_transaction_details)),
         )
         .service(
-            web::resource("/settings")
-                .route(web::post().to(settings::post_settings))
-                .route(web::get().to(settings::get_settings)),
-        )
-        .service(
             web::resource("/settings/change-password")
                 .route(web::post().to(settings::post_change_password))
                 .route(web::get().to(settings::get_change_password)),
@@ -35,5 +30,14 @@ pub fn init(config: &mut web::ServiceConfig) {
             web::resource("/settings/revoke-nfc")
                 .route(web::post().to(settings::post_revoke_nfc))
                 .route(web::get().to(settings::get_revoke_nfc)),
+        )
+        .service(
+            web::resource("/settings/theme/{theme}")
+                .route(web::get().to(settings::get_theme)),
+        )
+        .service(
+            web::resource("/settings")
+                .route(web::post().to(settings::post_settings))
+                .route(web::get().to(settings::get_settings)),
         );
 }
