@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use actix_web::web::{Bytes, Data};
 use actix_web::{Error, HttpResponse, Responder};
-use futures::{Stream, StreamExt};
+use futures::Stream;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::time::{interval_at, Instant};
 
@@ -26,7 +26,7 @@ pub async fn new_client(broadcaster: Data<Arc<Mutex<Broadcaster>>>) -> impl Resp
         .header("Content-Type", "text/event-stream")
         .header("Cache-Control", "no-cache")
         .header("X-Accel-Buffering", "no")
-        .no_chunking()
+        .no_chunking(0)
         .streaming(rx)
 }
 
@@ -46,12 +46,13 @@ impl Broadcaster {
     }
 
     pub fn spawn_ping(me: Arc<Mutex<Self>>) {
-        actix_rt::spawn(async move {
-            let mut task = interval_at(Instant::now(), Duration::from_secs(10));
-            while let Some(_) = task.next().await {
-                me.lock().unwrap().remove_stale_clients();
-            }
-        })
+        // actix_rt::spawn(async move {
+        //     let mut task = interval_at(Instant::now(), Duration::from_secs(10));
+        //     loop {
+        //         task.tick().await;
+        //         me.lock().unwrap().remove_stale_clients();
+        //     }
+        // });
     }
 
     fn remove_stale_clients(&mut self) {
@@ -98,7 +99,7 @@ impl Stream for Client {
     type Item = Result<Bytes, Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match Pin::new(&mut self.0).poll_next(cx) {
+        match Pin::new(&mut self.0).poll_recv(cx) {
             Poll::Ready(Some(v)) => Poll::Ready(Some(Ok(v))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,

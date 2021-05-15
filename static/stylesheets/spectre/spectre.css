@@ -630,7 +630,7 @@ html:lang(ko),
     border-color: var(--primary-color-dark-d5);
     color: var(--light-color);
     text-decoration: none; }
-    .btn:active.loading::after, .btn.active.loading::after {
+    .btn.loading:active::after, .btn.active.loading::after {
       border-bottom-color: var(--light-color);
       border-left-color: var(--light-color); }
   .btn[disabled], .btn:disabled, .btn.disabled {

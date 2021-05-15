@@ -180,7 +180,7 @@ fn generate_challenge() -> ServiceResult<String> {
     type Aes128Cbc = Cbc<Aes128, Pkcs7>;
     let key = hex!("000102030405060708090a0b0c0d0e0f");
     let iv = hex!("f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff");
-    let cipher = Aes128Cbc::new_var(&key, &iv)?;
+    let cipher = Aes128Cbc::new_from_slices(&key, &iv)?;
 
     // Sign challenge
     let ciphertext = cipher.encrypt_vec(&buffer);
@@ -198,7 +198,7 @@ fn verify_challenge(challenge: &str) -> ServiceResult<bool> {
     type Aes128Cbc = Cbc<Aes128, Pkcs7>;
     let key = hex!("000102030405060708090a0b0c0d0e0f");
     let iv = hex!("f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff");
-    let cipher = Aes128Cbc::new_var(&key, &iv)?;
+    let cipher = Aes128Cbc::new_from_slices(&key, &iv)?;
 
     let buffer = cipher.decrypt_vec(&ciphertext)?;
 

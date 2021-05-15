@@ -62,8 +62,8 @@ impl From<r2d2::Error> for ServiceError {
     }
 }
 
-impl From<uuid::parser::ParseError> for ServiceError {
-    fn from(error: uuid::parser::ParseError) -> Self {
+impl From<uuid::Error> for ServiceError {
+    fn from(error: uuid::Error) -> Self {
         ServiceError::BadRequest("Invalid UUID", format!("{}", error))
     }
 }

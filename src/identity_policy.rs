@@ -5,7 +5,6 @@ use actix_identity::Identity;
 use actix_identity::IdentityPolicy;
 use actix_web::dev::{Payload, ServiceRequest, ServiceResponse};
 use actix_web::{web, Error, FromRequest, HttpRequest};
-use chrono::Duration;
 use futures::future::{err, ok, Ready};
 use futures::prelude::*;
 
@@ -114,7 +113,7 @@ impl DbIdentityPolicy {
                 .name(AUTH_COOKIE_NAME)
                 .path("/")
                 .domain(env::DOMAIN.as_str())
-                .max_age_time(Duration::days(1))
+                .max_age_time(time::Duration::days(1))
                 .secure(secure),
         }
     }
@@ -125,7 +124,8 @@ impl DbIdentityPolicy {
         req: &mut ServiceRequest,
         session_id: String,
     ) -> ServiceResult<Option<String>> {
-        let pool: web::Data<Pool> = match req.app_data() {
+        let app_data: Option<&web::Data<Pool>> = req.app_data();
+        let pool: &web::Data<Pool> = match app_data {
             Some(pool) => pool,
             None => {
                 return Err(ServiceError::InternalServerError(

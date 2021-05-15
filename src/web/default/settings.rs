@@ -241,7 +241,7 @@ pub async fn post_revoke_nfc(
 pub async fn get_theme(
     theme: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let expires = time::now() + time::Duration::days(365);
+    let expires = time::OffsetDateTime::now_utc() + time::Duration::days(365);
 
     Ok(HttpResponse::Found()
         .header(http::header::LOCATION, "/settings")
