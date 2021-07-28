@@ -1,4 +1,4 @@
-FROM rust:1.41-buster as builder
+FROM rust:1.53-buster as builder
 
 WORKDIR /usr/src/ascii-pay-server
 RUN apt-get update && apt-get install -y libpq-dev libssl-dev build-essential clang llvm-dev libclang-dev
