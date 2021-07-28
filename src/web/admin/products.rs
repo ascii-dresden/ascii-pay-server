@@ -355,6 +355,9 @@ async fn save_file(
                 pos += bytes_written;
             }
         }
+
+        file.flush()?;
+        println!("Flush file!")
     }
     Ok(())
 }
