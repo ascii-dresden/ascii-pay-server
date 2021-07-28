@@ -16,12 +16,17 @@ services:
       - MAIL_PASSWORD=password
       - CRON_SECRET=12345678
       - IMAGE_PATH="./img/"
-    ports:
-      - "8080:8080"
+      - BASE_URL="https://ascii.pixix4.com/"
+    expose:
+      - "8080"
     volumes:
       - ./dist/img:/opt/ascii-pay-server/img
     depends_on:
       - db
+    networks:
+      - default
+      - proxy
+    restart: always
   db:
     build:
       context: .
@@ -33,3 +38,7 @@ services:
       - POSTGRES_DB=ascii-pay
     volumes:
       - ./dist/postgres:/var/lib/postgresql/data
+    restart: always
+networks:
+  proxy:
+    external: true
