@@ -16,7 +16,7 @@ services:
       - MAIL_USER=username
       - MAIL_PASSWORD=password
       - CRON_SECRET=12345678
-      - IMAGE_PATH=./img/
+      - IMAGE_PATH=./img
       - BASE_URL=https://ascii.pixix4.com/
     expose:
       - "8080"
