@@ -79,10 +79,11 @@ pub async fn get_register(
 ) -> ServiceResult<HttpResponse> {
     let conn = pool.get()?;
 
-    let _account = authentication_password::get_account_by_invitation_link(&conn, &invitation_id)?;
+    let account = authentication_password::get_account_by_invitation_link(&conn, &invitation_id)?;
 
     let body = HbData::new(&request)
         .with_data("error", &request.query_string().contains("error"))
+        .with_data("account", &account)
         .render(&hb, "register")?;
 
     Ok(HttpResponse::Ok().body(body))

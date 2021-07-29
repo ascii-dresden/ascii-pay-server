@@ -13,10 +13,15 @@
                     </div>
                 </div>
                 <form method="POST">
+                    <input class="form-input" type="hidden" name="username" value="{{account.username}}" />
                     <div class="card-body">
                         <div class="form-group">
+                            <label class="form-label" for="username">Username</label>
+                            <input class="form-input" type="text" name="username" value="{{account.username}}" readonly />
+                        </div>
+                        <div class="form-group">
                             <label class="form-label" class="form-label" for="password">Password</label>
-                            <input class="form-input" type="password" name="password" />
+                            <input class="form-input" type="password" name="password" autofocus />
                         </div>
                         <div class="form-group">
                             <label class="form-label" class="form-label" for="password2">Repeat password</label>
