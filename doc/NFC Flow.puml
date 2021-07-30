@@ -25,13 +25,13 @@ Proxy <- Server: Respond AuthenticationNeeded(key, challenge)
 Card <- Proxy: Request Secret(key)
 Card -> Proxy: Respond(Secret)
 
-Proxy -> Proxy: Calculate Challenge Response
+Proxy -> Proxy: Calculate challange-reponse
 Proxy -> Server: Request authentication(id, challange-reponse)
 Proxy <- Server: Respond Account(Account)
 
 else WriteKey
 Proxy <- Server: Respond WriteKey(key, secret)
-Card <- Proxy: Store Secret(key)
+Card <- Proxy: Store Secret(key, secret)
 Card -> Proxy: Respond Ok
 
 Proxy -> Server: Request authentication(id)
@@ -39,12 +39,11 @@ Proxy <- Server: Respond AuthenticationNeeded(key, challenge)
 Card <- Proxy: Request Secret(key)
 Card -> Proxy: Respond(Secret)
 
-Proxy -> Proxy: Calculate Challenge Response
+Proxy -> Proxy: Calculate challange-reponse
 Proxy -> Server: Request authentication(id, challange-reponse)
 Proxy <- Server: Respond Account(Account)
 
 end
-
 
 group Payment
 
