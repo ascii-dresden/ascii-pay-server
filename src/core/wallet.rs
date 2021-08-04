@@ -234,6 +234,7 @@ pub fn create_pass(conn: &DbConnection, account: &Account) -> ServiceResult<Vec<
     let mut field = template::Field::new_f64("balance", (account.credit as f64) / 100.0);
     field.label("balance");
     field.currency_code("EUR");
+    field.change_message("balance_updated");
     store_card.add_primary_field(field);
 
     let mut field = template::Field::new_string("account_name", &account.name);
@@ -297,7 +298,7 @@ pub fn set_pass_updated_at(conn: &DbConnection, serial_number: &Uuid) -> Service
 
 pub async fn send_update_notification(conn: &DbConnection, account: &Account) -> ServiceResult<()> {
     use crate::core::schema::apple_wallet_registration::dsl;
-    
+
     set_pass_updated_at(conn, &account.id)?;
     
     let results = dsl::apple_wallet_registration
