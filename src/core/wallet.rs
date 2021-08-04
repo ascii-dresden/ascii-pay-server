@@ -313,7 +313,7 @@ async fn send_update_notification_for_registration(
     let client = Client::certificate(
         &mut certificate,
         &env::APPLE_WALLET_PASS_CERTIFICATE_PASSWORD.as_str(),
-        Endpoint::Sandbox,
+        Endpoint::Production,
     )
     .unwrap();
 

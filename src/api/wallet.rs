@@ -2,6 +2,21 @@ use crate::core::{env, wallet, Account, Pool, ServiceError, ServiceResult};
 use actix_web::{web, HttpRequest, HttpResponse};
 use uuid::Uuid;
 
+fn get_authentication_token(request: &HttpRequest) -> Option<Uuid> {
+    let header_value = request
+        .headers()
+        .get("Authorization")
+        .map(|header_value| header_value.to_str().ok())
+        .flatten()
+        .unwrap_or("")
+        .split(' ')
+        .collect::<Vec<&str>>().get(1)
+        .copied()
+        .unwrap_or("");
+
+    Uuid::parse_str(header_value).ok()
+}
+
 /// Registration
 /// register a device to receive push notifications for a pass
 ///
@@ -22,30 +37,24 @@ use uuid::Uuid;
 /// --> if not authorized: 401
 pub async fn register_device(
     pool: web::Data<Pool>,
-    device_id: web::Path<String>,
-    pass_type_id: web::Path<String>,
-    serial_number: web::Path<Uuid>,
+    path: web::Path<RegisterDevicePath>,
     data: web::Json<PushToken>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let authentication_token = Uuid::parse_str(
-        request
-            .headers()
-            .get("HTTP_AUTHORIZATION")
-            .map(|header_value| header_value.to_str().ok())
-            .flatten()
-            .unwrap_or(""),
-    )?;
+    let authentication_token = match get_authentication_token(&request) {
+        Some(token) => token,
+        None => return Ok(HttpResponse::Unauthorized().finish()),
+    };
 
     let conn = &pool.get()?;
 
-    if wallet::check_pass_authorization(conn, &serial_number, &authentication_token)? {
-        if wallet::is_pass_registered_on_device(conn, &device_id, &serial_number)? {
+    if wallet::check_pass_authorization(conn, &path.serial_number, &authentication_token)? {
+        if wallet::is_pass_registered_on_device(conn, &path.device_id, &path.serial_number)? {
             wallet::register_pass_on_device(
                 conn,
-                &device_id,
-                &serial_number,
-                &pass_type_id,
+                &path.device_id,
+                &path.serial_number,
+                &path.pass_type_id,
                 &data.push_token,
             )?;
             Ok(HttpResponse::Created().finish())
@@ -55,6 +64,13 @@ pub async fn register_device(
     } else {
         Ok(HttpResponse::Unauthorized().finish())
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RegisterDevicePath {
+    pub device_id:String,
+    pub pass_type_id: String,
+    pub serial_number: Uuid,
 }
 
 #[derive(Debug, Deserialize)]
@@ -78,8 +94,7 @@ pub struct PushToken {
 /// --> if unknown device identifier: 404
 pub async fn update_passes(
     pool: web::Data<Pool>,
-    device_id: web::Path<String>,
-    pass_type_id: web::Path<String>,
+    path: web::Path<UpdatePassesPath>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
@@ -90,8 +105,8 @@ pub async fn update_passes(
         .parse::<i32>()
         .ok();
 
-    if wallet::is_device_registered(conn, &device_id)? {
-        let passes = wallet::list_passes_for_device(conn, &device_id, &pass_type_id)?;
+    if wallet::is_device_registered(conn, &path.device_id)? {
+        let passes = wallet::list_passes_for_device(conn, &path.device_id, &path.pass_type_id)?;
 
         let updated_passes = if let Some(passes_updated_since) = passes_updated_since {
             let mut updated_passes = Vec::<Uuid>::new();
@@ -120,6 +135,13 @@ pub async fn update_passes(
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UpdatePassesPath {
+    pub device_id: String,
+    pub pass_type_id: String,
+}
+
+
 #[derive(Debug, Serialize)]
 pub struct UpdatedPasses {
     #[serde(rename = "lastUpdated")]
@@ -141,24 +163,19 @@ pub struct UpdatedPasses {
 /// --> if not authorized: 401
 pub async fn unregister_device(
     pool: web::Data<Pool>,
-    device_id: web::Path<String>,
-    serial_number: web::Path<Uuid>,
+    path: web::Path<UnregisterDevicePath>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let authentication_token = Uuid::parse_str(
-        request
-            .headers()
-            .get("HTTP_AUTHORIZATION")
-            .map(|header_value| header_value.to_str().ok())
-            .flatten()
-            .unwrap_or(""),
-    )?;
+    let authentication_token = match get_authentication_token(&request) {
+        Some(token) => token,
+        None => return Ok(HttpResponse::Unauthorized().finish()),
+    };
 
     let conn = &pool.get()?;
 
-    if wallet::check_pass_authorization(conn, &serial_number, &authentication_token)? {
-        if wallet::is_pass_registered_on_device(conn, &device_id, &serial_number)? {
-            wallet::unregister_pass_on_device(conn, &device_id, &serial_number)?;
+    if wallet::check_pass_authorization(conn, &path.serial_number, &authentication_token)? {
+        if wallet::is_pass_registered_on_device(conn, &path.device_id, &path.serial_number)? {
+            wallet::unregister_pass_on_device(conn, &path.device_id, &path.serial_number)?;
             Ok(HttpResponse::Ok().finish())
         } else {
             Ok(HttpResponse::NotFound().finish())
@@ -166,6 +183,12 @@ pub async fn unregister_device(
     } else {
         Ok(HttpResponse::Unauthorized().finish())
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UnregisterDevicePath {
+    pub device_id: String,
+    pub serial_number: Uuid,
 }
 
 /// Pass delivery
@@ -178,27 +201,22 @@ pub async fn unregister_device(
 /// --> if auth token is incorrect: 401
 pub async fn pass_delivery(
     pool: web::Data<Pool>,
-    pass_type_id: web::Path<String>,
-    serial_number: web::Path<Uuid>,
+    path: web::Path<PassDeliveryPath>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let authentication_token = Uuid::parse_str(
-        request
-            .headers()
-            .get("HTTP_AUTHORIZATION")
-            .map(|header_value| header_value.to_str().ok())
-            .flatten()
-            .unwrap_or(""),
-    )?;
+    let authentication_token = match get_authentication_token(&request) {
+        Some(token) => token,
+        None => return Ok(HttpResponse::Unauthorized().finish()),
+    };
 
     let conn = &pool.get()?;
 
-    if wallet::check_pass_authorization(conn, &serial_number, &authentication_token)? {
-        if pass_type_id.into_inner() != env::APPLE_WALLET_PASS_TYPE_IDENTIFIER.to_string() {
+    if wallet::check_pass_authorization(conn, &path.serial_number, &authentication_token)? {
+        if path.pass_type_id != env::APPLE_WALLET_PASS_TYPE_IDENTIFIER.to_string() {
             return Err(ServiceError::NotFound);
         }
 
-        let account = Account::get(conn, &serial_number)?;
+        let account = Account::get(conn, &path.serial_number)?;
         let vec = wallet::create_pass(conn, &account)?;
         Ok(HttpResponse::Ok()
             .content_type("application/vnd.apple.pkpass")
@@ -206,4 +224,10 @@ pub async fn pass_delivery(
     } else {
         Ok(HttpResponse::Unauthorized().finish())
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PassDeliveryPath {
+    pub pass_type_id: String,
+    pub serial_number: Uuid,
 }
