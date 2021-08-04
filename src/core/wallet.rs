@@ -55,7 +55,7 @@ pub fn check_pass_authorization(
         .filter(dsl::authentication_token.eq(authentication_token))
         .load::<AppleWalletPass>(conn)?;
 
-    Ok(results.len() == 1)
+    Ok(!results.is_empty())
 }
 
 pub fn is_pass_registered_on_device(
@@ -69,7 +69,7 @@ pub fn is_pass_registered_on_device(
         .filter(dsl::serial_number.eq(serial_number))
         .load::<AppleWalletRegistration>(conn)?;
 
-    Ok(results.len() == 1)
+    Ok(!results.is_empty())
 }
 
 pub fn register_pass_on_device(
@@ -116,7 +116,7 @@ pub fn is_device_registered(conn: &DbConnection, device_id: &str) -> ServiceResu
         .filter(dsl::device_id.eq(device_id))
         .load::<AppleWalletRegistration>(conn)?;
 
-    Ok(results.len() == 1)
+    Ok(!results.is_empty())
 }
 
 pub fn list_passes_for_device(

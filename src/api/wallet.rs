@@ -96,7 +96,7 @@ pub struct PushToken {
 pub async fn update_passes(
     pool: web::Data<Pool>,
     path: web::Path<UpdatePassesPath>,
-    query: web::Path<UpdatePassesQuery>,
+    query: web::Query<UpdatePassesQuery>,
 ) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
 
