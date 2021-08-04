@@ -97,8 +97,8 @@ lazy_static::lazy_static! {
 
     /// Path to the apple wallet wwdr certificate.
     ///
-    /// Field name: `APPLE_WALLET_WDDR_CERTIFICATE`
-    pub static ref APPLE_WALLET_WDDR_CERTIFICATE: String = std::env::var("APPLE_WALLET_WDDR_CERTIFICATE").unwrap_or_else(|_| "./certificates/apple-wwdr.pem".to_owned());
+    /// Field name: `APPLE_WALLET_WWDR_CERTIFICATE`
+    pub static ref APPLE_WALLET_WWDR_CERTIFICATE: String = std::env::var("APPLE_WALLET_WWDR_CERTIFICATE").unwrap_or_else(|_| "./certificates/apple-wwdr.pem".to_owned());
 
     /// Path to the apple wallet pass certificate.
     ///

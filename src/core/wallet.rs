@@ -259,7 +259,7 @@ pub fn create_pass(conn: &DbConnection, account: &Account) -> ServiceResult<Vec<
     let cursor = pass.export(
         Path::new(env::APPLE_WALLET_PASS_CERTIFICATE.as_str()),
         env::APPLE_WALLET_PASS_CERTIFICATE_PASSWORD.as_str(),
-        Path::new(env::APPLE_WALLET_WDDR_CERTIFICATE.as_str()),
+        Path::new(env::APPLE_WALLET_WWDR_CERTIFICATE.as_str()),
         Cursor::new(vec),
     )?;
 
@@ -299,7 +299,7 @@ pub async fn send_update_notification(conn: &DbConnection, account: &Account) ->
 
     set_pass_updated_at(conn, &account.id)?;
 
-    let mut results = dsl::apple_wallet_registration
+    let results = dsl::apple_wallet_registration
         .filter(dsl::serial_number.eq(&account.id))
         .load::<AppleWalletRegistration>(conn)?;
 
@@ -307,12 +307,12 @@ pub async fn send_update_notification(conn: &DbConnection, account: &Account) ->
 
     let mut unregister_vec = Vec::<String>::new();
 
-    results.push(AppleWalletRegistration {
+    /* results.push(AppleWalletRegistration {
         device_id: "6a35455f07c9768804aed6e1b4bcae4b".to_owned(),
         serial_number: Uuid::parse_str("585ab55c-fdcc-44d1-b9cb-b102d37b5695")?,
         push_token: "a9b05cb7036bd62e8258b48e4b55f354bf0e8b5d8c7209d78d54be2645bc2f66".to_owned(),
         pass_type_id: "pass.coffee.ascii.pay".to_owned(),
-    });
+    }); */
     for registration in results {
         println!("Send APNS message for account: {:?}", account_move.id);
         let unregister = match send_update_notification_for_registration(&registration).await {

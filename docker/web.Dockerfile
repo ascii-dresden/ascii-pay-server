@@ -6,7 +6,7 @@ COPY . .
 RUN cargo build --release
 
 FROM debian:buster-slim
-RUN apt-get update && apt-get install -y libpq5 libssl-dev ca-certificates
+RUN apt-get update && apt-get install -y libpq5 libssl-dev
 RUN mkdir /opt/ascii-pay-server
 COPY --from=builder /usr/src/ascii-pay-server/target/release/ascii-pay-server /usr/src/ascii-pay-server/static /opt/ascii-pay-server/
 COPY ./static /opt/ascii-pay-server/static
