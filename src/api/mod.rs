@@ -79,15 +79,12 @@ pub fn init(config: &mut web::ServiceConfig) {
         )
         .service(
             web::resource("/v1/devices/{device_id}/registrations/{pass_type_id}/{serial_number}")
-                .route(web::post().to(wallet::register_device)),
+                .route(web::post().to(wallet::register_device))
+                .route(web::delete().to(wallet::unregister_device)),
         )
         .service(
             web::resource("/v1/devices/{device_id}/registrations/{pass_type_id}")
                 .route(web::get().to(wallet::update_passes)),
-        )
-        .service(
-            web::resource("/v1/devices/{device_id}/registrations/{pass_type_id}/{serial_number}")
-                .route(web::delete().to(wallet::unregister_device)),
         )
         .service(
             web::resource("/v1/passes/{pass_type_id}/{serial_number}")

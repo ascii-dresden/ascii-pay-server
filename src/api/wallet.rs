@@ -188,6 +188,7 @@ pub async fn unregister_device(
 #[derive(Debug, Deserialize)]
 pub struct UnregisterDevicePath {
     pub device_id: String,
+    pub pass_type_id: String,
     pub serial_number: Uuid,
 }
 

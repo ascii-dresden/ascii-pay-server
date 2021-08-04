@@ -1,4 +1,4 @@
-use a2::{Client, Endpoint, NotificationBuilder};
+use a2::{Endpoint, NotificationBuilder};
 use diesel::prelude::*;
 use std::fs::File;
 use std::io::Cursor;
@@ -8,7 +8,7 @@ use uuid::Uuid;
 use wallet_pass::{template, Pass};
 
 use crate::core::schema::{apple_wallet_pass, apple_wallet_registration};
-use crate::core::{generate_uuid, DbConnection, ServiceError, ServiceResult};
+use crate::core::{apns, generate_uuid, DbConnection, ServiceError, ServiceResult};
 
 use super::{env, Account};
 
@@ -326,14 +326,13 @@ async fn send_update_notification_for_registration(
     let mut certificate = File::open(env::APPLE_WALLET_PASS_CERTIFICATE.as_str()).unwrap();
 
     // Connecting to APNs using a client certificate
-    let client = Client::certificate(
+    let response = apns::send(
         &mut certificate,
         &env::APPLE_WALLET_PASS_CERTIFICATE_PASSWORD.as_str(),
-        Endpoint::Production,
+        Endpoint::Sandbox,
+        payload,
     )
-    .unwrap();
-
-    let response = client.send(payload).await?;
+    .await?;
 
     match response.code {
         200 => {}

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 mod accounts;
+mod apns;
 pub mod authentication_barcode;
 pub mod authentication_nfc;
 pub mod authentication_password;

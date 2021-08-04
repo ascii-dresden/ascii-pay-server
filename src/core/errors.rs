@@ -137,6 +137,24 @@ impl From<a2::Error> for ServiceError {
     }
 }
 
+impl From<openssl::error::ErrorStack> for ServiceError {
+    fn from(error: openssl::error::ErrorStack) -> Self {
+        ServiceError::InternalServerError("OpenSSL error", format!("{}", error))
+    }
+}
+
+impl From<actix_http::error::PayloadError> for ServiceError {
+    fn from(error: actix_http::error::PayloadError) -> Self {
+        ServiceError::InternalServerError("Http client error", format!("{}", error))
+    }
+}
+
+impl From<actix_http::client::SendRequestError> for ServiceError {
+    fn from(error: actix_http::client::SendRequestError) -> Self {
+        ServiceError::InternalServerError("Http client error", format!("{}", error))
+    }
+}
+
 /*
 /// nightly - allow `?` on Option<T> to unwrap
 impl From<std::option::NoneError> for ServiceError {
