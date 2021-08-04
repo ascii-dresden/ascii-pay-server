@@ -1,4 +1,3 @@
-use actix_rt::task::spawn_blocking;
 use diesel::prelude::*;
 use std::io::Cursor;
 use std::path::Path;
@@ -300,33 +299,34 @@ pub async fn send_update_notification(conn: &DbConnection, account: &Account) ->
 
     set_pass_updated_at(conn, &account.id)?;
 
-    let results = dsl::apple_wallet_registration
+    let mut results = dsl::apple_wallet_registration
         .filter(dsl::serial_number.eq(&account.id))
         .load::<AppleWalletRegistration>(conn)?;
 
     let account_move = account.clone();
 
-    let unregister_vec = spawn_blocking(move || {
-        let mut unregister_vec = Vec::<String>::new();
+    let mut unregister_vec = Vec::<String>::new();
 
-        for registration in results {
-            println!("Send APNS message for account: {:?}", account_move.id);
-            let unregister = match send_update_notification_for_registration(&registration) {
-                Ok(unregister) => unregister,
-                Err(e) => {
-                    eprintln!("Error while communicating with APNS: {:?}", e);
-                    continue;
-                }
-            };
-
-            if !unregister {
-                unregister_vec.push(registration.device_id.clone());
+    results.push(AppleWalletRegistration {
+        device_id: "6a35455f07c9768804aed6e1b4bcae4b".to_owned(),
+        serial_number: Uuid::parse_str("585ab55c-fdcc-44d1-b9cb-b102d37b5695")?,
+        push_token: "a9b05cb7036bd62e8258b48e4b55f354bf0e8b5d8c7209d78d54be2645bc2f66".to_owned(),
+        pass_type_id: "pass.coffee.ascii.pay".to_owned(),
+    });
+    for registration in results {
+        println!("Send APNS message for account: {:?}", account_move.id);
+        let unregister = match send_update_notification_for_registration(&registration).await {
+            Ok(unregister) => unregister,
+            Err(e) => {
+                eprintln!("Error while communicating with APNS: {:?}", e);
+                continue;
             }
-        }
+        };
 
-        unregister_vec
-    })
-    .await?;
+        if !unregister {
+            unregister_vec.push(registration.device_id.clone());
+        }
+    }
 
     for device_id in unregister_vec {
         if let Err(e) = unregister_pass_on_device(conn, &device_id, &account.id) {
@@ -340,11 +340,11 @@ pub async fn send_update_notification(conn: &DbConnection, account: &Account) ->
     Ok(())
 }
 
-fn send_update_notification_for_registration(
+async fn send_update_notification_for_registration(
     registration: &AppleWalletRegistration,
 ) -> ServiceResult<bool> {
     // Connecting to APNs using a client certificate
-    let response = apns::send(&registration.push_token)?;
+    let response = apns::send(&registration.push_token).await?;
 
     let unregister = match response {
         200 => false,

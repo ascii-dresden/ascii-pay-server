@@ -143,9 +143,9 @@ impl From<actix_http::client::SendRequestError> for ServiceError {
     }
 }
 
-impl From<reqwest::Error> for ServiceError {
-    fn from(error: reqwest::Error) -> Self {
-        ServiceError::InternalServerError("Http client (reqwest) error", format!("{}", error))
+impl From<openssl::error::ErrorStack> for ServiceError {
+    fn from(error: openssl::error::ErrorStack) -> Self {
+        ServiceError::InternalServerError("OpenSSL error", format!("{}", error))
     }
 }
 
