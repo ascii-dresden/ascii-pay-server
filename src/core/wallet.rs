@@ -283,8 +283,23 @@ pub fn delete_pass(conn: &DbConnection, account_id: &Uuid) -> ServiceResult<()> 
     Ok(())
 }
 
+pub fn set_pass_updated_at(conn: &DbConnection, serial_number: &Uuid) -> ServiceResult<()> {
+    use crate::core::schema::apple_wallet_pass::dsl;
+
+    diesel::update(
+        dsl::apple_wallet_pass.filter(apple_wallet_pass::serial_number.eq(serial_number)),
+    )
+    .set(dsl::updated_at.eq(get_current_time()))
+    .execute(conn)?;
+
+    Ok(())
+}
+
 pub async fn send_update_notification(conn: &DbConnection, account: &Account) -> ServiceResult<()> {
     use crate::core::schema::apple_wallet_registration::dsl;
+    
+    set_pass_updated_at(conn, &account.id)?;
+    
     let results = dsl::apple_wallet_registration
         .filter(dsl::serial_number.eq(&account.id))
         .load::<AppleWalletRegistration>(conn)?;

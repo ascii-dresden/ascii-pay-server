@@ -1,6 +1,8 @@
 use crate::client_cert_required;
 use crate::core::authentication_nfc::NfcResult;
-use crate::core::{Account, Pool, Product, ServiceResult, authentication_barcode, authentication_nfc, wallet};
+use crate::core::{
+    authentication_barcode, authentication_nfc, wallet, Account, Pool, Product, ServiceResult,
+};
 use crate::identity_policy::Action;
 
 use actix_web::{web, HttpRequest, HttpResponse};

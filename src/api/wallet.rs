@@ -10,7 +10,8 @@ fn get_authentication_token(request: &HttpRequest) -> Option<Uuid> {
         .flatten()
         .unwrap_or("")
         .split(' ')
-        .collect::<Vec<&str>>().get(1)
+        .collect::<Vec<&str>>()
+        .get(1)
         .copied()
         .unwrap_or("");
 
@@ -68,7 +69,7 @@ pub async fn register_device(
 
 #[derive(Debug, Deserialize)]
 pub struct RegisterDevicePath {
-    pub device_id:String,
+    pub device_id: String,
     pub pass_type_id: String,
     pub serial_number: Uuid,
 }
@@ -140,7 +141,6 @@ pub struct UpdatePassesPath {
     pub device_id: String,
     pub pass_type_id: String,
 }
-
 
 #[derive(Debug, Serialize)]
 pub struct UpdatedPasses {
