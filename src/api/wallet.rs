@@ -96,20 +96,15 @@ pub struct PushToken {
 pub async fn update_passes(
     pool: web::Data<Pool>,
     path: web::Path<UpdatePassesPath>,
-    request: HttpRequest,
+    query: web::Path<UpdatePassesQuery>,
 ) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
-
-    let passes_updated_since = request
-        .match_info()
-        .query("passesUpdatedSince")
-        .parse::<i32>()
-        .ok();
 
     if wallet::is_device_registered(conn, &path.device_id)? {
         let passes = wallet::list_passes_for_device(conn, &path.device_id, &path.pass_type_id)?;
 
-        let updated_passes = if let Some(passes_updated_since) = passes_updated_since {
+        println!("Get updates for {:?}: {:?}", query, passes);
+        let updated_passes = if let Some(passes_updated_since) = query.passes_updated_since {
             let mut updated_passes = Vec::<Uuid>::new();
 
             for pass in passes {
@@ -122,6 +117,15 @@ pub async fn update_passes(
         } else {
             passes
         };
+
+        println!("{:?}", UpdatedPasses {
+            last_updated: format!("{}", wallet::get_current_time()),
+            serial_numbers: updated_passes.clone(),
+        });
+        println!("{:?}", serde_json::to_string_pretty(&UpdatedPasses {
+            last_updated: format!("{}", wallet::get_current_time()),
+            serial_numbers: updated_passes.clone(),
+        })?);
 
         if updated_passes.is_empty() {
             Ok(HttpResponse::NoContent().finish())
@@ -140,6 +144,12 @@ pub async fn update_passes(
 pub struct UpdatePassesPath {
     pub device_id: String,
     pub pass_type_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdatePassesQuery {
+    #[serde(rename = "passesUpdatedSince")]
+    pub passes_updated_since: Option<i32>,
 }
 
 #[derive(Debug, Serialize)]
