@@ -1,8 +1,6 @@
 use crate::client_cert_required;
 use crate::core::authentication_nfc::NfcResult;
-use crate::core::{
-    authentication_barcode, authentication_nfc, Account, Pool, Product, ServiceResult,
-};
+use crate::core::{Account, Pool, Product, ServiceResult, authentication_barcode, authentication_nfc, wallet};
 use crate::identity_policy::Action;
 
 use actix_web::{web, HttpRequest, HttpResponse};
@@ -61,6 +59,11 @@ pub async fn post_identify(
         IdentificationRequest::Barcode { code } => {
             if let Ok(product) = Product::get_by_barcode(&conn, &code) {
                 return Ok(HttpResponse::Ok().json(&IdentificationResponse::Product { product }));
+            }
+
+            if let Ok(account_id) = wallet::get_by_qr_code(&conn, &code) {
+                let account = Account::get(conn, &account_id)?;
+                return Ok(HttpResponse::Ok().json(&IdentificationResponse::Account { account }));
             }
 
             let account = authentication_barcode::get(&conn, &code)?;

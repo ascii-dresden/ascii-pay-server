@@ -148,6 +148,19 @@ pub fn get_pass_updated_at(conn: &DbConnection, serial_number: &Uuid) -> Service
     Ok(results.pop().unwrap().updated_at)
 }
 
+pub fn get_by_qr_code(conn: &DbConnection, qr_code: &str) -> ServiceResult<Uuid> {
+    use crate::core::schema::apple_wallet_pass::dsl;
+    let mut results = dsl::apple_wallet_pass
+        .filter(dsl::qr_code.eq(qr_code))
+        .load::<AppleWalletPass>(conn)?;
+
+    if results.len() != 1 {
+        return Err(ServiceError::NotFound);
+    }
+
+    Ok(results.pop().unwrap().serial_number)
+}
+
 pub fn create_pass(conn: &DbConnection, account: &Account) -> ServiceResult<Vec<u8>> {
     use crate::core::schema::apple_wallet_pass::dsl;
 
