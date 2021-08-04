@@ -51,6 +51,8 @@ pub async fn register_device(
 
     if wallet::check_pass_authorization(conn, &path.serial_number, &authentication_token)? {
         if wallet::is_pass_registered_on_device(conn, &path.device_id, &path.serial_number)? {
+            Ok(HttpResponse::NotModified().finish())
+        } else {
             wallet::register_pass_on_device(
                 conn,
                 &path.device_id,
@@ -59,8 +61,6 @@ pub async fn register_device(
                 &data.push_token,
             )?;
             Ok(HttpResponse::Created().finish())
-        } else {
-            Ok(HttpResponse::NotModified().finish())
         }
     } else {
         Ok(HttpResponse::Unauthorized().finish())
@@ -127,7 +127,7 @@ pub async fn update_passes(
             Ok(HttpResponse::NoContent().finish())
         } else {
             Ok(HttpResponse::Ok().json(UpdatedPasses {
-                last_updated: wallet::get_current_time(),
+                last_updated: format!("{}", wallet::get_current_time()),
                 serial_numbers: updated_passes,
             }))
         }
@@ -145,7 +145,7 @@ pub struct UpdatePassesPath {
 #[derive(Debug, Serialize)]
 pub struct UpdatedPasses {
     #[serde(rename = "lastUpdated")]
-    last_updated: i32,
+    last_updated: String,
     #[serde(rename = "serialNumbers")]
     serial_numbers: Vec<Uuid>,
 }

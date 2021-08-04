@@ -300,7 +300,7 @@ pub async fn send_update_notification(conn: &DbConnection, account: &Account) ->
     use crate::core::schema::apple_wallet_registration::dsl;
 
     set_pass_updated_at(conn, &account.id)?;
-    
+
     let results = dsl::apple_wallet_registration
         .filter(dsl::serial_number.eq(&account.id))
         .load::<AppleWalletRegistration>(conn)?;
