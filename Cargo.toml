@@ -39,8 +39,9 @@ byteorder = "1.4"
 hex-literal = "0.3"
 block-modes = "0.8"
 rpassword = "5.0" 
-
-tokio = "1.6"
+wallet-pass = "0.2"
+a2 = "0.6"
+tokio = "1.9"
 
 # for sending mails
 lettre = "0.9"

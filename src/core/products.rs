@@ -304,7 +304,10 @@ impl Product {
 
         fs::create_dir_all(env::IMAGE_PATH.as_str())?;
         let file = File::create(format!("{}/{}", env::IMAGE_PATH.as_str(), name))?;
-        println!("Save image '{}'", format!("{}/{}", env::IMAGE_PATH.as_str(), name));
+        println!(
+            "Save image '{}'",
+            format!("{}/{}", env::IMAGE_PATH.as_str(), name)
+        );
 
         diesel::update(dsl::product.find(&self.id))
             .set(dsl::image.eq(&self.image))

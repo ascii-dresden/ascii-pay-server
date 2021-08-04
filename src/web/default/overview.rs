@@ -1,4 +1,4 @@
-use crate::core::{transactions, Permission, Pool, ServiceResult};
+use crate::core::{transactions, wallet, Permission, Pool, ServiceResult};
 use crate::identity_policy::{Action, RetrievedAccount};
 use crate::login_required;
 use crate::web::admin::transactions::{
@@ -103,4 +103,19 @@ pub async fn get_transaction_details(
         .render(&hb, "default_transaction_details")?;
 
     Ok(HttpResponse::Ok().body(body))
+}
+
+/// GET route for `/AsciiPayCard.pkpass` if user is logged in
+pub async fn get_apple_wallet_pass(
+    pool: web::Data<Pool>,
+    logged_account: RetrievedAccount,
+) -> ServiceResult<HttpResponse> {
+    let logged_account = login_required!(logged_account, Permission::DEFAULT, Action::REDIRECT);
+
+    let conn = &pool.get()?;
+
+    let vec = wallet::create_pass(conn, &logged_account.account)?;
+    Ok(HttpResponse::Ok()
+        .content_type("application/vnd.apple.pkpass")
+        .body(vec))
 }

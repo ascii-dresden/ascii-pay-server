@@ -146,7 +146,8 @@ pub async fn post_execute_transaction(
             &mut account,
             Some(&logged_account.account),
             (execute_form.total * 100.0) as Money,
-        )?;
+        )
+        .await?;
     }
 
     Ok(HttpResponse::Found()
@@ -169,7 +170,7 @@ pub async fn get_transaction_details(
 
     let conn = &pool.get()?;
 
-    let account_id = Uuid::parse_str(&path.0.0)?;
+    let account_id = Uuid::parse_str(&path.0 .0)?;
     let transaction_id = Uuid::parse_str(&path.1)?;
 
     let account = Account::get(&conn, &account_id)?;
@@ -311,7 +312,8 @@ pub async fn post_transaction_generate_random(
         data.count_per_day,
         (data.avg_down * 100.0) as Money,
         (data.avg_up * 100.0) as Money,
-    )?;
+    )
+    .await?;
 
     Ok(HttpResponse::Found()
         .header(

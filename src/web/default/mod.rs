@@ -3,10 +3,14 @@ pub mod settings;
 
 use actix_web::web;
 
-/// Setup routes for admin ui
+/// Setup routes for default ui
 pub fn init(config: &mut web::ServiceConfig) {
     config
         .service(web::resource("").route(web::get().to(overview::get_overview)))
+        .service(
+            web::resource("/AsciiPayCard.pkpass")
+                .route(web::get().to(overview::get_apple_wallet_pass)),
+        )
         .service(
             web::resource("/transaction/{transaction_id}")
                 .route(web::get().to(overview::get_transaction_details)),
@@ -31,10 +35,7 @@ pub fn init(config: &mut web::ServiceConfig) {
                 .route(web::post().to(settings::post_revoke_nfc))
                 .route(web::get().to(settings::get_revoke_nfc)),
         )
-        .service(
-            web::resource("/settings/theme/{theme}")
-                .route(web::get().to(settings::get_theme)),
-        )
+        .service(web::resource("/settings/theme/{theme}").route(web::get().to(settings::get_theme)))
         .service(
             web::resource("/settings")
                 .route(web::post().to(settings::post_settings))

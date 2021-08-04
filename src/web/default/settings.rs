@@ -238,9 +238,7 @@ pub async fn post_revoke_nfc(
 }
 
 /// GET route for `/settings/theme/{theme}`
-pub async fn get_theme(
-    theme: web::Path<String>,
-) -> ServiceResult<HttpResponse> {
+pub async fn get_theme(theme: web::Path<String>) -> ServiceResult<HttpResponse> {
     let expires = time::OffsetDateTime::now_utc() + time::Duration::days(365);
 
     Ok(HttpResponse::Found()

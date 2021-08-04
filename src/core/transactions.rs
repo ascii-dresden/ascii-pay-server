@@ -5,11 +5,13 @@ use uuid::Uuid;
 
 use crate::core::schema::transaction;
 use crate::core::{
-    generate_uuid, Account, DbConnection, Money, Product, ServiceError, ServiceResult,
+    generate_uuid, wallet, Account, DbConnection, Money, Product, ServiceError, ServiceResult,
 };
 
 /// Represent a transaction
-#[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset, Serialize, Deserialize, Clone)]
+#[derive(
+    Debug, Queryable, Insertable, Identifiable, AsChangeset, Serialize, Deserialize, Clone,
+)]
 #[table_name = "transaction"]
 pub struct Transaction {
     pub id: Uuid,
@@ -100,13 +102,19 @@ fn execute_at(
 /// * 4 Check if the account minimum_credit allows the new credit
 /// * 5 Create and save the transaction (with optional cashier refernece)
 /// * 6 Save the new credit to the account
-pub fn execute(
+pub async fn execute(
     conn: &DbConnection,
     account: &mut Account,
     cashier: Option<&Account>,
     total: Money,
 ) -> ServiceResult<Transaction> {
-    execute_at(conn, account, cashier, total, Local::now().naive_local())
+    let transaction = execute_at(conn, account, cashier, total, Local::now().naive_local())?;
+
+    if let Err(e) = wallet::send_update_notification(conn, account).await {
+        eprintln!("Error while communicating with APNS: {:?}", e);
+    }
+
+    Ok(transaction)
 }
 
 // Pagination reference: https://github.com/diesel-rs/diesel/blob/v1.3.0/examples/postgres/advanced-blog-cli/src/pagination.rs
@@ -334,7 +342,7 @@ impl Transaction {
     }
 }
 
-pub fn generate_transactions(
+pub async fn generate_transactions(
     conn: &DbConnection,
     account: &mut Account,
     from: NaiveDateTime,
@@ -415,6 +423,10 @@ pub fn generate_transactions(
                     .collect(),
             )?;
         }
+    }
+
+    if let Err(e) = wallet::send_update_notification(conn, account).await {
+        eprintln!("Error while communicating with APNS: {:?}", e);
     }
 
     Ok(())

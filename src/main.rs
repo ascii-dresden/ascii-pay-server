@@ -12,6 +12,7 @@ extern crate uuid;
 #[macro_use]
 extern crate hex_literal;
 extern crate rpassword;
+extern crate wallet_pass;
 
 use std::io::Write;
 
@@ -24,7 +25,9 @@ mod identity_policy;
 mod server;
 mod web;
 
-use crate::core::{authentication_password, env, Account, DbConnection, Pool, ServiceResult, Permission};
+use crate::core::{
+    authentication_password, env, Account, DbConnection, Permission, Pool, ServiceResult,
+};
 use server::start_server;
 
 #[actix_web::main]
@@ -91,7 +94,6 @@ fn read_value(prompt: &str, hide_input: bool) -> String {
         value.trim().to_owned()
     }
 }
-
 
 /// Check if a initial user exists. Otherwise create a new one
 async fn check_admin_user_exisits(pool: &Pool) -> ServiceResult<()> {

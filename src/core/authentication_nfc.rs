@@ -159,8 +159,8 @@ fn crc_checksum(value: &[u8]) -> [u8; 2] {
     [((wCrc) & 0xFF) as u8, ((wCrc >> 8) & 0xFF) as u8]
 }
 
-/// Create a new challenge. A challenge contains the current timestamp, 
-/// a random byte sequence and a crc checksum. 
+/// Create a new challenge. A challenge contains the current timestamp,
+/// a random byte sequence and a crc checksum.
 /// Afterwords, the challenge is signed/encrypted with aes/cbc.
 fn generate_challenge() -> ServiceResult<String> {
     let mut buffer: Vec<u8> = Vec::new();
@@ -188,7 +188,7 @@ fn generate_challenge() -> ServiceResult<String> {
     Ok(base64::encode(&ciphertext))
 }
 
-/// Verify if a challenge is valid. First it decrypts the challenge 
+/// Verify if a challenge is valid. First it decrypts the challenge
 /// and verifies the integrity with the crc checksum.
 /// Afterwords it checks if the timestamp is not older than 2 minutes.
 fn verify_challenge(challenge: &str) -> ServiceResult<bool> {
@@ -223,10 +223,10 @@ fn verify_challenge(challenge: &str) -> ServiceResult<bool> {
 
 /// Create the response for the given challenge and card secret.
 /// The challenge is base64 encoded.
-/// 
+///
 /// To create the response each byte of the challenge is xor-ed with the secret.
 /// If the challenge is longer than the secret, than the secret will repeat itself.
-/// 
+///
 /// The result is base64 encoded.
 fn create_response(secret: &[u8], challenge: &str) -> ServiceResult<String> {
     let challenge = base64::decode(challenge)?;
@@ -240,9 +240,13 @@ fn create_response(secret: &[u8], challenge: &str) -> ServiceResult<String> {
     Ok(base64::encode(&response))
 }
 
-/// Convienient function that verifies the validity of the challange 
+/// Convienient function that verifies the validity of the challange
 /// and afterwords checks if the response matches the challenge.
-fn verify_challenge_response(secret: &[u8], challenge: &str, response: &str) -> ServiceResult<bool> {
+fn verify_challenge_response(
+    secret: &[u8],
+    challenge: &str,
+    response: &str,
+) -> ServiceResult<bool> {
     Ok(verify_challenge(challenge)? && create_response(secret, challenge)? == response)
 }
 

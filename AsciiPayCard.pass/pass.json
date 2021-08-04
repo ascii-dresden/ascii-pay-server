@@ -1,0 +1,19 @@
+{
+  "formatVersion" : 1,
+  "passTypeIdentifier": "<<pass_type_identifier>>",
+  "teamIdentifier": "<<team_identifier>>",
+  "serialNumber": "<<serialNumber>>",
+  "webServiceURL" : "https://ascii.pixix4.com/",
+  "locations" : [
+    {
+      "longitude" : 51.02560613810922,
+      "latitude" : 13.723384617811181
+    }
+  ],
+  "organizationName" : "Ascii Pay",
+  "description" : "Ascii Pay Card",
+  "logoText" : "Ascii Pay Card",
+  "foregroundColor" : "rgb(255, 255, 255)",
+  "labelColor" : "rgb(255, 255, 255)",
+  "backgroundColor" : "rgb(138, 98, 74)"
+}

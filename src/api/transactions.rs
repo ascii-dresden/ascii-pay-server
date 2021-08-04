@@ -166,7 +166,8 @@ pub async fn post_transaction_payment(
         return Err(ServiceError::Unauthorized);
     }
 
-    let transaction = transactions::execute(&conn, &mut account, None, payment_request.amount)?;
+    let transaction =
+        transactions::execute(&conn, &mut account, None, payment_request.amount).await?;
 
     let mut products: Vec<(Product, i32)> = Vec::new();
 

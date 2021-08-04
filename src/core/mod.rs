@@ -15,6 +15,7 @@ mod sessions;
 pub mod stats;
 pub mod transactions;
 mod utils;
+pub mod wallet;
 
 pub use self::accounts::{Account, Permission};
 pub use self::categories::*;

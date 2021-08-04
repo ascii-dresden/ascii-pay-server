@@ -13,6 +13,25 @@ table! {
 }
 
 table! {
+    apple_wallet_pass (serial_number) {
+        serial_number -> Uuid,
+        authentication_token -> Uuid,
+        qr_code -> Varchar,
+        pass_type_id -> Varchar,
+        updated_at -> Int4,
+    }
+}
+
+table! {
+    apple_wallet_registration (device_id, serial_number) {
+        device_id -> Varchar,
+        serial_number -> Uuid,
+        push_token -> Varchar,
+        pass_type_id -> Varchar,
+    }
+}
+
+table! {
     authentication_barcode (account_id) {
         account_id -> Uuid,
         code -> Varchar,
@@ -119,6 +138,8 @@ table! {
 
 allow_tables_to_appear_in_same_query!(
     account,
+    apple_wallet_pass,
+    apple_wallet_registration,
     authentication_barcode,
     authentication_nfc,
     authentication_nfc_write_key,

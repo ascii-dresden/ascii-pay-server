@@ -131,6 +131,12 @@ impl From<std::num::ParseIntError> for ServiceError {
     }
 }
 
+impl From<a2::Error> for ServiceError {
+    fn from(error: a2::Error) -> Self {
+        ServiceError::InternalServerError("Cannot communicate with APNS", format!("{}", error))
+    }
+}
+
 /*
 /// nightly - allow `?` on Option<T> to unwrap
 impl From<std::option::NoneError> for ServiceError {

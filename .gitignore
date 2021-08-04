@@ -8,3 +8,6 @@
 static/templates/**/*.css
 postgres/
 backup/
+certificates/*
+.DS_Store
+._.DS_Store
