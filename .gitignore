@@ -4,6 +4,7 @@
 /.idea
 /*.db
 /img
+/*.sql
 .vscode/
 static/templates/**/*.css
 postgres/
