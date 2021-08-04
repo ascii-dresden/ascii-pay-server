@@ -1,6 +1,5 @@
-use a2::{Endpoint, NotificationBuilder};
+use actix_rt::task::spawn_blocking;
 use diesel::prelude::*;
-use std::fs::File;
 use std::io::Cursor;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -305,47 +304,58 @@ pub async fn send_update_notification(conn: &DbConnection, account: &Account) ->
         .filter(dsl::serial_number.eq(&account.id))
         .load::<AppleWalletRegistration>(conn)?;
 
-    for registration in results {
-        println!("Send APNS message for account: {:?}", account.id);
-        if let Err(e) = send_update_notification_for_registration(conn, &registration).await {
-            eprintln!("Error while communicating with APNS: {:?}", e);
+    let account_move = account.clone();
+
+    let unregister_vec = spawn_blocking(move || {
+        let mut unregister_vec = Vec::<String>::new();
+
+        for registration in results {
+            println!("Send APNS message for account: {:?}", account_move.id);
+            let unregister = match send_update_notification_for_registration(&registration) {
+                Ok(unregister) => unregister,
+                Err(e) => {
+                    eprintln!("Error while communicating with APNS: {:?}", e);
+                    continue;
+                }
+            };
+
+            if !unregister {
+                unregister_vec.push(registration.device_id.clone());
+            }
+        }
+
+        unregister_vec
+    })
+    .await?;
+
+    for device_id in unregister_vec {
+        if let Err(e) = unregister_pass_on_device(conn, &device_id, &account.id) {
+            eprintln!(
+                "Cannot unregister device {} as APNS requested: {:?}",
+                &device_id, e
+            );
         }
     }
 
     Ok(())
 }
 
-async fn send_update_notification_for_registration(
-    conn: &DbConnection,
+fn send_update_notification_for_registration(
     registration: &AppleWalletRegistration,
-) -> ServiceResult<()> {
-    let builder = a2::SilentNotificationBuilder::new();
-    let payload = builder.build(&registration.push_token, Default::default());
-
-    // Read the private key and certificate from the disk
-    let mut certificate = File::open(env::APPLE_WALLET_PASS_CERTIFICATE.as_str()).unwrap();
-
+) -> ServiceResult<bool> {
     // Connecting to APNs using a client certificate
-    let response = apns::send(
-        &mut certificate,
-        &env::APPLE_WALLET_PASS_CERTIFICATE_PASSWORD.as_str(),
-        Endpoint::Production,
-        payload,
-    )
-    .await?;
+    let response = apns::send(&registration.push_token)?;
 
-    match response.code {
-        200 => {}
-        410 => {
-            unregister_pass_on_device(conn, &registration.device_id, &registration.serial_number)?;
-        }
+    let unregister = match response {
+        200 => false,
+        410 => true,
         _ => {
             return Err(ServiceError::InternalServerError(
                 "APNS returned illegal status code!",
-                format!("Status code: {}", response.code),
+                format!("Status code: {}", response),
             ))
         }
-    }
+    };
 
-    Ok(())
+    Ok(unregister)
 }

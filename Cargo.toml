@@ -8,7 +8,8 @@ build = "build.rs"
 
 [dependencies]
 actix-identity = "0.3"
-actix-web = {version = "3.3", features = ["openssl"]}
+actix-web = "3.3"
+reqwest = { version = "0.11", features = ["native-tls", "blocking"]}
 actix-files = "0.5"
 actix-multipart = "0.3"
 actix-rt = "2.2"
@@ -40,9 +41,7 @@ hex-literal = "0.3"
 block-modes = "0.8"
 rpassword = "5.0" 
 wallet-pass = "0.2"
-a2 = "0.6"
 tokio = "1.9"
-openssl = "0.10"
 
 # for sending mails
 lettre = "0.9"

@@ -131,27 +131,27 @@ impl From<std::num::ParseIntError> for ServiceError {
     }
 }
 
-impl From<a2::Error> for ServiceError {
-    fn from(error: a2::Error) -> Self {
-        ServiceError::InternalServerError("Cannot communicate with APNS", format!("{}", error))
-    }
-}
-
-impl From<openssl::error::ErrorStack> for ServiceError {
-    fn from(error: openssl::error::ErrorStack) -> Self {
-        ServiceError::InternalServerError("OpenSSL error", format!("{}", error))
-    }
-}
-
 impl From<actix_http::error::PayloadError> for ServiceError {
     fn from(error: actix_http::error::PayloadError) -> Self {
-        ServiceError::InternalServerError("Http client error", format!("{}", error))
+        ServiceError::InternalServerError("Http client payload error", format!("{}", error))
     }
 }
 
 impl From<actix_http::client::SendRequestError> for ServiceError {
     fn from(error: actix_http::client::SendRequestError) -> Self {
-        ServiceError::InternalServerError("Http client error", format!("{}", error))
+        ServiceError::InternalServerError("Http client (actix) error", format!("{}", error))
+    }
+}
+
+impl From<reqwest::Error> for ServiceError {
+    fn from(error: reqwest::Error) -> Self {
+        ServiceError::InternalServerError("Http client (reqwest) error", format!("{}", error))
+    }
+}
+
+impl From<actix_rt::task::JoinError> for ServiceError {
+    fn from(error: actix_rt::task::JoinError) -> Self {
+        ServiceError::InternalServerError("Actix join error", format!("{}", error))
     }
 }
 
