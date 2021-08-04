@@ -88,6 +88,6 @@ pub fn init(config: &mut web::ServiceConfig) {
         )
         .service(
             web::resource("/v1/passes/{pass_type_id}/{serial_number}")
-                .route(web::post().to(wallet::pass_delivery)),
+                .route(web::get().to(wallet::pass_delivery)),
         );
 }
