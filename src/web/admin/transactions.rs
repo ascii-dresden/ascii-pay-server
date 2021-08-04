@@ -94,7 +94,7 @@ pub async fn get_transactions(
         .unwrap_or_else(|| now - Duration::days(30))
         .date()
         .and_hms(0, 0, 0);
-    let to = query.to.unwrap_or_else(|| now).date().and_hms(23, 59, 59);
+    let to = query.to.unwrap_or(now).date().and_hms(23, 59, 59);
 
     let list: Vec<TransactionWithProducts> =
         transactions::get_by_account(&conn, &account, &from, &to)?
@@ -302,7 +302,7 @@ pub async fn post_transaction_generate_random(
         .unwrap_or_else(|| now - Duration::days(30))
         .date()
         .and_hms(0, 0, 0);
-    let to = data.to.unwrap_or_else(|| now).date().and_hms(23, 59, 59);
+    let to = data.to.unwrap_or(now).date().and_hms(23, 59, 59);
 
     transactions::generate_transactions(
         conn,

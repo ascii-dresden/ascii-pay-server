@@ -60,7 +60,7 @@ pub fn get(conn: &DbConnection, barcode: &str) -> ServiceResult<Account> {
         .limit(1)
         .load::<AuthenticationBarcode>(conn)?;
 
-    let entry = results.pop().ok_or_else(|| ServiceError::NotFound)?;
+    let entry = results.pop().ok_or(ServiceError::NotFound)?;
 
     let a = Account::get(conn, &entry.account_id)?;
 

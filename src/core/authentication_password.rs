@@ -151,7 +151,7 @@ pub fn get(conn: &DbConnection, login: &str, password: &str) -> ServiceResult<Ac
         .filter(dsl::account_id.eq(account.id))
         .load::<AuthenticationPassword>(conn)?;
 
-    let entry = results.pop().ok_or_else(|| ServiceError::NotFound)?;
+    let entry = results.pop().ok_or(ServiceError::NotFound)?;
 
     if !verify(&entry.password, password)? {
         return Err(ServiceError::NotFound);
@@ -173,9 +173,9 @@ pub fn verify_password(
         .filter(dsl::account_id.eq(account.id))
         .load::<AuthenticationPassword>(conn)?;
 
-    let entry = results.pop().ok_or_else(|| ServiceError::NotFound)?;
+    let entry = results.pop().ok_or(ServiceError::NotFound)?;
 
-    Ok(verify(&entry.password, password)?)
+    verify(&entry.password, password)
 }
 
 /// Create the hash version of a password

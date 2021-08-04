@@ -293,7 +293,7 @@ pub fn get(conn: &DbConnection, card_id: &str) -> ServiceResult<NfcResult> {
         .limit(1)
         .load::<AuthenticationNfc>(conn)?;
 
-    let mut entry = results.pop().ok_or_else(|| ServiceError::NotFound)?;
+    let mut entry = results.pop().ok_or(ServiceError::NotFound)?;
 
     if entry.need_write_key(&conn)? {
         let key = bytes_to_string(&generate_key(16));
@@ -340,7 +340,7 @@ pub fn get_challenge_response(
         .limit(1)
         .load::<AuthenticationNfc>(conn)?;
 
-    let entry = results.pop().ok_or_else(|| ServiceError::NotFound)?;
+    let entry = results.pop().ok_or(ServiceError::NotFound)?;
 
     if let Some(secret) = entry.secret {
         let secret = str_to_bytes(&secret)?;

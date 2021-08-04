@@ -150,7 +150,7 @@ pub fn get_by_account_and_id(
         .filter(dsl::account_id.eq(&account.id).and(dsl::id.eq(id)))
         .load::<Transaction>(conn)?;
 
-    results.pop().ok_or_else(|| ServiceError::NotFound)
+    results.pop().ok_or(ServiceError::NotFound)
 }
 
 #[derive(Debug, Deserialize, Serialize)]

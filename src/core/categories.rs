@@ -183,10 +183,7 @@ impl Category {
             .filter(|p| p.validity_start <= *datetime)
             .max_by(|p1, p2| p1.validity_start.cmp(&p2.validity_start));
 
-        match current {
-            Some(price) => Some(price.value),
-            None => None,
-        }
+        current.map(|price| price.value)
     }
 
     /// List all categorys
@@ -212,7 +209,7 @@ impl Category {
             .filter(dsl::id.eq(id))
             .load::<Category>(conn)?;
 
-        let mut category = results.pop().ok_or_else(|| ServiceError::NotFound)?;
+        let mut category = results.pop().ok_or(ServiceError::NotFound)?;
 
         category.load_prices(conn)?;
 

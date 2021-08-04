@@ -47,15 +47,12 @@ impl
     type Row = (Uuid, String, Option<Uuid>, Option<String>);
 
     fn build(row: Self::Row) -> Self {
-        let category = match row.2 {
-            Some(id) => Some(Category {
-                id,
-                name: String::new(),
-                prices: vec![],
-                current_price: None,
-            }),
-            None => None,
-        };
+        let category = row.2.map(|id| Category {
+            id,
+            name: String::new(),
+            prices: vec![],
+            current_price: None,
+        });
 
         Product {
             id: row.0,
@@ -78,10 +75,7 @@ impl Product {
     ) -> ServiceResult<Product> {
         use crate::core::schema::product::dsl;
 
-        let category_id = match category.as_ref() {
-            Some(category) => Some(category.id.to_owned()),
-            None => None,
-        };
+        let category_id = category.as_ref().map(|category| category.id.to_owned());
 
         let p = Product {
             id: generate_uuid(),
@@ -110,10 +104,10 @@ impl Product {
     pub fn update(&self, conn: &DbConnection) -> ServiceResult<()> {
         use crate::core::schema::product::dsl;
 
-        let category = match &self.category {
-            Some(category) => Some(category.id.to_owned()),
-            None => None,
-        };
+        let category = self
+            .category
+            .as_ref()
+            .map(|category| category.id.to_owned());
 
         diesel::update(dsl::product.find(&self.id))
             .set((dsl::name.eq(&self.name), dsl::category.eq(&category)))
@@ -356,7 +350,7 @@ impl Product {
 
         let mut results = dsl::product.filter(dsl::id.eq(id)).load::<Product>(conn)?;
 
-        let mut p = results.pop().ok_or_else(|| ServiceError::NotFound)?;
+        let mut p = results.pop().ok_or(ServiceError::NotFound)?;
 
         p.load_category(conn)?;
         p.load_prices(conn)?;
@@ -372,7 +366,7 @@ impl Product {
             .filter(dsl::code.eq(code))
             .load::<ProductBarcode>(conn)?;
 
-        let p = results.pop().ok_or_else(|| ServiceError::NotFound)?;
+        let p = results.pop().ok_or(ServiceError::NotFound)?;
 
         Self::get(conn, &p.product_id)
     }

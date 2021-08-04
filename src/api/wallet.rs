@@ -194,7 +194,7 @@ pub async fn pass_delivery(
     let conn = &pool.get()?;
 
     if wallet::check_pass_authorization(conn, &serial_number, &authentication_token)? {
-        if &pass_type_id.into_inner() != &env::APPLE_WALLET_PASS_TYPE_IDENTIFIER.to_string() {
+        if pass_type_id.into_inner() != env::APPLE_WALLET_PASS_TYPE_IDENTIFIER.to_string() {
             return Err(ServiceError::NotFound);
         }
 

@@ -44,7 +44,7 @@ pub async fn get_overview(
         .unwrap_or_else(|| now - Duration::days(30))
         .date()
         .and_hms(0, 0, 0);
-    let to = query.to.unwrap_or_else(|| now).date().and_hms(23, 59, 59);
+    let to = query.to.unwrap_or(now).date().and_hms(23, 59, 59);
 
     let list: Vec<TransactionWithProducts> =
         transactions::get_by_account(&conn, &logged_account.account, &from, &to)?

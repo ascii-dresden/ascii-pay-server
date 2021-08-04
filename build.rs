@@ -1,4 +1,3 @@
-use sass_rs;
 use std::fs::{self, File};
 use std::io;
 use std::io::Write;
@@ -23,7 +22,7 @@ fn process_files(path: &Path) -> io::Result<()> {
 
                 let is_source_file = if let Some(os_filename) = path.file_name() {
                     if let Some(filename) = os_filename.to_str() {
-                        !filename.starts_with("_")
+                        !filename.starts_with('_')
                     } else {
                         false
                     }
@@ -57,9 +56,7 @@ fn main() {
             "The static stylesheets path at {} could not be found. Please make sure it exists.",
             sass_path.canonicalize().expect("Invalid path").display()
         );
-    } else {
-        if let Err(e) = process_files(sass_path) {
-            panic!("{}", e);
-        }
+    } else if let Err(e) = process_files(sass_path) {
+        panic!("{}", e);
     }
 }

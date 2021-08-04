@@ -157,7 +157,7 @@ pub async fn post_product_edit(
 
     let mut server_product = Product::get(&conn, &Uuid::parse_str(&product_id)?)?;
 
-    let category = if product.category == "" {
+    let category = if product.category.is_empty() {
         None
     } else {
         Some(Category::get(&conn, &Uuid::parse_str(&product.category)?)?)
@@ -229,7 +229,7 @@ pub async fn post_product_create(
 
     let conn = &pool.get()?;
 
-    let category = if product.category == "" {
+    let category = if product.category.is_empty() {
         None
     } else {
         Some(Category::get(&conn, &Uuid::parse_str(&product.category)?)?)

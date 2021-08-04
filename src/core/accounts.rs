@@ -189,7 +189,7 @@ impl Account {
 
         let mut results = dsl::account.filter(dsl::id.eq(id)).load::<Account>(conn)?;
 
-        results.pop().ok_or_else(|| ServiceError::NotFound)
+        results.pop().ok_or(ServiceError::NotFound)
     }
 
     /// Get an account by the `id`
@@ -214,7 +214,7 @@ impl Account {
             return Err(ServiceError::NotFound);
         }
 
-        results.pop().ok_or_else(|| ServiceError::NotFound)
+        results.pop().ok_or(ServiceError::NotFound)
     }
 
     fn exist_conficting_account(&self, conn: &DbConnection) -> ServiceResult<bool> {

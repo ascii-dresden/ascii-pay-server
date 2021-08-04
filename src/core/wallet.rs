@@ -57,7 +57,7 @@ pub fn check_pass_authorization(
         .filter(dsl::authentication_token.eq(authentication_token))
         .load::<AppleWalletPass>(conn)?;
 
-    return Ok(results.len() == 1);
+    Ok(results.len() == 1)
 }
 
 pub fn is_pass_registered_on_device(
@@ -71,7 +71,7 @@ pub fn is_pass_registered_on_device(
         .filter(dsl::serial_number.eq(serial_number))
         .load::<AppleWalletRegistration>(conn)?;
 
-    return Ok(results.len() == 1);
+    Ok(results.len() == 1)
 }
 
 pub fn register_pass_on_device(
@@ -118,7 +118,7 @@ pub fn is_device_registered(conn: &DbConnection, device_id: &str) -> ServiceResu
         .filter(dsl::device_id.eq(device_id))
         .load::<AppleWalletRegistration>(conn)?;
 
-    return Ok(results.len() == 1);
+    Ok(results.len() == 1)
 }
 
 pub fn list_passes_for_device(
@@ -132,7 +132,7 @@ pub fn list_passes_for_device(
         .filter(dsl::pass_type_id.eq(pass_type_id))
         .load::<AppleWalletRegistration>(conn)?;
 
-    return Ok(results.into_iter().map(|r| r.serial_number).collect());
+    Ok(results.into_iter().map(|r| r.serial_number).collect())
 }
 
 pub fn get_pass_updated_at(conn: &DbConnection, serial_number: &Uuid) -> ServiceResult<i32> {
@@ -145,7 +145,7 @@ pub fn get_pass_updated_at(conn: &DbConnection, serial_number: &Uuid) -> Service
         return Err(ServiceError::NotFound);
     }
 
-    return Ok(results.pop().unwrap().updated_at);
+    Ok(results.pop().unwrap().updated_at)
 }
 
 pub fn create_pass(conn: &DbConnection, account: &Account) -> ServiceResult<Vec<u8>> {
@@ -169,7 +169,7 @@ pub fn create_pass(conn: &DbConnection, account: &Account) -> ServiceResult<Vec<
             );
 
             let db_pass = AppleWalletPass {
-                serial_number: account.id.clone(),
+                serial_number: account.id,
                 authentication_token: generate_uuid(),
                 qr_code,
                 pass_type_id: env::APPLE_WALLET_PASS_TYPE_IDENTIFIER.as_str().to_owned(),

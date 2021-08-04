@@ -87,7 +87,7 @@ impl Session {
 
         let mut results = dsl::session.filter(dsl::id.eq(id)).load::<Session>(conn)?;
 
-        let a = results.pop().ok_or_else(|| ServiceError::Unauthorized)?;
+        let a = results.pop().ok_or(ServiceError::Unauthorized)?;
 
         if a.valid_until < Local::now().naive_local() {
             a.delete(&conn)?;
