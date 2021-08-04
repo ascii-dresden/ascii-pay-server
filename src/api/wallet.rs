@@ -113,7 +113,7 @@ pub async fn update_passes(
             let mut updated_passes = Vec::<Uuid>::new();
 
             for pass in passes {
-                if wallet::get_pass_updated_at(conn, &pass)? >= passes_updated_since {
+                if wallet::get_pass_updated_at(conn, &pass)? > passes_updated_since {
                     updated_passes.push(pass);
                 }
             }

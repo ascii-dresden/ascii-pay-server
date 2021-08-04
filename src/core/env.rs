@@ -90,6 +90,11 @@ lazy_static::lazy_static! {
     /// Field name: `APPLE_WALLET_TEMPLATE`
     pub static ref APPLE_WALLET_TEMPLATE: String = std::env::var("APPLE_WALLET_TEMPLATE").unwrap_or_else(|_| "./AsciiPayCard.pass".to_owned());
 
+    /// Path to the apple wallet apns certificate.
+    ///
+    /// Field name: `APPLE_WALLET_APNS_CERTIFICATE`
+    pub static ref APPLE_WALLET_APNS_CERTIFICATE: String = std::env::var("APPLE_WALLET_APNS_CERTIFICATE").unwrap_or_else(|_| "./certificates/apple-apns.pem".to_owned());
+
     /// Path to the apple wallet wwdr certificate.
     ///
     /// Field name: `APPLE_WALLET_WDDR_CERTIFICATE`
