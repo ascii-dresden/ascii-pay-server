@@ -39,7 +39,7 @@ fn get_authentication_token(request: &HttpRequest) -> Option<Uuid> {
 pub async fn register_device(
     pool: web::Data<Pool>,
     path: web::Path<RegisterDevicePath>,
-    data: web::Json<PushToken>,
+    data: web::Json<RegisterDeviceResponse>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
     let authentication_token = match get_authentication_token(&request) {
@@ -75,7 +75,7 @@ pub struct RegisterDevicePath {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct PushToken {
+pub struct RegisterDeviceResponse {
     #[serde(rename = "pushToken")]
     push_token: String,
 }
@@ -117,17 +117,21 @@ pub async fn update_passes(
             passes
         };
 
-        println!("{}", serde_json::to_string_pretty(&UpdatedPasses {
-            last_updated: format!("{}", wallet::get_current_time()),
-            serial_numbers: updated_passes.clone(),
-        })?);
+        let serial_numbers = updated_passes
+            .iter()
+            .map(|uuid| {
+                uuid.to_hyphenated()
+                    .encode_upper(&mut Uuid::encode_buffer())
+                    .to_owned()
+            })
+            .collect::<Vec<String>>();
 
         if updated_passes.is_empty() {
             Ok(HttpResponse::NoContent().finish())
         } else {
-            Ok(HttpResponse::Ok().json(UpdatedPasses {
+            Ok(HttpResponse::Ok().json(UpdatedPassesResponse {
                 last_updated: format!("{}", wallet::get_current_time()),
-                serial_numbers: updated_passes,
+                serial_numbers,
             }))
         }
     } else {
@@ -148,11 +152,11 @@ pub struct UpdatePassesQuery {
 }
 
 #[derive(Debug, Serialize)]
-pub struct UpdatedPasses {
+pub struct UpdatedPassesResponse {
     #[serde(rename = "lastUpdated")]
     last_updated: String,
     #[serde(rename = "serialNumbers")]
-    serial_numbers: Vec<Uuid>,
+    serial_numbers: Vec<String>,
 }
 
 /// Unregister
@@ -245,9 +249,7 @@ pub struct PassDeliveryPath {
     pub serial_number: Uuid,
 }
 
-pub async fn log(
-    body: web::Bytes,
-) -> ServiceResult<HttpResponse> {
+pub async fn log(body: web::Bytes) -> ServiceResult<HttpResponse> {
     println!("{}", std::str::from_utf8(&body).unwrap());
     Ok(HttpResponse::Ok().finish())
 }
