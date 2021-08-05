@@ -103,7 +103,6 @@ pub async fn update_passes(
     if wallet::is_device_registered(conn, &path.device_id)? {
         let passes = wallet::list_passes_for_device(conn, &path.device_id, &path.pass_type_id)?;
 
-        println!("Get updates for {:?}: {:?}", query, passes);
         let updated_passes = if let Some(passes_updated_since) = query.passes_updated_since {
             let mut updated_passes = Vec::<Uuid>::new();
 
@@ -118,11 +117,7 @@ pub async fn update_passes(
             passes
         };
 
-        println!("{:?}", UpdatedPasses {
-            last_updated: format!("{}", wallet::get_current_time()),
-            serial_numbers: updated_passes.clone(),
-        });
-        println!("{:?}", serde_json::to_string_pretty(&UpdatedPasses {
+        println!("{}", serde_json::to_string_pretty(&UpdatedPasses {
             last_updated: format!("{}", wallet::get_current_time()),
             serial_numbers: updated_passes.clone(),
         })?);
@@ -227,10 +222,17 @@ pub async fn pass_delivery(
             return Err(ServiceError::NotFound);
         }
 
+        let updated_at = wallet::get_pass_updated_at(conn, &path.serial_number)?;
+
+        let last_modified = chrono::NaiveDateTime::from_timestamp(updated_at as i64, 0)
+            .format("%a, %d %b %G %T GMT")
+            .to_string();
+
         let account = Account::get(conn, &path.serial_number)?;
         let vec = wallet::create_pass(conn, &account)?;
         Ok(HttpResponse::Ok()
             .content_type("application/vnd.apple.pkpass")
+            .header(http::header::LAST_MODIFIED, last_modified)
             .body(vec))
     } else {
         Ok(HttpResponse::Unauthorized().finish())
@@ -241,4 +243,11 @@ pub async fn pass_delivery(
 pub struct PassDeliveryPath {
     pub pass_type_id: String,
     pub serial_number: Uuid,
+}
+
+pub async fn log(
+    body: web::Bytes,
+) -> ServiceResult<HttpResponse> {
+    println!("{}", std::str::from_utf8(&body).unwrap());
+    Ok(HttpResponse::Ok().finish())
 }

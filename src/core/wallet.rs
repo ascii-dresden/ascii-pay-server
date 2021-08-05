@@ -112,6 +112,7 @@ pub fn unregister_pass_on_device(
 
 pub fn is_device_registered(conn: &DbConnection, device_id: &str) -> ServiceResult<bool> {
     use crate::core::schema::apple_wallet_registration::dsl;
+
     let results = dsl::apple_wallet_registration
         .filter(dsl::device_id.eq(device_id))
         .load::<AppleWalletRegistration>(conn)?;
@@ -323,7 +324,7 @@ pub async fn send_update_notification(conn: &DbConnection, account: &Account) ->
             }
         };
 
-        if !unregister {
+        if unregister {
             unregister_vec.push(registration.device_id.clone());
         }
     }

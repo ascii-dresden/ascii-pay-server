@@ -89,5 +89,9 @@ pub fn init(config: &mut web::ServiceConfig) {
         .service(
             web::resource("/v1/passes/{pass_type_id}/{serial_number}")
                 .route(web::get().to(wallet::pass_delivery)),
+        )
+        .service(
+            web::resource("/v1/log")
+                .route(web::post().to(wallet::log)),
         );
 }
