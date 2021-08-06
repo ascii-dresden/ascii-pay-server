@@ -34,6 +34,7 @@ pub async fn get_overview(
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
     let logged_account = login_required!(logged_account, Permission::DEFAULT, Action::REDIRECT);
+    let auth_token = logged_account.create_auth_token()?;
 
     let conn = &pool.get()?;
 
@@ -71,6 +72,7 @@ pub async fn get_overview(
         )
         .with_data("transactions", &list)
         .with_data("transactions_str", &list_str)
+        .with_data("auth_token", &auth_token)
         .render(&hb, "default_overview")?;
 
     Ok(HttpResponse::Ok().body(body))

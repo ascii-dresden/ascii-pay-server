@@ -31,7 +31,7 @@ use crate::core::{
 use server::start_server;
 
 #[actix_web::main]
-async fn main() -> ServiceResult<()> {
+async fn main() {
     let result = init().await;
 
     let exit_code = match result {

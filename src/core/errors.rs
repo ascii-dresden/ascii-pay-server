@@ -155,6 +155,12 @@ impl From<actix_rt::task::JoinError> for ServiceError {
     }
 }
 
+impl From<std::str::Utf8Error> for ServiceError {
+    fn from(error: std::str::Utf8Error) -> Self {
+        ServiceError::InternalServerError("Utf8 conversion error", format!("{}", error))
+    }
+}
+
 /*
 /// nightly - allow `?` on Option<T> to unwrap
 impl From<std::option::NoneError> for ServiceError {

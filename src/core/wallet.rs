@@ -5,8 +5,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 use wallet_pass::{template, Pass};
 
+use crate::core::apns::APNS;
 use crate::core::schema::{apple_wallet_pass, apple_wallet_registration};
-use crate::core::{apns, generate_uuid, DbConnection, ServiceError, ServiceResult};
+use crate::core::{generate_uuid, DbConnection, ServiceError, ServiceResult};
 
 use super::{env, Account};
 
@@ -304,23 +305,28 @@ pub async fn send_update_notification(conn: &DbConnection, account: &Account) ->
         .filter(dsl::serial_number.eq(&account.id))
         .load::<AppleWalletRegistration>(conn)?;
 
-    let account_move = account.clone();
+    println!("Send APNS message for account: {:?}", account.id);
 
     let mut unregister_vec = Vec::<String>::new();
 
-    /* results.push(AppleWalletRegistration {
-        device_id: "6a35455f07c9768804aed6e1b4bcae4b".to_owned(),
-        serial_number: Uuid::parse_str("585ab55c-fdcc-44d1-b9cb-b102d37b5695")?,
-        push_token: "a9b05cb7036bd62e8258b48e4b55f354bf0e8b5d8c7209d78d54be2645bc2f66".to_owned(),
-        pass_type_id: "pass.coffee.ascii.pay".to_owned(),
-    }); */
+    let apns = APNS::new()?;
     for registration in results {
-        println!("Send APNS message for account: {:?}", account_move.id);
-        let unregister = match send_update_notification_for_registration(&registration).await {
-            Ok(unregister) => unregister,
+        let response_code = match apns.send(&registration.push_token).await {
+            Ok(response_code) => response_code,
             Err(e) => {
                 eprintln!("Error while communicating with APNS: {:?}", e);
                 continue;
+            }
+        };
+
+        let unregister = match response_code {
+            200 => false,
+            410 => true,
+            _ => {
+                return Err(ServiceError::InternalServerError(
+                    "APNS returned illegal status code!",
+                    format!("Status code: {}", response_code),
+                ))
             }
         };
 
@@ -339,24 +345,4 @@ pub async fn send_update_notification(conn: &DbConnection, account: &Account) ->
     }
 
     Ok(())
-}
-
-async fn send_update_notification_for_registration(
-    registration: &AppleWalletRegistration,
-) -> ServiceResult<bool> {
-    // Connecting to APNs using a client certificate
-    let response = apns::send(&registration.push_token).await?;
-
-    let unregister = match response {
-        200 => false,
-        410 => true,
-        _ => {
-            return Err(ServiceError::InternalServerError(
-                "APNS returned illegal status code!",
-                format!("Status code: {}", response),
-            ))
-        }
-    };
-
-    Ok(unregister)
 }

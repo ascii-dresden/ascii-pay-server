@@ -5,6 +5,9 @@ use actix_identity::Identity;
 use actix_identity::IdentityPolicy;
 use actix_web::dev::{Payload, ServiceRequest, ServiceResponse};
 use actix_web::{web, Error, FromRequest, HttpRequest};
+use aes::Aes128;
+use block_modes::block_padding::Pkcs7;
+use block_modes::{BlockMode, Cbc};
 use futures::future::{err, ok, Ready};
 use futures::prelude::*;
 
@@ -137,7 +140,6 @@ impl DbIdentityPolicy {
         let conn = &pool.get()?;
 
         let mut session = Session::get(&conn, &session_id)?;
-
         let account = Account::get(conn, &session.account_id)?;
 
         let logged_account = LoggedAccount {
@@ -158,7 +160,7 @@ impl IdentityPolicy for DbIdentityPolicy {
 
     fn from_request(&self, req: &mut ServiceRequest) -> Self::Future {
         // it's safe to unwrap this future here as it should be immediately ready
-        let cookie_data = match self
+        let mut cookie_data = match self
             .cookie_policy
             .from_request(req)
             .now_or_never()
@@ -167,6 +169,18 @@ impl IdentityPolicy for DbIdentityPolicy {
             Ok(val) => val,
             Err(e) => return err(e),
         };
+
+        if cookie_data.is_none() {
+            for pair in req.query_string().split('&') {
+                if let Some((key, value)) = pair.split_once('=') {
+                    if key == "auth_token" {
+                        cookie_data = auth_token_to_session_id(value).ok();
+                        break;
+                    }
+                }
+            }
+        }
+
         match cookie_data {
             // Some(session_id) => self.load_logged_account(req, session_id).map_err(|err| err.actix()),
             Some(session_id) => match self.load_logged_account(req, session_id) {
@@ -268,6 +282,52 @@ impl LoggedAccount {
         let session = Session::get(&conn, &self.session_id)?;
         session.delete(&conn)?;
 
+        Ok(())
+    }
+
+    pub fn create_auth_token(&self) -> ServiceResult<String> {
+        session_id_to_auth_token(&self.session_id)
+    }
+}
+
+fn session_id_to_auth_token(session_id: &str) -> ServiceResult<String> {
+    type Aes128Cbc = Cbc<Aes128, Pkcs7>;
+    let key = hex!("000102030405060708090a0b0c0d0e0f");
+    let iv = hex!("f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff");
+    let cipher = Aes128Cbc::new_from_slices(&key, &iv)?;
+
+    let buffer = session_id.as_bytes();
+    let ciphertext = cipher.encrypt_vec(&buffer);
+
+    Ok(base64::encode(&ciphertext))
+}
+
+fn auth_token_to_session_id(auth_token: &str) -> ServiceResult<String> {
+    type Aes128Cbc = Cbc<Aes128, Pkcs7>;
+    let key = hex!("000102030405060708090a0b0c0d0e0f");
+    let iv = hex!("f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff");
+    let cipher = Aes128Cbc::new_from_slices(&key, &iv)?;
+
+    let ciphertext = base64::decode(auth_token)?;
+    let buffer = cipher.decrypt_vec(&ciphertext)?;
+
+    Ok(String::from_utf8(buffer)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::core::generate_uuid_str;
+
+    use super::*;
+
+    #[test]
+    fn test_auth_token_conversion() -> ServiceResult<()> {
+        let session_id = generate_uuid_str();
+
+        let auth_token = session_id_to_auth_token(&session_id)?;
+        let converted_session_id = auth_token_to_session_id(&auth_token)?;
+
+        assert_eq!(session_id, converted_session_id);
         Ok(())
     }
 }
