@@ -16,7 +16,7 @@ extern crate wallet_pass;
 
 use std::io::Write;
 
-use clap::App;
+use clap::{App, SubCommand};
 use diesel::r2d2::{self, ConnectionManager};
 
 mod api;
@@ -54,17 +54,25 @@ async fn init() -> ServiceResult<()> {
     let manager = ConnectionManager::<DbConnection>::new(env::DATABASE_URL.as_str());
     let pool = r2d2::Pool::builder().build(manager)?;
 
-    let _matches = App::new(crate_name!())
+    let matches = App::new(crate_name!())
         .version(crate_version!())
         .about(crate_description!())
         .author(crate_authors!("\n"))
+        .subcommand(SubCommand::with_name("run").about("Start the web server"))
+        .subcommand(SubCommand::with_name("admin").about("Create a new admin user"))
         .get_matches();
 
-    // Check if admin exists, create otherwise
-    check_admin_user_exisits(&pool).await?;
+    if let Some(_matches) = matches.subcommand_matches("run") {
+        // Setup web server
+        start_server(pool).await?;
+        return Ok(());
+    }
 
-    // Setup web server
-    start_server(pool).await?;
+    if let Some(_matches) = matches.subcommand_matches("admin") {
+        // Check if admin exists, create otherwise
+        create_admin_user(&pool).await?;
+        return Ok(());
+    }
 
     Ok(())
 }
@@ -95,27 +103,19 @@ fn read_value(prompt: &str, hide_input: bool) -> String {
     }
 }
 
-/// Check if a initial user exists. Otherwise create a new one
-async fn check_admin_user_exisits(pool: &Pool) -> ServiceResult<()> {
-    let conn = &pool.get().unwrap();
+async fn create_admin_user(pool: &Pool) -> ServiceResult<()> {
+    let conn = &pool.get()?;
 
-    let admin_with_password_exists = Account::all(&conn)?
-        .iter()
-        .filter(|a| a.permission.is_admin())
-        .any(|a| authentication_password::has_password(&conn, a).unwrap_or(false));
+    let fullname = read_value("Fullname: ", false);
+    let username = read_value("Username: ", false);
+    let password = read_value("Password: ", true);
 
-    if !admin_with_password_exists {
-        println!("You seem to have started the server on an empty database. We'll now create the initial superuser.");
+    let mut account = Account::create(&conn, &fullname, Permission::ADMIN)?;
+    account.username = Some(username.clone());
+    account.update(&conn)?;
+    authentication_password::register(&conn, &account, &password)?;
 
-        let fullname = read_value("Fullname: ", false);
-        let username = read_value("Username: ", false);
-        let password = read_value("Password: ", true);
-
-        let mut account = Account::create(&conn, &fullname, Permission::ADMIN)?;
-        account.username = Some(username);
-        account.update(&conn)?;
-        authentication_password::register(&conn, &account, &password)?;
-    }
+    println!("Admin user '{}' was successfully created!", username);
 
     Ok(())
 }

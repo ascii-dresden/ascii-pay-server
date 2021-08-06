@@ -31,7 +31,7 @@ impl APNS {
         let pkcs = Pkcs12::from_der(&pkcs12_buffer)?
             .parse(&env::APPLE_WALLET_PASS_CERTIFICATE_PASSWORD.as_str())?;
 
-        let mut builder = X509StoreBuilder::new().unwrap();
+        let mut builder = X509StoreBuilder::new()?;
         builder.add_cert(load_x509(env::APPLE_WALLET_APNS_CERTIFICATE.as_str())?)?;
         let store = builder.build();
 

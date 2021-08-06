@@ -145,7 +145,7 @@ pub fn get_pass_updated_at(conn: &DbConnection, serial_number: &Uuid) -> Service
         return Err(ServiceError::NotFound);
     }
 
-    Ok(results.pop().unwrap().updated_at)
+    Ok(results.pop().ok_or(ServiceError::NoneError)?.updated_at)
 }
 
 pub fn get_by_qr_code(conn: &DbConnection, qr_code: &str) -> ServiceResult<Uuid> {
@@ -158,7 +158,7 @@ pub fn get_by_qr_code(conn: &DbConnection, qr_code: &str) -> ServiceResult<Uuid>
         return Err(ServiceError::NotFound);
     }
 
-    Ok(results.pop().unwrap().serial_number)
+    Ok(results.pop().ok_or(ServiceError::NoneError)?.serial_number)
 }
 
 pub fn create_pass(conn: &DbConnection, account: &Account) -> ServiceResult<Vec<u8>> {
@@ -194,7 +194,7 @@ pub fn create_pass(conn: &DbConnection, account: &Account) -> ServiceResult<Vec<
                 .execute(conn)?;
             db_pass
         }
-        1 => results.pop().unwrap(),
+        1 => results.pop().ok_or(ServiceError::NoneError)?,
         _ => {
             return Err(ServiceError::NotFound);
         }

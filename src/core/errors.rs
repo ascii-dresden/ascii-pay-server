@@ -27,6 +27,9 @@ pub enum ServiceError {
 
     #[display(fmt = "Error sending mail: {}", _0)]
     MailError(LettreError),
+
+    #[display(fmt = "Cannot access none reference")]
+    NoneError,
 }
 
 impl ServiceError {
@@ -188,11 +191,18 @@ impl ResponseError for ServiceError {
                     "cause": cause
                 }))
             }
-            ServiceError::NotFound => HttpResponse::NotFound().json("NotFound"),
-            ServiceError::Unauthorized => HttpResponse::Unauthorized().json("Unauthorized"),
-            ServiceError::InsufficientPrivileges => {
-                HttpResponse::Unauthorized().json("Insufficient Privileges")
-            }
+            ServiceError::NotFound => HttpResponse::NotFound().json(json!({
+                "message": "Not found"
+            })),
+            ServiceError::NoneError => HttpResponse::InternalServerError().json(json!({
+                "message": "None type error"
+            })),
+            ServiceError::Unauthorized => HttpResponse::Unauthorized().json(json!({
+                "message": "Unauthorized"
+            })),
+            ServiceError::InsufficientPrivileges => HttpResponse::Unauthorized().json(json!({
+                "message": "Insufficient privileges"
+            })),
             ServiceError::MailError(ref mail_err) => {
                 HttpResponse::InternalServerError().json(json!({
                     "message": "An error occured when trying to send an email.",

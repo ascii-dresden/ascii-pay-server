@@ -348,7 +348,7 @@ async fn save_file(
 
         // Field in turn is stream of *Bytes* object
         while let Some(chunk) = field.next().await {
-            let data = chunk.unwrap();
+            let data = chunk?;
             let mut pos = 0;
             while pos < data.len() {
                 let bytes_written = file.write(&data[pos..])?;
