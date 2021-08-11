@@ -13,16 +13,23 @@ extern crate uuid;
 extern crate hex_literal;
 extern crate rpassword;
 extern crate wallet_pass;
+#[macro_use]
+extern crate async_graphql;
 
 use std::io::Write;
 
 use clap::{App, SubCommand};
 use diesel::r2d2::{self, ConnectionManager};
 
-mod api;
+// Internal services
 mod core;
 mod identity_policy;
 mod server;
+
+// Api endpoints
+mod api;
+
+// Frontend
 mod web;
 
 use crate::core::{

@@ -4,6 +4,7 @@ use chrono::NaiveDateTime;
 use handlebars::{Context, Handlebars, Helper, Output, RenderContext, RenderError};
 
 use crate::api as module_api;
+use crate::api::graphql;
 use crate::core::{env, Pool, ServiceResult};
 use crate::identity_policy::DbIdentityPolicy;
 use crate::web as module_web;
@@ -62,14 +63,21 @@ pub async fn start_server(pool: Pool) -> ServiceResult<()> {
     // Move handlebars reference to actix
     let handlebars_ref = web::Data::new(handlebars);
 
+    let schema = graphql::create_schema_with_context(pool.clone());
+
     HttpServer::new(move || {
         App::new()
             // Move database pool
             .data(pool.clone())
+            .data(schema.clone())
             // Set handlebars reference
             .app_data(handlebars_ref.clone())
-            // Logger
-            .wrap(middleware::Logger::default())
+            // Enable request/response compression support
+            .wrap(middleware::Compress::default())
+            // Enable logger
+            .wrap(middleware::Logger::new(
+                r#"%s: "%r" %b "%{Referer}i" "%{User-Agent}i" %T"#,
+            ))
             // Set identity service for encrypted cookies
             .wrap(IdentityService::new(DbIdentityPolicy::new()))
             // Register api module
@@ -77,6 +85,7 @@ pub async fn start_server(pool: Pool) -> ServiceResult<()> {
             // Register admin ui module
             .configure(module_web::init)
     })
+    .keep_alive(60)
     .bind(address)?
     .run()
     .await?;

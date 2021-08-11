@@ -8,7 +8,7 @@ pub const AUTH_COOKIE_NAME: &str = "auth";
 /// Represent errors in the application
 ///
 /// All `ServiceError`s can be transformed to http errors.
-#[derive(Debug, Display)]
+#[derive(Debug, Display, Clone)]
 pub enum ServiceError {
     #[display(fmt = "Bad Request: '{}'\n{}", _0, _1)]
     BadRequest(&'static str, String),
@@ -26,7 +26,7 @@ pub enum ServiceError {
     InsufficientPrivileges,
 
     #[display(fmt = "Error sending mail: {}", _0)]
-    MailError(LettreError),
+    MailError(String),
 
     #[display(fmt = "Cannot access none reference")]
     NoneError,
@@ -83,6 +83,12 @@ impl From<actix_multipart::MultipartError> for ServiceError {
     }
 }
 
+impl From<actix_http::Error> for ServiceError {
+    fn from(error: actix_http::Error) -> Self {
+        ServiceError::InternalServerError("Http error", format!("{}", error))
+    }
+}
+
 impl From<base64::DecodeError> for ServiceError {
     fn from(error: base64::DecodeError) -> Self {
         ServiceError::InternalServerError("Base64 error", format!("{}", error))
@@ -109,7 +115,7 @@ impl From<block_modes::BlockModeError> for ServiceError {
 
 impl From<LettreError> for ServiceError {
     fn from(error: LettreError) -> Self {
-        ServiceError::MailError(error)
+        ServiceError::MailError(error.to_string())
     }
 }
 
@@ -164,6 +170,12 @@ impl From<std::str::Utf8Error> for ServiceError {
     }
 }
 
+impl From<async_graphql::Error> for ServiceError {
+    fn from(error: async_graphql::Error) -> Self {
+        ServiceError::InternalServerError("GraphQL error", format!("{:?}", error))
+    }
+}
+
 /*
 /// nightly - allow `?` on Option<T> to unwrap
 impl From<std::option::NoneError> for ServiceError {
@@ -206,7 +218,7 @@ impl ResponseError for ServiceError {
             ServiceError::MailError(ref mail_err) => {
                 HttpResponse::InternalServerError().json(json!({
                     "message": "An error occured when trying to send an email.",
-                    "cause": format!("{}", mail_err)
+                    "cause": mail_err.to_string()
                 }))
             }
         }
