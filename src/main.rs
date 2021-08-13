@@ -1,6 +1,8 @@
 #[macro_use]
 extern crate diesel;
 #[macro_use]
+extern crate diesel_migrations;
+#[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
@@ -23,7 +25,7 @@ use diesel::r2d2::{self, ConnectionManager};
 
 // Internal services
 mod core;
-mod identity_policy;
+mod identity_service;
 mod server;
 
 // Api endpoints
@@ -36,6 +38,8 @@ use crate::core::{
     authentication_password, env, Account, DbConnection, Permission, Pool, ServiceResult,
 };
 use server::start_server;
+
+embed_migrations!();
 
 #[actix_web::main]
 async fn main() {
@@ -60,6 +64,9 @@ async fn init() -> ServiceResult<()> {
     // Setup database connection
     let manager = ConnectionManager::<DbConnection>::new(env::DATABASE_URL.as_str());
     let pool = r2d2::Pool::builder().build(manager)?;
+
+    let conn = pool.get()?;
+    embedded_migrations::run_with_output(&conn, &mut std::io::stdout())?;
 
     let matches = App::new(crate_name!())
         .version(crate_version!())

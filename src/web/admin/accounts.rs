@@ -2,8 +2,7 @@ use crate::core::{
     authentication_barcode, authentication_nfc, authentication_password, fuzzy_vec_match, Account,
     Money, Permission, Pool, ServiceError, ServiceResult,
 };
-use crate::identity_policy::{Action, RetrievedAccount};
-use crate::login_required;
+use crate::identity_service::Identity;
 use crate::web::utils::{EmptyToNone, HbData, IsJson, Search};
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
@@ -100,12 +99,15 @@ impl SearchAccount {
 pub async fn get_accounts(
     pool: web::Data<Pool>,
     hb: web::Data<Handlebars<'_>>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     query: web::Query<Search>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let action = request.redirect_type();
-    let logged_account = login_required!(logged_account, Permission::MEMBER, action);
+    let account = if request.is_json() {
+        identity.require_account(Permission::MEMBER)?
+    } else {
+        identity.require_account_with_redirect(Permission::MEMBER)?
+    };
 
     let conn = &pool.get()?;
 
@@ -124,7 +126,7 @@ pub async fn get_accounts(
         Ok(HttpResponse::Ok().json(search_accounts))
     } else {
         let body = HbData::new(&request)
-            .with_account(logged_account)
+            .with_account(account)
             .with_data("search", &search)
             .with_data("accounts", &search_accounts)
             .render(&hb, "admin_account_list")?;
@@ -137,11 +139,15 @@ pub async fn get_accounts(
 pub async fn get_account_edit(
     pool: web::Data<Pool>,
     hb: web::Data<Handlebars<'_>>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     account_id: web::Path<String>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    let identity_account = if request.is_json() {
+        identity.require_account(Permission::MEMBER)?
+    } else {
+        identity.require_account_with_redirect(Permission::MEMBER)?
+    };
 
     let conn = &pool.get()?;
 
@@ -242,7 +248,7 @@ pub async fn get_account_edit(
     }
 
     let body = HbData::new(&request)
-        .with_account(logged_account)
+        .with_account(identity_account)
         .with_data("account", &account)
         .with_data("authentication_methods", &authentication_methods)
         .with_data("has_mail_address", &has_mail_address)
@@ -254,11 +260,11 @@ pub async fn get_account_edit(
 /// POST route for `/admin/account/{account_id}`
 pub async fn post_account_edit(
     pool: web::Data<Pool>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     account: web::Form<FormAccount>,
     account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::MEMBER)?;
 
     if *account_id != account.id {
         return Err(ServiceError::BadRequest(
@@ -322,13 +328,13 @@ pub async fn post_account_edit(
 /// GET route for `/admin/account/create`
 pub async fn get_account_create(
     hb: web::Data<Handlebars<'_>>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    let identity_account = identity.require_account_with_redirect(Permission::MEMBER)?;
 
     let body = HbData::new(&request)
-        .with_account(logged_account)
+        .with_account(identity_account)
         .render(&hb, "admin_account_create")?;
 
     Ok(HttpResponse::Ok().body(body))
@@ -337,10 +343,10 @@ pub async fn get_account_create(
 /// POST route for `/admin/account/create`
 pub async fn post_account_create(
     pool: web::Data<Pool>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     account: web::Form<FormAccount>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::MEMBER)?;
 
     let conn = &pool.get()?;
 
@@ -364,10 +370,10 @@ pub async fn post_account_create(
 /// GET route for `/admin/account/invite/{account_id}`
 pub async fn invite_get(
     pool: web::Data<Pool>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::MEMBER)?;
 
     let conn = &pool.get()?;
 
@@ -385,10 +391,10 @@ pub async fn invite_get(
 /// GET route for `/admin/account/revoke/{account_id}`
 pub async fn revoke_get(
     pool: web::Data<Pool>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::MEMBER)?;
 
     let conn = &pool.get()?;
 
@@ -407,10 +413,10 @@ pub async fn revoke_get(
 /// GET route for `/admin/account/remove-nfc/{account_id}`
 pub async fn remove_nfc_get(
     pool: web::Data<Pool>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::MEMBER)?;
 
     let conn = &pool.get()?;
 
@@ -428,10 +434,10 @@ pub async fn remove_nfc_get(
 /// GET route for `/admin/account/remove-nfc/{account_id}`
 pub async fn remove_barcode_get(
     pool: web::Data<Pool>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::MEMBER)?;
 
     let conn = &pool.get()?;
 
@@ -449,10 +455,10 @@ pub async fn remove_barcode_get(
 /// GET route for `/admin/account/delete/{account_id}`
 pub async fn delete_get(
     _hb: web::Data<Handlebars<'_>>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     _account_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::MEMBER)?;
 
     println!("Delete is not supported!");
 

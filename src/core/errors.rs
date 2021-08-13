@@ -3,8 +3,6 @@ use actix_web::{error::ResponseError, Error as ActixError, HttpResponse};
 use derive_more::Display;
 use lettre::smtp::error::Error as LettreError;
 
-pub const AUTH_COOKIE_NAME: &str = "auth";
-
 /// Represent errors in the application
 ///
 /// All `ServiceError`s can be transformed to http errors.
@@ -30,6 +28,9 @@ pub enum ServiceError {
 
     #[display(fmt = "Cannot access none reference")]
     NoneError,
+
+    #[display(fmt = "Request should be redirected to: {}". _0)]
+    Redirect(String),
 }
 
 impl ServiceError {
@@ -43,6 +44,12 @@ pub type ServiceResult<T> = Result<T, ServiceError>;
 
 impl From<diesel::result::Error> for ServiceError {
     fn from(error: diesel::result::Error) -> Self {
+        ServiceError::InternalServerError("Database error", format!("{}", error))
+    }
+}
+
+impl From<diesel_migrations::RunMigrationsError> for ServiceError {
+    fn from(error: diesel_migrations::RunMigrationsError) -> Self {
         ServiceError::InternalServerError("Database error", format!("{}", error))
     }
 }
@@ -176,6 +183,12 @@ impl From<async_graphql::Error> for ServiceError {
     }
 }
 
+impl From<http::Error> for ServiceError {
+    fn from(error: http::Error) -> Self {
+        ServiceError::InternalServerError("Http error", format!("{:?}", error))
+    }
+}
+
 /*
 /// nightly - allow `?` on Option<T> to unwrap
 impl From<std::option::NoneError> for ServiceError {
@@ -212,8 +225,8 @@ impl ResponseError for ServiceError {
             ServiceError::Unauthorized => HttpResponse::Unauthorized().json(json!({
                 "message": "Unauthorized"
             })),
-            ServiceError::InsufficientPrivileges => HttpResponse::Unauthorized().json(json!({
-                "message": "Insufficient privileges"
+            ServiceError::InsufficientPrivileges => HttpResponse::Forbidden().json(json!({
+                "message": "Forbidden"
             })),
             ServiceError::MailError(ref mail_err) => {
                 HttpResponse::InternalServerError().json(json!({
@@ -221,6 +234,9 @@ impl ResponseError for ServiceError {
                     "cause": mail_err.to_string()
                 }))
             }
+            ServiceError::Redirect(ref url) => HttpResponse::Found()
+                .set_header(actix_web::http::header::LOCATION, url.as_str())
+                .finish(),
         }
     }
 }

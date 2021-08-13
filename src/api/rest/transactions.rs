@@ -1,51 +1,15 @@
-use crate::client_cert_required;
-use crate::core::{
-    authentication_barcode, authentication_nfc, generate_uuid, transactions, Account, DbConnection,
-    Pool, Product, ServiceError, ServiceResult, Session, Transaction,
+use crate::{
+    core::{
+        authentication_barcode, authentication_nfc, transactions, Account, Pool, Product,
+        ServiceError, ServiceResult, Session, Transaction,
+    },
+    identity_service::Identity,
+    web::utils::{create_token_from_obj, parse_obj_from_token},
 };
-use crate::identity_policy::Action;
 
-use actix_web::{web, HttpRequest, HttpResponse};
+use actix_web::{web, HttpResponse};
 use std::collections::HashMap;
 use uuid::Uuid;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Token {
-    pub id: Uuid,
-    pub amount: i32,
-    pub account_id: Uuid,
-}
-impl Token {
-    pub fn new(conn: &DbConnection, account: &Account, amount: i32) -> ServiceResult<Token> {
-        let token = Token {
-            id: generate_uuid(),
-            amount,
-            account_id: account.id,
-        };
-
-        Session::register(conn, &account.id, &token.to_string()?)?;
-
-        Ok(token)
-    }
-
-    pub fn to_string(&self) -> ServiceResult<String> {
-        let s = serde_json::to_string(&self)?;
-        Ok(base64::encode(&s.as_bytes()))
-    }
-
-    pub fn from_str(s: &str) -> ServiceResult<Self> {
-        let s = base64::decode(s)?;
-        let s = String::from_utf8(s)?;
-        Ok(serde_json::from_str(&s)?)
-    }
-
-    pub fn parse(conn: &DbConnection, s: &str) -> ServiceResult<Self> {
-        let session = Session::get(&conn, s)?;
-        session.delete(&conn)?;
-
-        Self::from_str(s)
-    }
-}
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
@@ -99,26 +63,34 @@ pub struct PaymentResponse {
 
 /// POST route for `/api/v1/transaction/token`
 pub async fn post_transaction_token(
+    identity: Identity,
     pool: web::Data<Pool>,
     token_request: web::Json<TokenRequest>,
-    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    client_cert_required!(request, Action::FORBIDDEN);
-
+    identity.require_cert()?;
     let conn = &pool.get()?;
 
     let result = match &token_request.method {
         Authentication::Barcode { code } => {
             let account = authentication_barcode::get(&conn, &code)?;
+
             TokenResponse::Authorized {
-                token: Token::new(&conn, &account, token_request.amount)?.to_string()?,
+                token: create_token_from_obj(&Session::create_transaction(
+                    &conn,
+                    &account.id,
+                    token_request.amount,
+                )?)?,
             }
         }
         Authentication::Nfc { id } => {
             let result = authentication_nfc::get(&conn, &id)?;
             match result {
                 authentication_nfc::NfcResult::Ok { account } => TokenResponse::Authorized {
-                    token: Token::new(&conn, &account, token_request.amount)?.to_string()?,
+                    token: create_token_from_obj(&Session::create_transaction(
+                        &conn,
+                        &account.id,
+                        token_request.amount,
+                    )?)?,
                 },
                 authentication_nfc::NfcResult::AuthenticationRequested { key, challenge } => {
                     TokenResponse::AuthenticationNeeded {
@@ -140,7 +112,11 @@ pub async fn post_transaction_token(
             let account =
                 authentication_nfc::get_challenge_response(&conn, &id, &challenge, &response)?;
             TokenResponse::Authorized {
-                token: Token::new(&conn, &account, token_request.amount)?.to_string()?,
+                token: create_token_from_obj(&Session::create_transaction(
+                    &conn,
+                    &account.id,
+                    token_request.amount,
+                )?)?,
             }
         }
     };
@@ -150,19 +126,23 @@ pub async fn post_transaction_token(
 
 /// POST route for `/api/v1/transaction/payment`
 pub async fn post_transaction_payment(
+    identity: Identity,
     pool: web::Data<Pool>,
     payment_request: web::Json<PaymentRequest>,
-    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    client_cert_required!(request, Action::FORBIDDEN);
-
+    identity.require_cert()?;
     let conn = &pool.get()?;
 
-    let token = Token::parse(&conn, &payment_request.token)?;
+    let request_token: Session = parse_obj_from_token(&payment_request.token)?;
+    let session = Session::get(&conn, &request_token.id)?;
+    let transaction_total = if let Some(transaction_total) = session.transaction_total {
+        transaction_total
+    } else {
+        return Err(ServiceError::Unauthorized);
+    };
+    let mut account = Account::get(&conn, &session.account_id)?;
 
-    let mut account = Account::get(&conn, &token.account_id)?;
-
-    if payment_request.amount != token.amount {
+    if payment_request.amount != transaction_total {
         return Err(ServiceError::Unauthorized);
     }
 

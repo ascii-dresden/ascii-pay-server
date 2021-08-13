@@ -1,8 +1,7 @@
 use crate::core::{
     fuzzy_vec_match, Category, Money, Permission, Pool, ServiceError, ServiceResult,
 };
-use crate::identity_policy::{Action, RetrievedAccount};
-use crate::login_required;
+use crate::identity_service::Identity;
 use crate::web::utils::{HbData, IsJson, Search};
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use chrono::NaiveDateTime;
@@ -61,13 +60,16 @@ impl SearchCategory {
 /// GET route for `/admin/categories`
 pub async fn get_categories(
     hb: web::Data<Handlebars<'_>>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     pool: web::Data<Pool>,
     query: web::Query<Search>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let action = request.redirect_type();
-    let logged_account = login_required!(logged_account, Permission::MEMBER, action);
+    let account = if request.is_json() {
+        identity.require_account(Permission::MEMBER)?
+    } else {
+        identity.require_account_with_redirect(Permission::MEMBER)?
+    };
 
     let conn = &pool.get()?;
 
@@ -86,7 +88,7 @@ pub async fn get_categories(
         Ok(HttpResponse::Ok().json(search_categories))
     } else {
         let body = HbData::new(&request)
-            .with_account(logged_account)
+            .with_account(account)
             .with_data("search", &search)
             .with_data("categories", &search_categories)
             .render(&hb, "admin_category_list")?;
@@ -98,19 +100,19 @@ pub async fn get_categories(
 /// GET route for `/admin/category/{category_id}`
 pub async fn get_category_edit(
     hb: web::Data<Handlebars<'_>>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     pool: web::Data<Pool>,
     category_id: web::Path<String>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    let identity_account = identity.require_account_with_redirect(Permission::MEMBER)?;
 
     let conn = &pool.get()?;
 
     let category = Category::get(&conn, &Uuid::parse_str(&category_id)?)?;
 
     let body = HbData::new(&request)
-        .with_account(logged_account)
+        .with_account(identity_account)
         .with_data("category", &category)
         .render(&hb, "admin_category_edit")?;
 
@@ -119,12 +121,12 @@ pub async fn get_category_edit(
 
 /// POST route for `/admin/category/{category_id}`
 pub async fn post_category_edit(
-    logged_account: RetrievedAccount,
+    identity: Identity,
     pool: web::Data<Pool>,
     category: web::Form<FormCategory>,
     category_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::MEMBER)?;
 
     if *category_id != category.id {
         return Err(ServiceError::BadRequest(
@@ -169,13 +171,13 @@ pub async fn post_category_edit(
 /// GET route for `/admin/category/create`
 pub async fn get_category_create(
     hb: web::Data<Handlebars<'_>>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    let identity_account = identity.require_account_with_redirect(Permission::MEMBER)?;
 
     let body = HbData::new(&request)
-        .with_account(logged_account)
+        .with_account(identity_account)
         .render(&hb, "admin_category_create")?;
 
     Ok(HttpResponse::Ok().body(body))
@@ -183,11 +185,11 @@ pub async fn get_category_create(
 
 /// POST route for `/admin/category/create`
 pub async fn post_category_create(
-    logged_account: RetrievedAccount,
+    identity: Identity,
     pool: web::Data<Pool>,
     category: web::Form<FormCategory>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::MEMBER)?;
 
     let conn = &pool.get()?;
 
@@ -212,10 +214,10 @@ pub async fn post_category_create(
 /// GET route for `/admin/category/delete/{category_id}`
 pub async fn get_category_delete(
     _hb: web::Data<Handlebars<'_>>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     _category_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::MEMBER)?;
 
     println!("Delete is not supported!");
 

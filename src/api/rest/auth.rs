@@ -1,6 +1,7 @@
-use crate::core::{authentication_password, Pool, ServiceResult};
-use crate::identity_policy::{LoggedAccount, RetrievedAccount};
-use actix_identity::Identity;
+use crate::{
+    core::{authentication_password, Permission, Pool, ServiceResult},
+    identity_service::Identity,
+};
 use actix_web::{web, HttpResponse};
 
 #[derive(Serialize, Deserialize)]
@@ -10,19 +11,15 @@ pub struct LoginForm {
 }
 
 /// GET route for `/api/v1/auth`
-pub async fn get_auth(logged_account: RetrievedAccount) -> ServiceResult<HttpResponse> {
-    match logged_account {
-        RetrievedAccount::Acc(logged_account) => {
-            Ok(HttpResponse::Ok().json(logged_account.account))
-        }
-        RetrievedAccount::Nothing => Ok(HttpResponse::Unauthorized().finish()),
-    }
+pub async fn get_auth(identity: Identity) -> ServiceResult<HttpResponse> {
+    let identity_account = identity.require_account(Permission::DEFAULT)?;
+    Ok(HttpResponse::Ok().json(identity_account))
 }
 
 /// POST route for `/api/v1/auth`
 pub async fn post_auth(
+    identity: Identity,
     pool: web::Data<Pool>,
-    id: Identity,
     params: web::Json<LoginForm>,
 ) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
@@ -30,7 +27,7 @@ pub async fn post_auth(
     let login_result = authentication_password::get(conn, &params.username, &params.password);
     match login_result {
         Ok(account) => {
-            LoggedAccount::new(&conn, account)?.save(id)?;
+            identity.store(&conn, &account.id)?;
 
             Ok(HttpResponse::Ok().finish())
         }
@@ -39,17 +36,10 @@ pub async fn post_auth(
 }
 
 /// DELETE route for `/api/v1/auth`
-pub async fn delete_auth(
-    pool: web::Data<Pool>,
-    logged_account: RetrievedAccount,
-    id: Identity,
-) -> ServiceResult<HttpResponse> {
+pub async fn delete_auth(identity: Identity, pool: web::Data<Pool>) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
 
-    // TODO: Check implications of this -> any cleanup needed?
-    if let RetrievedAccount::Acc(acc) = logged_account {
-        acc.forget(conn, id)?;
-    }
+    identity.forget(&conn)?;
 
     Ok(HttpResponse::Ok().finish())
 }

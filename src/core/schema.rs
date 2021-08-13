@@ -90,13 +90,7 @@ table! {
         name -> Varchar,
         category -> Nullable<Uuid>,
         image -> Nullable<Varchar>,
-    }
-}
-
-table! {
-    product_barcode (product_id) {
-        product_id -> Uuid,
-        code -> Varchar,
+        barcode -> Nullable<Varchar>,
     }
 }
 
@@ -110,9 +104,10 @@ table! {
 
 table! {
     session (id) {
-        id -> Varchar,
+        id -> Uuid,
         account_id -> Uuid,
         valid_until -> Timestamp,
+        transaction_total -> Nullable<Int4>,
     }
 }
 
@@ -148,7 +143,6 @@ allow_tables_to_appear_in_same_query!(
     category,
     category_price,
     product,
-    product_barcode,
     product_price,
     session,
     transaction,

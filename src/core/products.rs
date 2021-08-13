@@ -4,7 +4,6 @@ use std::fs::{self, File};
 use std::path::Path;
 use uuid::Uuid;
 
-use crate::core::schema::product_barcode;
 use crate::core::{
     env, generate_uuid, Category, DbConnection, Money, Price, ServiceError, ServiceResult, DB,
 };
@@ -22,14 +21,6 @@ pub struct Product {
     pub barcode: Option<String>,
 }
 
-#[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset, Clone)]
-#[table_name = "product_barcode"]
-#[primary_key("product_id")]
-struct ProductBarcode {
-    product_id: Uuid,
-    code: String,
-}
-
 /// Custom db loader for `Product`
 ///
 /// Ignore price vec
@@ -40,11 +31,12 @@ impl
             diesel::sql_types::Text,
             diesel::sql_types::Nullable<diesel::sql_types::Uuid>,
             diesel::sql_types::Nullable<diesel::sql_types::Text>,
+            diesel::sql_types::Nullable<diesel::sql_types::Text>,
         ),
         DB,
     > for Product
 {
-    type Row = (Uuid, String, Option<Uuid>, Option<String>);
+    type Row = (Uuid, String, Option<Uuid>, Option<String>, Option<String>);
 
     fn build(row: Self::Row) -> Self {
         let category = row.2.map(|id| Category {
@@ -61,7 +53,7 @@ impl
             image: row.3,
             prices: vec![],
             current_price: None,
-            barcode: None,
+            barcode: row.4,
         }
     }
 }
@@ -110,31 +102,12 @@ impl Product {
             .map(|category| category.id.to_owned());
 
         diesel::update(dsl::product.find(&self.id))
-            .set((dsl::name.eq(&self.name), dsl::category.eq(&category)))
+            .set((
+                dsl::name.eq(&self.name),
+                dsl::category.eq(&category),
+                dsl::barcode.eq(&self.barcode),
+            ))
             .execute(conn)?;
-
-        match &self.barcode {
-            Some(barcode) => {
-                use crate::core::schema::product_barcode::dsl;
-
-                let help = ProductBarcode {
-                    product_id: self.id,
-                    code: barcode.clone(),
-                };
-
-                diesel::insert_into(dsl::product_barcode)
-                    .values(&help)
-                    .on_conflict(dsl::product_id)
-                    .do_update()
-                    .set(&help)
-                    .execute(conn)?;
-            }
-            None => {
-                use crate::core::schema::product_barcode::dsl;
-                diesel::delete(dsl::product_barcode.filter(dsl::product_id.eq(&self.id)))
-                    .execute(conn)?;
-            }
-        }
 
         Ok(())
     }
@@ -239,17 +212,6 @@ impl Product {
         Ok(())
     }
 
-    fn load_barcode(&mut self, conn: &DbConnection) -> ServiceResult<()> {
-        use crate::core::schema::product_barcode::dsl;
-        let mut results = dsl::product_barcode
-            .filter(dsl::product_id.eq(&self.id))
-            .load::<ProductBarcode>(conn)?;
-
-        self.barcode = results.pop().map(|x| x.code);
-
-        Ok(())
-    }
-
     /// Load the prices for this product
     ///
     /// This updates the `prices` vec and the `current_price`
@@ -338,7 +300,6 @@ impl Product {
         for p in &mut results {
             p.load_category(conn)?;
             p.load_prices(conn)?;
-            p.load_barcode(conn)?;
         }
 
         Ok(results)
@@ -354,20 +315,22 @@ impl Product {
 
         p.load_category(conn)?;
         p.load_prices(conn)?;
-        p.load_barcode(conn)?;
 
         Ok(p)
     }
+    /// Get a product by the `id`
+    pub fn get_by_barcode(conn: &DbConnection, barcode: &str) -> ServiceResult<Product> {
+        use crate::core::schema::product::dsl;
 
-    pub fn get_by_barcode(conn: &DbConnection, code: &str) -> ServiceResult<Product> {
-        use crate::core::schema::product_barcode::dsl;
+        let mut results = dsl::product
+            .filter(dsl::barcode.eq(barcode))
+            .load::<Product>(conn)?;
 
-        let mut results = dsl::product_barcode
-            .filter(dsl::code.eq(code))
-            .load::<ProductBarcode>(conn)?;
+        let mut p = results.pop().ok_or(ServiceError::NotFound)?;
 
-        let p = results.pop().ok_or(ServiceError::NotFound)?;
+        p.load_category(conn)?;
+        p.load_prices(conn)?;
 
-        Self::get(conn, &p.product_id)
+        Ok(p)
     }
 }

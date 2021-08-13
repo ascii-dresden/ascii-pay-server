@@ -1,7 +1,6 @@
 use crate::core::{authentication_password, Pool, ServiceResult};
-use crate::identity_policy::{LoggedAccount, RetrievedAccount};
+use crate::identity_service::Identity;
 use crate::web::utils::HbData;
-use actix_identity::Identity;
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
 
@@ -32,7 +31,7 @@ pub async fn get_login(
 /// POST route for `/login`
 pub async fn post_login(
     pool: web::Data<Pool>,
-    id: Identity,
+    identity: Identity,
     params: web::Form<LoginForm>,
 ) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
@@ -40,7 +39,7 @@ pub async fn post_login(
     let login_result = authentication_password::get(conn, &params.username, &params.password);
     match login_result {
         Ok(account) => {
-            LoggedAccount::new(&conn, account)?.save(id)?;
+            identity.store(&conn, &account.id)?;
 
             Ok(HttpResponse::Found()
                 .header(http::header::LOCATION, "/")
@@ -53,17 +52,10 @@ pub async fn post_login(
 }
 
 /// GET route for `/logout`
-pub async fn get_logout(
-    pool: web::Data<Pool>,
-    logged_account: RetrievedAccount,
-    id: Identity,
-) -> ServiceResult<HttpResponse> {
+pub async fn get_logout(pool: web::Data<Pool>, identity: Identity) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
 
-    // TODO: Check implications of this -> any cleanup needed?
-    if let RetrievedAccount::Acc(acc) = logged_account {
-        acc.forget(conn, id)?;
-    }
+    identity.forget(&conn)?;
 
     Ok(HttpResponse::Found()
         .header(http::header::LOCATION, "/")

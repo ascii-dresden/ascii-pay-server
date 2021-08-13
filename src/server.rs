@@ -1,4 +1,3 @@
-use actix_identity::IdentityService;
 use actix_web::{middleware, web, App, HttpServer};
 use chrono::NaiveDateTime;
 use handlebars::{Context, Handlebars, Helper, Output, RenderContext, RenderError};
@@ -6,7 +5,7 @@ use handlebars::{Context, Handlebars, Helper, Output, RenderContext, RenderError
 use crate::api as module_api;
 use crate::api::graphql;
 use crate::core::{env, Pool, ServiceResult};
-use crate::identity_policy::DbIdentityPolicy;
+use crate::identity_service::IdentityService;
 use crate::web as module_web;
 
 /// Helper function for handlebars. Converts cents to euros
@@ -79,7 +78,7 @@ pub async fn start_server(pool: Pool) -> ServiceResult<()> {
                 r#"%s: "%r" %b "%{Referer}i" "%{User-Agent}i" %T"#,
             ))
             // Set identity service for encrypted cookies
-            .wrap(IdentityService::new(DbIdentityPolicy::new()))
+            .wrap(IdentityService::new())
             // Register api module
             .configure(module_api::init)
             // Register admin ui module

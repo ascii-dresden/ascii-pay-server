@@ -1,11 +1,10 @@
-use crate::client_cert_required;
 use crate::core::authentication_nfc::NfcResult;
 use crate::core::{
     authentication_barcode, authentication_nfc, wallet, Account, Pool, Product, ServiceResult,
 };
-use crate::identity_policy::Action;
+use crate::identity_service::Identity;
 
-use actix_web::{web, HttpRequest, HttpResponse};
+use actix_web::{web, HttpResponse};
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
@@ -48,11 +47,11 @@ pub enum IdentificationResponse {
 
 /// POST route for `/api/v1/identify`
 pub async fn post_identify(
+    identity: Identity,
     pool: web::Data<Pool>,
     identification_request: web::Json<IdentificationRequest>,
-    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    client_cert_required!(request, Action::FORBIDDEN);
+    identity.require_cert()?;
 
     let conn = &pool.get()?;
     let identification_request = identification_request.into_inner();

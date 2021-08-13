@@ -1,24 +1,17 @@
 use crate::core::{Category, Permission, Pool, ServiceError, ServiceResult};
-use crate::identity_policy::{Action, RetrievedAccount};
-use crate::login_or_client_cert_required;
+use crate::identity_service::Identity;
 use crate::web::admin::categories::SearchCategory;
 use crate::web::utils::Search;
-use actix_web::{web, HttpRequest, HttpResponse};
+use actix_web::{web, HttpResponse};
 use uuid::Uuid;
 
 /// GET route for `/api/v1/categories`
 pub async fn get_categories(
     pool: web::Data<Pool>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     query: web::Query<Search>,
-    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_or_client_cert_required!(
-        request,
-        logged_account,
-        Permission::MEMBER,
-        Action::FORBIDDEN
-    );
+    identity.require_account_or_cert(Permission::MEMBER)?;
 
     let conn = &pool.get()?;
 
@@ -38,17 +31,11 @@ pub async fn get_categories(
 
 /// PUT route for `/api/v1/categories`
 pub async fn put_categories(
-    logged_account: RetrievedAccount,
+    identity: Identity,
     pool: web::Data<Pool>,
     category: web::Json<Category>,
-    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_or_client_cert_required!(
-        request,
-        logged_account,
-        Permission::MEMBER,
-        Action::FORBIDDEN
-    );
+    identity.require_account_or_cert(Permission::MEMBER)?;
 
     let conn = &pool.get()?;
 
@@ -64,16 +51,10 @@ pub async fn put_categories(
 /// GET route for `/api/v1/category/{category_id}`
 pub async fn get_category(
     pool: web::Data<Pool>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     category_id: web::Path<String>,
-    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_or_client_cert_required!(
-        request,
-        logged_account,
-        Permission::MEMBER,
-        Action::FORBIDDEN
-    );
+    identity.require_account_or_cert(Permission::MEMBER)?;
 
     let conn = &pool.get()?;
 
@@ -84,18 +65,12 @@ pub async fn get_category(
 
 /// POST route for `/api/v1/category/{category_id}`
 pub async fn post_category(
-    logged_account: RetrievedAccount,
+    identity: Identity,
     pool: web::Data<Pool>,
     category: web::Json<Category>,
     category_id: web::Path<Uuid>,
-    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_or_client_cert_required!(
-        request,
-        logged_account,
-        Permission::MEMBER,
-        Action::FORBIDDEN
-    );
+    identity.require_account_or_cert(Permission::MEMBER)?;
 
     if *category_id != category.id {
         return Err(ServiceError::BadRequest(
@@ -118,16 +93,10 @@ pub async fn post_category(
 
 /// DELETE route for `/api/v1/category/{category_id}`
 pub async fn delete_category(
-    logged_account: RetrievedAccount,
+    identity: Identity,
     _category_id: web::Path<String>,
-    request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_or_client_cert_required!(
-        request,
-        logged_account,
-        Permission::MEMBER,
-        Action::FORBIDDEN
-    );
+    identity.require_account_or_cert(Permission::MEMBER)?;
 
     println!("Delete is not supported!");
 

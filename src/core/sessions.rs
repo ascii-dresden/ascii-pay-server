@@ -3,10 +3,14 @@ use diesel::prelude::*;
 use uuid::Uuid;
 
 use crate::core::schema::session;
-use crate::core::{generate_uuid_str, DbConnection, ServiceError, ServiceResult};
+use crate::core::{generate_uuid, DbConnection, ServiceError, ServiceResult};
+
+use super::Money;
 
 /// Auto logout after `self` minutes of inactivity
 const VALIDITY_MINUTES: i64 = 10;
+
+const TRANSACTION_VALIDITY_SECONDS: i64 = 10;
 
 /// Represent a session
 #[derive(
@@ -24,22 +28,24 @@ const VALIDITY_MINUTES: i64 = 10;
 )]
 #[table_name = "session"]
 pub struct Session {
-    pub id: String,
+    pub id: Uuid,
     pub account_id: Uuid,
     pub valid_until: NaiveDateTime,
+    pub transaction_total: Option<Money>,
 }
 
 impl Session {
     /// Create a new session
-    pub fn create(conn: &DbConnection, account_id: &Uuid) -> ServiceResult<Session> {
+    pub fn create_default(conn: &DbConnection, account_id: &Uuid) -> ServiceResult<Session> {
         use crate::core::schema::session::dsl;
 
         Session::cleanup(&conn)?;
 
         let a = Session {
-            id: generate_uuid_str(),
+            id: generate_uuid(),
             account_id: *account_id,
             valid_until: Local::now().naive_local() + Duration::minutes(VALIDITY_MINUTES),
+            transaction_total: None,
         };
 
         diesel::delete(dsl::session.filter(dsl::id.eq(&a.id))).execute(conn)?;
@@ -48,15 +54,21 @@ impl Session {
         Ok(a)
     }
 
-    pub fn register(conn: &DbConnection, account_id: &Uuid, token: &str) -> ServiceResult<Session> {
+    pub fn create_transaction(
+        conn: &DbConnection,
+        account_id: &Uuid,
+        transaction_total: Money,
+    ) -> ServiceResult<Session> {
         use crate::core::schema::session::dsl;
 
         Session::cleanup(&conn)?;
 
         let a = Session {
-            id: token.to_owned(),
+            id: generate_uuid(),
             account_id: *account_id,
-            valid_until: Local::now().naive_local() + Duration::minutes(VALIDITY_MINUTES),
+            valid_until: Local::now().naive_local()
+                + Duration::seconds(TRANSACTION_VALIDITY_SECONDS),
+            transaction_total: Some(transaction_total),
         };
 
         diesel::delete(dsl::session.filter(dsl::id.eq(&a.id))).execute(conn)?;
@@ -82,7 +94,7 @@ impl Session {
     }
 
     /// Get an session by the `id`
-    pub fn get(conn: &DbConnection, id: &str) -> ServiceResult<Session> {
+    pub fn get(conn: &DbConnection, id: &Uuid) -> ServiceResult<Session> {
         use crate::core::schema::session::dsl;
 
         let mut results = dsl::session.filter(dsl::id.eq(id)).load::<Session>(conn)?;

@@ -2,8 +2,7 @@ use crate::core::{
     transactions, Account, DbConnection, Money, Permission, Pool, Product, ServiceResult,
     Transaction,
 };
-use crate::identity_policy::{Action, RetrievedAccount};
-use crate::login_required;
+use crate::identity_service::Identity;
 use crate::web::utils::HbData;
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use chrono::{Duration, Local, NaiveDateTime};
@@ -76,12 +75,12 @@ impl TransactionProduct {
 pub async fn get_transactions(
     pool: web::Data<Pool>,
     hb: web::Data<Handlebars<'_>>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     account_id: web::Path<String>,
     query: web::Query<FromToQuery>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    let identity_account = identity.require_account_with_redirect(Permission::MEMBER)?;
 
     let conn = &pool.get()?;
 
@@ -111,7 +110,7 @@ pub async fn get_transactions(
     let list_str = serde_json::to_string(&list).unwrap_or_else(|_| "[]".to_owned());
 
     let body = HbData::new(&request)
-        .with_account(logged_account)
+        .with_account(identity_account)
         .with_data(
             "date",
             &FromToQuery {
@@ -130,11 +129,11 @@ pub async fn get_transactions(
 /// POST route for `/admin/transaction/execute/{account_id}`
 pub async fn post_execute_transaction(
     pool: web::Data<Pool>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     account_id: web::Path<String>,
     execute_form: web::Form<Execute>,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    let identity_account = identity.require_account_with_redirect(Permission::MEMBER)?;
 
     if execute_form.total != 0.0 {
         let conn = &pool.get()?;
@@ -144,7 +143,7 @@ pub async fn post_execute_transaction(
         transactions::execute(
             &conn,
             &mut account,
-            Some(&logged_account.account),
+            Some(&identity_account),
             (execute_form.total * 100.0) as Money,
         )
         .await?;
@@ -162,11 +161,11 @@ pub async fn post_execute_transaction(
 pub async fn get_transaction_details(
     pool: web::Data<Pool>,
     hb: web::Data<Handlebars<'_>>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     request: HttpRequest,
     path: web::Path<(String, String)>,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    let identity_account = identity.require_account_with_redirect(Permission::MEMBER)?;
 
     let conn = &pool.get()?;
 
@@ -181,7 +180,7 @@ pub async fn get_transaction_details(
     let products = TransactionProduct::vec_to_transaction_product(products);
 
     let body = HbData::new(&request)
-        .with_account(logged_account)
+        .with_account(identity_account)
         .with_data("account", &account)
         .with_data("transaction", &transaction)
         .with_data("products", &products)
@@ -239,11 +238,11 @@ pub mod naive_date_time_option_serializer {
 pub async fn get_transaction_generate_random(
     pool: web::Data<Pool>,
     hb: web::Data<Handlebars<'_>>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     request: HttpRequest,
     path: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account, Permission::ADMIN, Action::REDIRECT);
+    let identity_account = identity.require_account_with_redirect(Permission::ADMIN)?;
 
     let conn = &pool.get()?;
 
@@ -253,7 +252,7 @@ pub async fn get_transaction_generate_random(
     let now = Local::now().naive_local();
 
     let body = HbData::new(&request)
-        .with_account(logged_account)
+        .with_account(identity_account)
         .with_data("account", &account)
         .with_data(
             "date",
@@ -284,11 +283,11 @@ pub struct GenerateRandomQuery {
 /// POST route for `/admin/transactions/generate/{account_id}/`
 pub async fn post_transaction_generate_random(
     pool: web::Data<Pool>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     path: web::Path<String>,
     data: web::Form<GenerateRandomQuery>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::ADMIN, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::ADMIN)?;
 
     let conn = &pool.get()?;
 
@@ -326,9 +325,9 @@ pub async fn post_transaction_generate_random(
 /// GET route for `/admin/transactions/validate`
 pub async fn get_transactions_validate(
     pool: web::Data<Pool>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::ADMIN, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::ADMIN)?;
 
     let conn = &pool.get()?;
 

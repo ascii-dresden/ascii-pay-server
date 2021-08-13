@@ -2,8 +2,7 @@ use crate::core::{
     fuzzy_vec_match, Category, DbConnection, Money, Permission, Pool, Product, ServiceError,
     ServiceResult,
 };
-use crate::identity_policy::{Action, RetrievedAccount};
-use crate::login_required;
+use crate::identity_service::Identity;
 use crate::web::utils::{HbData, IsJson, Search};
 use actix_multipart::Multipart;
 use actix_web::{http, web, HttpRequest, HttpResponse};
@@ -78,13 +77,16 @@ impl SearchProduct {
 /// GET route for `/admin/products`
 pub async fn get_products(
     hb: web::Data<Handlebars<'_>>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     pool: web::Data<Pool>,
     query: web::Query<Search>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let action = request.redirect_type();
-    let logged_account = login_required!(logged_account, Permission::MEMBER, action);
+    let identity_account = if request.is_json() {
+        identity.require_account(Permission::MEMBER)?
+    } else {
+        identity.require_account_with_redirect(Permission::MEMBER)?
+    };
 
     let conn = &pool.get()?;
 
@@ -103,7 +105,7 @@ pub async fn get_products(
         Ok(HttpResponse::Ok().json(search_products))
     } else {
         let body = HbData::new(&request)
-            .with_account(logged_account)
+            .with_account(identity_account)
             .with_data("search", &search)
             .with_data("products", &search_products)
             .render(&hb, "admin_product_list")?;
@@ -115,12 +117,12 @@ pub async fn get_products(
 /// GET route for `/admin/product/{product_id}`
 pub async fn get_product_edit(
     hb: web::Data<Handlebars<'_>>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     pool: web::Data<Pool>,
     product_id: web::Path<String>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    let identity_account = identity.require_account_with_redirect(Permission::MEMBER)?;
 
     let conn = &pool.get()?;
 
@@ -129,7 +131,7 @@ pub async fn get_product_edit(
     let all_categories = Category::all(&conn)?;
 
     let body = HbData::new(&request)
-        .with_account(logged_account)
+        .with_account(identity_account)
         .with_data("product", &product)
         .with_data("categories", &all_categories)
         .render(&hb, "admin_product_edit")?;
@@ -139,12 +141,12 @@ pub async fn get_product_edit(
 
 /// POST route for `/admin/product/{product_id}`
 pub async fn post_product_edit(
-    logged_account: RetrievedAccount,
+    identity: Identity,
     pool: web::Data<Pool>,
     product: web::Form<FormProduct>,
     product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::MEMBER)?;
 
     if *product_id != product.id {
         return Err(ServiceError::BadRequest(
@@ -202,17 +204,17 @@ pub async fn post_product_edit(
 /// GET route for `/admin/product/create`
 pub async fn get_product_create(
     hb: web::Data<Handlebars<'_>>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     pool: web::Data<Pool>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
-    let logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    let identity_account = identity.require_account_with_redirect(Permission::MEMBER)?;
     let conn = &pool.get()?;
 
     let all_categories = Category::all(&conn)?;
 
     let body = HbData::new(&request)
-        .with_account(logged_account)
+        .with_account(identity_account)
         .with_data("categories", &all_categories)
         .render(&hb, "admin_product_create")?;
 
@@ -221,11 +223,11 @@ pub async fn get_product_create(
 
 /// POST route for `/admin/product/create`
 pub async fn post_product_create(
-    logged_account: RetrievedAccount,
+    identity: Identity,
     pool: web::Data<Pool>,
     product: web::Form<FormProduct>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::MEMBER)?;
 
     let conn = &pool.get()?;
 
@@ -264,10 +266,10 @@ pub async fn post_product_create(
 /// GET route for `/admin/product/delete/{product_id}`
 pub async fn get_product_delete(
     _hb: web::Data<Handlebars<'_>>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     _product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::MEMBER)?;
 
     println!("Delete is not supported!");
 
@@ -279,10 +281,10 @@ pub async fn get_product_delete(
 /// GET route for `/admin/product/remove-image/{product_id}`
 pub async fn get_product_remove_image(
     pool: web::Data<Pool>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     product_id: web::Path<String>,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::MEMBER)?;
 
     let conn = &pool.get()?;
 
@@ -301,11 +303,11 @@ pub async fn get_product_remove_image(
 /// POST route for `/admin/product/upload-image/{product_id}`
 pub async fn post_product_upload_image(
     pool: web::Data<Pool>,
-    logged_account: RetrievedAccount,
+    identity: Identity,
     product_id: web::Path<String>,
     multipart: Multipart,
 ) -> ServiceResult<HttpResponse> {
-    let _logged_account = login_required!(logged_account, Permission::MEMBER, Action::REDIRECT);
+    identity.require_account_with_redirect(Permission::MEMBER)?;
 
     let conn = &pool.get()?;
     let mut product = Product::get(&conn, &Uuid::parse_str(&product_id)?)?;

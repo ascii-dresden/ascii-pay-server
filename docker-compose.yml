@@ -28,12 +28,9 @@ services:
       - db
     networks:
       - default
-      - proxy
     restart: always
   db:
-    build:
-      context: .
-      dockerfile: docker/db.Dockerfile
+    image: postgres:13-buster
     container_name: "ascii-pay-postgres-dist"
     environment:
       - POSTGRES_USER=ascii
@@ -44,6 +41,3 @@ services:
     networks:
       - default
     restart: always
-networks:
-  proxy:
-    external: true
