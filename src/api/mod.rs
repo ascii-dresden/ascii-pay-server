@@ -1,6 +1,6 @@
 pub mod graphql;
-mod rest;
-mod wallet;
+pub mod rest;
+pub mod wallet;
 
 use actix_web::web;
 

@@ -1,22 +1,24 @@
 mod model;
 mod mutation;
 mod query;
-mod subscription;
 
 use std::sync::Arc;
 
-use actix_web::{guard, web, HttpRequest, HttpResponse};
+use actix_web::{web, HttpResponse};
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig},
-    Context, Schema,
+    Context, EmptySubscription, Schema,
 };
-use async_graphql_actix_web::{Request, Response, WSSubscription};
+use async_graphql_actix_web::{Request, Response};
 
-use crate::core::{Pool, ServiceResult};
+use crate::{
+    core::{Pool, ServiceResult},
+    identity_service::Identity,
+};
 
-use self::{mutation::Mutation, query::Query, subscription::Subscription};
+use self::{mutation::Mutation, query::Query};
 
-pub type AppSchema = Schema<Query, Mutation, Subscription>;
+pub type AppSchema = Schema<Query, Mutation, EmptySubscription>;
 
 pub fn get_conn_from_ctx(
     ctx: &Context<'_>,
@@ -27,26 +29,15 @@ pub fn get_conn_from_ctx(
 pub fn create_schema_with_context(pool: Pool) -> AppSchema {
     let arc_pool = Arc::new(pool);
 
-    Schema::build(Query, Mutation, Subscription)
+    Schema::build(Query, Mutation, EmptySubscription)
         .data(arc_pool)
         .finish()
 }
 
-async fn index(schema: web::Data<AppSchema>, req: Request) -> Response {
-    let query = req.into_inner();
+async fn index(schema: web::Data<AppSchema>, identity: Identity, req: Request) -> Response {
+    let mut query = req.into_inner();
+    query = query.data(identity);
     schema.execute(query).await.into()
-}
-
-async fn index_ws(
-    schema: web::Data<AppSchema>,
-    req: HttpRequest,
-    payload: web::Payload,
-) -> ServiceResult<HttpResponse> {
-    Ok(WSSubscription::start(
-        Schema::clone(&*schema),
-        &req,
-        payload,
-    )?)
 }
 
 async fn index_playground() -> HttpResponse {
@@ -62,11 +53,6 @@ pub fn init(config: &mut web::ServiceConfig) {
     config.service(
         web::resource("")
             .route(web::post().to(self::index))
-            .route(
-                web::get()
-                    .guard(guard::Header("upgrade", "websocket"))
-                    .to(self::index_ws),
-            )
             .route(web::get().to(self::index_playground)),
     );
 }

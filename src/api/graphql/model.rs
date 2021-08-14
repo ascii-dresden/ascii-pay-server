@@ -1,24 +1,19 @@
-use async_graphql::{Object, ID};
+use async_graphql::ID;
 use chrono::NaiveDateTime;
 
-use crate::core::{self, naive_date_time_serializer, Money};
+use crate::core::{self, naive_date_time_serializer, Money, Permission};
 
-#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone)]
+#[derive(SimpleObject, Serialize)]
+pub struct LoginResult {
+    pub token: String,
+    pub authorization: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone, SimpleObject)]
 pub struct Price {
     #[serde(with = "naive_date_time_serializer")]
     pub validity_start: NaiveDateTime,
     pub value: Money,
-}
-
-#[Object]
-impl Price {
-    async fn validity_start(&self) -> &NaiveDateTime {
-        &self.validity_start
-    }
-
-    async fn value(&self) -> &Money {
-        &self.value
-    }
 }
 
 impl From<&core::Price> for Price {
@@ -30,31 +25,28 @@ impl From<&core::Price> for Price {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(InputObject, Deserialize)]
+pub struct PriceInput {
+    #[serde(with = "naive_date_time_serializer")]
+    pub validity_start: NaiveDateTime,
+    pub value: Money,
+}
+
+impl From<&PriceInput> for core::Price {
+    fn from(entity: &PriceInput) -> Self {
+        Self {
+            validity_start: entity.validity_start,
+            value: entity.value,
+        }
+    }
+}
+
+#[derive(SimpleObject, Serialize, Deserialize)]
 pub struct Category {
     pub id: ID,
     pub name: String,
     pub prices: Vec<Price>,
     pub current_price: Option<Money>,
-}
-
-#[Object]
-impl Category {
-    async fn id(&self) -> &ID {
-        &self.id
-    }
-
-    async fn name(&self) -> &str {
-        &self.name
-    }
-
-    async fn prices(&self) -> &[Price] {
-        &self.prices
-    }
-
-    async fn current_price(&self) -> &Option<Money> {
-        &self.current_price
-    }
 }
 
 impl From<&core::Category> for Category {
@@ -71,10 +63,17 @@ impl From<&core::Category> for Category {
 #[derive(InputObject)]
 pub struct CategoryCreateInput {
     pub name: String,
-    pub price: Option<Money>,
+    pub prices: Vec<PriceInput>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(InputObject)]
+pub struct CategoryUpdateInput {
+    pub id: ID,
+    pub name: String,
+    pub prices: Vec<PriceInput>,
+}
+
+#[derive(SimpleObject, Serialize, Deserialize)]
 pub struct Product {
     pub id: ID,
     pub name: String,
@@ -83,37 +82,6 @@ pub struct Product {
     pub prices: Vec<Price>,
     pub current_price: Option<Money>,
     pub barcode: Option<String>,
-}
-
-#[Object]
-impl Product {
-    async fn id(&self) -> &ID {
-        &self.id
-    }
-
-    async fn name(&self) -> &str {
-        &self.name
-    }
-
-    async fn category(&self) -> &Option<Category> {
-        &self.category
-    }
-
-    async fn image(&self) -> &Option<String> {
-        &self.image
-    }
-
-    async fn prices(&self) -> &[Price] {
-        &self.prices
-    }
-
-    async fn current_price(&self) -> &Option<Money> {
-        &self.current_price
-    }
-
-    async fn barcode(&self) -> &Option<String> {
-        &self.barcode
-    }
 }
 
 impl From<&core::Product> for Product {
@@ -126,6 +94,52 @@ impl From<&core::Product> for Product {
             prices: entity.prices.iter().map(Price::from).collect(),
             current_price: entity.current_price,
             barcode: entity.barcode.clone(),
+        }
+    }
+}
+
+#[derive(InputObject)]
+pub struct ProductCreateInput {
+    pub name: String,
+    pub category: Option<ID>,
+    pub barcode: Option<String>,
+    pub prices: Vec<PriceInput>,
+}
+
+#[derive(InputObject)]
+pub struct ProductUpdateInput {
+    pub id: ID,
+    pub name: String,
+    pub category: Option<ID>,
+    pub barcode: Option<String>,
+    pub prices: Vec<PriceInput>,
+}
+
+#[derive(SimpleObject, Serialize, Deserialize)]
+pub struct Account {
+    pub id: ID,
+    pub credit: Money,
+    pub minimum_credit: Money,
+    pub name: String,
+    pub mail: Option<String>,
+    pub username: Option<String>,
+    pub account_number: Option<String>,
+    pub permission: Permission,
+    pub receives_monthly_report: bool,
+}
+
+impl From<&core::Account> for Account {
+    fn from(entity: &core::Account) -> Self {
+        Self {
+            id: entity.id.into(),
+            credit: entity.credit,
+            minimum_credit: entity.minimum_credit,
+            name: entity.name.clone(),
+            mail: entity.mail.clone(),
+            username: entity.username.clone(),
+            account_number: entity.account_number.clone(),
+            permission: entity.permission,
+            receives_monthly_report: entity.receives_monthly_report,
         }
     }
 }

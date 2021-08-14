@@ -1,13 +1,13 @@
 use crate::{
     core::{authentication_password, Permission, Pool, ServiceResult},
-    identity_service::Identity,
+    identity_service::{Identity, IdentityMut, IdentityRequire},
 };
 use actix_web::{web, HttpResponse};
 
-#[derive(Serialize, Deserialize)]
+#[derive(InputObject, Serialize, Deserialize)]
 pub struct LoginForm {
-    username: String,
-    password: String,
+    pub username: String,
+    pub password: String,
 }
 
 /// GET route for `/api/v1/auth`
@@ -18,7 +18,7 @@ pub async fn get_auth(identity: Identity) -> ServiceResult<HttpResponse> {
 
 /// POST route for `/api/v1/auth`
 pub async fn post_auth(
-    identity: Identity,
+    identity: IdentityMut,
     pool: web::Data<Pool>,
     params: web::Json<LoginForm>,
 ) -> ServiceResult<HttpResponse> {
@@ -36,7 +36,10 @@ pub async fn post_auth(
 }
 
 /// DELETE route for `/api/v1/auth`
-pub async fn delete_auth(identity: Identity, pool: web::Data<Pool>) -> ServiceResult<HttpResponse> {
+pub async fn delete_auth(
+    identity: IdentityMut,
+    pool: web::Data<Pool>,
+) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
 
     identity.forget(&conn)?;

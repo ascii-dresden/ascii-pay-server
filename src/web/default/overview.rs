@@ -1,5 +1,5 @@
 use crate::core::{transactions, wallet, Permission, Pool, ServiceResult};
-use crate::identity_service::Identity;
+use crate::identity_service::{Identity, IdentityRequire};
 use crate::web::admin::transactions::{
     naive_date_time_option_serializer, TransactionProduct, TransactionWithProducts,
 };

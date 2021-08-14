@@ -2,7 +2,7 @@ use crate::core::authentication_nfc::NfcResult;
 use crate::core::{
     authentication_barcode, authentication_nfc, wallet, Account, Pool, Product, ServiceResult,
 };
-use crate::identity_service::Identity;
+use crate::identity_service::{Identity, IdentityRequire};
 
 use actix_web::{web, HttpResponse};
 

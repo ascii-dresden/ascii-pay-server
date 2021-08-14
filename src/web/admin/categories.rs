@@ -1,7 +1,7 @@
 use crate::core::{
     fuzzy_vec_match, Category, Money, Permission, Pool, ServiceError, ServiceResult,
 };
-use crate::identity_service::Identity;
+use crate::identity_service::{Identity, IdentityRequire};
 use crate::web::utils::{HbData, IsJson, Search};
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use chrono::NaiveDateTime;

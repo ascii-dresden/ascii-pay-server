@@ -1,5 +1,5 @@
 use crate::core::{Category, Permission, Pool, ServiceError, ServiceResult};
-use crate::identity_service::Identity;
+use crate::identity_service::{Identity, IdentityRequire};
 use crate::web::admin::categories::SearchCategory;
 use crate::web::utils::Search;
 use actix_web::{web, HttpResponse};

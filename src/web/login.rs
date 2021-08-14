@@ -1,14 +1,9 @@
+use crate::api::rest::auth::LoginForm;
 use crate::core::{authentication_password, Pool, ServiceResult};
-use crate::identity_service::Identity;
+use crate::identity_service::IdentityMut;
 use crate::web::utils::HbData;
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
-
-#[derive(Serialize, Deserialize)]
-pub struct LoginForm {
-    username: String,
-    password: String,
-}
 
 #[derive(Serialize, Deserialize)]
 pub struct RegisterForm {
@@ -31,7 +26,7 @@ pub async fn get_login(
 /// POST route for `/login`
 pub async fn post_login(
     pool: web::Data<Pool>,
-    identity: Identity,
+    identity: IdentityMut,
     params: web::Form<LoginForm>,
 ) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
@@ -52,7 +47,10 @@ pub async fn post_login(
 }
 
 /// GET route for `/logout`
-pub async fn get_logout(pool: web::Data<Pool>, identity: Identity) -> ServiceResult<HttpResponse> {
+pub async fn get_logout(
+    pool: web::Data<Pool>,
+    identity: IdentityMut,
+) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
 
     identity.forget(&conn)?;

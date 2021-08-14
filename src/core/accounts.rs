@@ -40,7 +40,7 @@ pub struct Account {
 
 /// Represents the permission level of an account
 #[derive(
-    Debug, Copy, Clone, FromSqlRow, AsExpression, Hash, PartialEq, Eq, Serialize, Deserialize,
+    Debug, Copy, Clone, FromSqlRow, AsExpression, Hash, PartialEq, Eq, Serialize, Deserialize, Enum,
 )]
 #[sql_type = "SmallInt"]
 pub enum Permission {

@@ -2,7 +2,7 @@ use crate::core::{
     fuzzy_vec_match, Category, DbConnection, Money, Permission, Pool, Product, ServiceError,
     ServiceResult,
 };
-use crate::identity_service::Identity;
+use crate::identity_service::{Identity, IdentityRequire};
 use crate::web::utils::{HbData, IsJson, Search};
 use actix_multipart::Multipart;
 use actix_web::{http, web, HttpRequest, HttpResponse};

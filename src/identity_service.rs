@@ -11,6 +11,7 @@ use futures_util::future::{ready, LocalBoxFuture, Ready};
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
 use actix_web::{
@@ -178,13 +179,16 @@ impl IdentityInfo {
             .headers()
             .get(header::AUTHORIZATION)
             .map(|v| v.to_str().unwrap_or(""))
+            .map(|t| t.trim_start_matches("Bearer "))
             .map(|t| AuthToken::parse_session_id_from_token(t).ok())
             .flatten();
         if let Some(session_id) = authorization_header {
             let session = if let Ok(session) = Session::get(&conn, &session_id) {
                 let account = Account::get(&conn, &session.account_id)?;
                 Some((session, account))
-            } else { None };
+            } else {
+                None
+            };
 
             return Ok(Self {
                 session,
@@ -202,7 +206,9 @@ impl IdentityInfo {
             let session = if let Ok(session) = Session::get(&conn, &session_id) {
                 let account = Account::get(&conn, &session.account_id)?;
                 Some((session, account))
-            } else { None };
+            } else {
+                None
+            };
 
             return Ok(Self {
                 session,
@@ -228,7 +234,9 @@ impl IdentityInfo {
             let session = if let Ok(session) = Session::get(&conn, &session_id) {
                 let account = Account::get(&conn, &session.account_id)?;
                 Some((session, account))
-            } else { None };
+            } else {
+                None
+            };
 
             return Ok(Self {
                 session,
@@ -261,12 +269,147 @@ impl IdentityInfo {
     }
 }
 
+pub trait IdentityRequire {
+    fn get_account(&self) -> ServiceResult<Option<Account>>;
+    fn is_cert_present(&self) -> ServiceResult<bool>;
+    fn get_auth_token(&self) -> ServiceResult<Option<String>>;
+
+    fn require_account(&self, permission: Permission) -> ServiceResult<Account> {
+        if let Some(account) = self.get_account()? {
+            if account.permission >= permission {
+                Ok(account)
+            } else {
+                Err(ServiceError::InsufficientPrivileges)
+            }
+        } else {
+            Err(ServiceError::Unauthorized)
+        }
+    }
+
+    fn require_account_with_redirect(&self, permission: Permission) -> ServiceResult<Account> {
+        match self.require_account(permission) {
+            Ok(account) => Ok(account),
+            Err(e) => match e {
+                ServiceError::Unauthorized => Err(ServiceError::Redirect("/login".to_owned())),
+                _ => Err(e),
+            },
+        }
+    }
+
+    fn require_cert(&self) -> ServiceResult<()> {
+        if self.is_cert_present()? {
+            Ok(())
+        } else {
+            Err(ServiceError::Unauthorized)
+        }
+    }
+
+    fn require_auth_token(&self) -> ServiceResult<String> {
+        if let Some(auth_token) = self.get_auth_token()? {
+            Ok(auth_token)
+        } else {
+            Err(ServiceError::Unauthorized)
+        }
+    }
+
+    fn require_account_or_cert(&self, permission: Permission) -> ServiceResult<()> {
+        if self.is_cert_present()? {
+            return Ok(());
+        }
+
+        if let Some(account) = self.get_account()? {
+            if account.permission >= permission {
+                Ok(())
+            } else {
+                Err(ServiceError::InsufficientPrivileges)
+            }
+        } else {
+            Err(ServiceError::Unauthorized)
+        }
+    }
+
+    fn require_account_or_cert_with_redirect(&self, permission: Permission) -> ServiceResult<()> {
+        match self.require_account_or_cert(permission) {
+            Ok(_) => Ok(()),
+            Err(e) => match e {
+                ServiceError::Unauthorized => Err(ServiceError::Redirect("/login".to_owned())),
+                _ => Err(e),
+            },
+        }
+    }
+}
+
 #[derive(Debug)]
+#[allow(clippy::mutex_atomic)]
 pub struct Identity {
-    request: HttpRequest,
+    session: Arc<Mutex<Option<(Session, Account)>>>,
+    is_cert_present: Arc<Mutex<bool>>,
 }
 
 impl FromRequest for Identity {
+    type Error = Error;
+    type Future = Ready<Result<Self, Error>>;
+    type Config = ();
+
+    #[allow(clippy::mutex_atomic)]
+    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+        if let Some(info) = req.extensions().get::<IdentityInfo>() {
+            ok(Self {
+                session: Arc::new(Mutex::new(info.session.as_ref().cloned())),
+                is_cert_present: Arc::new(Mutex::new(info.is_cert_present)),
+            })
+        } else {
+            ok(Self {
+                session: Arc::new(Mutex::new(None)),
+                is_cert_present: Arc::new(Mutex::new(false)),
+            })
+        }
+    }
+}
+
+impl Identity {
+    pub fn store(&self, conn: &DbConnection, account_id: &Uuid) -> ServiceResult<()> {
+        let account = Account::get(&conn, account_id)?;
+        let session = Session::create_default(&conn, account_id)?;
+        let mut s = self.session.lock().unwrap();
+        *s = Some((session, account));
+        Ok(())
+    }
+
+    pub fn forget(&self, conn: &DbConnection) -> ServiceResult<()> {
+        if let Some((session, _)) = self.session.lock().unwrap().as_ref() {
+            session.delete(&conn)?;
+        }
+        let mut s = self.session.lock().unwrap();
+        *s = None;
+        Ok(())
+    }
+}
+
+impl IdentityRequire for Identity {
+    fn get_account(&self) -> ServiceResult<Option<Account>> {
+        Ok(self.session.lock().unwrap().as_ref().map(|t| t.1.clone()))
+    }
+
+    fn is_cert_present(&self) -> ServiceResult<bool> {
+        Ok(*self.is_cert_present.lock().unwrap())
+    }
+
+    fn get_auth_token(&self) -> ServiceResult<Option<String>> {
+        if let Some((s, _)) = self.session.lock().unwrap().as_ref() {
+            Ok(Some(AuthToken::create_token_from_session_id(&s.id)?))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct IdentityMut {
+    request: HttpRequest,
+}
+
+impl FromRequest for IdentityMut {
     type Error = Error;
     type Future = Ready<Result<Self, Error>>;
     type Config = ();
@@ -278,7 +421,7 @@ impl FromRequest for Identity {
     }
 }
 
-impl Identity {
+impl IdentityMut {
     pub fn store(&self, conn: &DbConnection, account_id: &Uuid) -> ServiceResult<()> {
         let account = Account::get(&conn, account_id)?;
         let session = Session::create_default(&conn, account_id)?;
@@ -307,8 +450,10 @@ impl Identity {
             Err(ServiceError::Unauthorized)
         }
     }
+}
 
-    pub fn get_account(&self) -> ServiceResult<Option<Account>> {
+impl IdentityRequire for IdentityMut {
+    fn get_account(&self) -> ServiceResult<Option<Account>> {
         if let Some(info) = self.request.extensions().get::<IdentityInfo>() {
             Ok(info.session.as_ref().map(|(_, a)| a.clone()))
         } else {
@@ -316,29 +461,7 @@ impl Identity {
         }
     }
 
-    pub fn require_account(&self, permission: Permission) -> ServiceResult<Account> {
-        if let Some(account) = self.get_account()? {
-            if account.permission >= permission {
-                Ok(account)
-            } else {
-                Err(ServiceError::InsufficientPrivileges)
-            }
-        } else {
-            Err(ServiceError::Unauthorized)
-        }
-    }
-
-    pub fn require_account_with_redirect(&self, permission: Permission) -> ServiceResult<Account> {
-        match self.require_account(permission) {
-            Ok(account) => Ok(account),
-            Err(e) => match e {
-                ServiceError::Unauthorized => Err(ServiceError::Redirect("/login".to_owned())),
-                _ => Err(e),
-            },
-        }
-    }
-
-    pub fn is_cert_present(&self) -> ServiceResult<bool> {
+    fn is_cert_present(&self) -> ServiceResult<bool> {
         if let Some(info) = self.request.extensions().get::<IdentityInfo>() {
             Ok(info.is_cert_present)
         } else {
@@ -346,15 +469,7 @@ impl Identity {
         }
     }
 
-    pub fn require_cert(&self) -> ServiceResult<()> {
-        if self.is_cert_present()? {
-            Ok(())
-        } else {
-            Err(ServiceError::Unauthorized)
-        }
-    }
-
-    pub fn get_auth_token(&self) -> ServiceResult<Option<String>> {
+    fn get_auth_token(&self) -> ServiceResult<Option<String>> {
         if let Some(info) = self.request.extensions().get::<IdentityInfo>() {
             if let Some((s, _)) = &info.session {
                 Ok(Some(AuthToken::create_token_from_session_id(&s.id)?))
@@ -363,44 +478,6 @@ impl Identity {
             }
         } else {
             Err(ServiceError::Unauthorized)
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn require_auth_token(&self) -> ServiceResult<String> {
-        if let Some(auth_token) = self.get_auth_token()? {
-            Ok(auth_token)
-        } else {
-            Err(ServiceError::Unauthorized)
-        }
-    }
-
-    pub fn require_account_or_cert(&self, permission: Permission) -> ServiceResult<()> {
-        if self.is_cert_present()? {
-            return Ok(());
-        }
-
-        if let Some(account) = self.get_account()? {
-            if account.permission >= permission {
-                Ok(())
-            } else {
-                Err(ServiceError::InsufficientPrivileges)
-            }
-        } else {
-            Err(ServiceError::Unauthorized)
-        }
-    }
-    #[allow(dead_code)]
-    pub fn require_account_or_cert_with_redirect(
-        &self,
-        permission: Permission,
-    ) -> ServiceResult<()> {
-        match self.require_account_or_cert(permission) {
-            Ok(_) => Ok(()),
-            Err(e) => match e {
-                ServiceError::Unauthorized => Err(ServiceError::Redirect("/login".to_owned())),
-                _ => Err(e),
-            },
         }
     }
 }

@@ -1,9 +1,9 @@
-mod accounts;
-mod auth;
-mod categories;
-mod identification;
-mod products;
-mod transactions;
+pub mod accounts;
+pub mod auth;
+pub mod categories;
+pub mod identification;
+pub mod products;
+pub mod transactions;
 
 use actix_web::web;
 

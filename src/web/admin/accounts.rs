@@ -2,7 +2,7 @@ use crate::core::{
     authentication_barcode, authentication_nfc, authentication_password, fuzzy_vec_match, Account,
     Money, Permission, Pool, ServiceError, ServiceResult,
 };
-use crate::identity_service::Identity;
+use crate::identity_service::{Identity, IdentityRequire};
 use crate::web::utils::{EmptyToNone, HbData, IsJson, Search};
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;

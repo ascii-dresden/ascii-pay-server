@@ -3,7 +3,7 @@ use crate::{
         authentication_barcode, authentication_nfc, transactions, Account, Pool, Product,
         ServiceError, ServiceResult, Session, Transaction,
     },
-    identity_service::Identity,
+    identity_service::{Identity, IdentityRequire},
     web::utils::{create_token_from_obj, parse_obj_from_token},
 };
 

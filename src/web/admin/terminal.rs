@@ -1,5 +1,5 @@
 use crate::core::{Permission, ServiceResult};
-use crate::identity_service::Identity;
+use crate::identity_service::{Identity, IdentityRequire};
 use crate::web::utils::HbData;
 use actix_web::{web, HttpRequest, HttpResponse};
 use handlebars::Handlebars;

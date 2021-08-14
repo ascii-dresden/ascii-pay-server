@@ -2,7 +2,7 @@ use crate::core::{
     transactions, Account, DbConnection, Money, Permission, Pool, Product, ServiceResult,
     Transaction,
 };
-use crate::identity_service::Identity;
+use crate::identity_service::{Identity, IdentityRequire};
 use crate::web::utils::HbData;
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use chrono::{Duration, Local, NaiveDateTime};

@@ -2,7 +2,7 @@ use crate::core::{
     authentication_barcode, authentication_nfc, Account, Permission, Pool, ServiceError,
     ServiceResult,
 };
-use crate::identity_service::Identity;
+use crate::identity_service::{Identity, IdentityRequire};
 use crate::web::admin::accounts::SearchAccount;
 use crate::web::utils::Search;
 use actix_web::{web, HttpResponse};
