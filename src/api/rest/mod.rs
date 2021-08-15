@@ -7,6 +7,12 @@ pub mod transactions;
 
 use actix_web::web;
 
+/// Helper to deserialize search queries
+#[derive(Debug, Deserialize)]
+pub struct Search {
+    pub search: Option<String>,
+}
+
 pub fn init(config: &mut web::ServiceConfig) {
     config
         .service(web::resource("/identify").route(web::post().to(identification::post_identify)))

@@ -1,9 +1,10 @@
-use crate::core::{Category, Permission, Pool, ServiceError, ServiceResult};
-use crate::identity_service::{Identity, IdentityRequire};
-use crate::web::admin::categories::SearchCategory;
-use crate::web::utils::Search;
+use crate::identity_service::Identity;
+use crate::model::{Pool, ServiceResult};
+use crate::repo::{self, CategoryInput};
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
+
+use super::Search;
 
 /// GET route for `/api/v1/categories`
 pub async fn get_categories(
@@ -11,94 +12,52 @@ pub async fn get_categories(
     identity: Identity,
     query: web::Query<Search>,
 ) -> ServiceResult<HttpResponse> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
-
     let conn = &pool.get()?;
-
-    let search = match &query.search {
-        Some(s) => s.clone(),
-        None => "".to_owned(),
-    };
-
-    let lower_search = search.trim().to_ascii_lowercase();
-    let search_categories: Vec<SearchCategory> = Category::all(&conn)?
-        .into_iter()
-        .filter_map(|c| SearchCategory::wrap(c, &lower_search))
-        .collect();
-
-    Ok(HttpResponse::Ok().json(&search_categories))
+    let result = repo::get_categories(conn, &identity, query.search.as_deref())?;
+    Ok(HttpResponse::Ok().json(&result))
 }
 
 /// PUT route for `/api/v1/categories`
 pub async fn put_categories(
-    identity: Identity,
     pool: web::Data<Pool>,
-    category: web::Json<Category>,
+    identity: Identity,
+    input: web::Json<CategoryInput>,
 ) -> ServiceResult<HttpResponse> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
-
     let conn = &pool.get()?;
-
-    let mut server_category = Category::create(&conn, &category.name)?;
-
-    server_category.update_prices(&conn, &category.prices)?;
-
-    Ok(HttpResponse::Created().json(json!({
-        "id": server_category.id
-    })))
+    let result = repo::create_category(conn, &identity, input.into_inner())?;
+    Ok(HttpResponse::Ok().json(&result))
 }
 
 /// GET route for `/api/v1/category/{category_id}`
 pub async fn get_category(
     pool: web::Data<Pool>,
     identity: Identity,
-    category_id: web::Path<String>,
+    id: web::Path<Uuid>,
 ) -> ServiceResult<HttpResponse> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
-
     let conn = &pool.get()?;
-
-    let category = Category::get(&conn, &Uuid::parse_str(&category_id)?)?;
-
-    Ok(HttpResponse::Ok().json(&category))
+    let result = repo::get_category(conn, &identity, id.into_inner())?;
+    Ok(HttpResponse::Ok().json(&result))
 }
 
 /// POST route for `/api/v1/category/{category_id}`
 pub async fn post_category(
-    identity: Identity,
     pool: web::Data<Pool>,
-    category: web::Json<Category>,
-    category_id: web::Path<Uuid>,
+    identity: Identity,
+    id: web::Path<Uuid>,
+    input: web::Json<CategoryInput>,
 ) -> ServiceResult<HttpResponse> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
-
-    if *category_id != category.id {
-        return Err(ServiceError::BadRequest(
-            "Id missmage",
-            "The category id of the url and the json do not match!".to_owned(),
-        ));
-    }
-
     let conn = &pool.get()?;
-
-    let mut server_category = Category::get(&conn, &category_id)?;
-
-    server_category.name = category.name.clone();
-    server_category.update(&conn)?;
-
-    server_category.update_prices(&conn, &category.prices)?;
-
-    Ok(HttpResponse::Ok().finish())
+    let result = repo::update_category(conn, &identity, id.into_inner(), input.into_inner())?;
+    Ok(HttpResponse::Ok().json(&result))
 }
 
 /// DELETE route for `/api/v1/category/{category_id}`
 pub async fn delete_category(
+    pool: web::Data<Pool>,
     identity: Identity,
-    _category_id: web::Path<String>,
+    id: web::Path<Uuid>,
 ) -> ServiceResult<HttpResponse> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
-
-    println!("Delete is not supported!");
-
-    Ok(HttpResponse::MethodNotAllowed().finish())
+    let conn = &pool.get()?;
+    let result = repo::delete_category(conn, &identity, id.into_inner())?;
+    Ok(HttpResponse::Ok().json(&result))
 }

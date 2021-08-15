@@ -1,4 +1,4 @@
-use crate::core::{env, wallet, Account, Pool, ServiceError, ServiceResult};
+use crate::model::{env, wallet, Account, Pool, ServiceError, ServiceResult};
 use actix_web::{web, HttpRequest, HttpResponse};
 use uuid::Uuid;
 

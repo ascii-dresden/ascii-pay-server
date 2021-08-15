@@ -4,9 +4,8 @@ use handlebars::{Context, Handlebars, Helper, Output, RenderContext, RenderError
 
 use crate::api as module_api;
 use crate::api::graphql;
-use crate::core::{env, Pool, ServiceResult};
 use crate::identity_service::IdentityService;
-use crate::web as module_web;
+use crate::model::{env, Pool, ServiceResult};
 
 /// Helper function for handlebars. Converts cents to euros
 fn currency_helper(
@@ -81,8 +80,6 @@ pub async fn start_server(pool: Pool) -> ServiceResult<()> {
             .wrap(IdentityService::new())
             // Register api module
             .configure(module_api::init)
-            // Register admin ui module
-            .configure(module_web::init)
     })
     .keep_alive(60)
     .bind(address)?

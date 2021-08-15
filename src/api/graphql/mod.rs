@@ -1,4 +1,3 @@
-mod model;
 mod mutation;
 mod query;
 
@@ -12,8 +11,8 @@ use async_graphql::{
 use async_graphql_actix_web::{Request, Response};
 
 use crate::{
-    core::{Pool, ServiceResult},
     identity_service::Identity,
+    model::{Pool, ServiceResult},
 };
 
 use self::{mutation::Mutation, query::Query};

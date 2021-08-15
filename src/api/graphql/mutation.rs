@@ -1,160 +1,113 @@
-use std::convert::TryFrom;
-
-use async_graphql::{Context, Object};
+use async_graphql::Context;
 use uuid::Uuid;
 
-use crate::{
-    api::rest::auth::LoginForm,
-    core::{self, authentication_password, Permission, ServiceError, ServiceResult},
-    identity_service::{Identity, IdentityRequire},
+use crate::identity_service::Identity;
+use crate::model::ServiceResult;
+use crate::repo::{
+    self, AccountInput, AccountOutput, CategoryInput, CategoryOutput, LoginInput, LoginOutput,
+    ProductInput, ProductOutput,
 };
 
-use super::{
-    get_conn_from_ctx,
-    model::{
-        Category, CategoryCreateInput, CategoryUpdateInput, LoginResult, Product,
-        ProductCreateInput, ProductUpdateInput,
-    },
-};
+use super::get_conn_from_ctx;
 
 pub struct Mutation;
 
 #[Object]
 impl Mutation {
-    async fn login(&self, ctx: &Context<'_>, input: LoginForm) -> ServiceResult<LoginResult> {
-        let identity = ctx.data::<Identity>()?;
-
+    async fn login(&self, ctx: &Context<'_>, input: LoginInput) -> ServiceResult<LoginOutput> {
         let conn = &get_conn_from_ctx(ctx)?;
-
-        let login_result = authentication_password::get(conn, &input.username, &input.password);
-        match login_result {
-            Ok(account) => {
-                identity.store(&conn, &account.id)?;
-
-                let token = identity.require_auth_token()?;
-                Ok(LoginResult {
-                    authorization: format!("Bearer {}", &token),
-                    token,
-                })
-            }
-            Err(_) => Err(ServiceError::Unauthorized),
-        }
+        let identity = ctx.data::<Identity>()?;
+        repo::login(conn, identity, input)
     }
 
     async fn logout(&self, ctx: &Context<'_>) -> ServiceResult<String> {
-        let identity = ctx.data::<Identity>()?;
-
         let conn = &get_conn_from_ctx(ctx)?;
+        let identity = ctx.data::<Identity>()?;
+        repo::logout(conn, identity)?;
+        Ok("ok".to_string())
+    }
 
-        identity.forget(&conn)?;
+    async fn create_account(
+        &self,
+        ctx: &Context<'_>,
+        input: AccountInput,
+    ) -> ServiceResult<AccountOutput> {
+        let conn = &get_conn_from_ctx(ctx)?;
+        let identity = ctx.data::<Identity>()?;
+        repo::create_account(conn, identity, input)
+    }
 
-        Ok("ok".to_owned())
+    async fn update_account(
+        &self,
+        ctx: &Context<'_>,
+        id: Uuid,
+        input: AccountInput,
+    ) -> ServiceResult<AccountOutput> {
+        let conn = &get_conn_from_ctx(ctx)?;
+        let identity = ctx.data::<Identity>()?;
+        repo::update_account(conn, identity, id, input)
+    }
+
+    async fn delete_account(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<String> {
+        let conn = &get_conn_from_ctx(ctx)?;
+        let identity = ctx.data::<Identity>()?;
+        repo::delete_account(conn, identity, id)?;
+        Ok("ok".to_string())
     }
 
     async fn create_category(
         &self,
         ctx: &Context<'_>,
-        category: CategoryCreateInput,
-    ) -> ServiceResult<Category> {
-        let identity = ctx.data::<Identity>()?;
-        identity.require_account_or_cert(Permission::MEMBER)?;
-
+        input: CategoryInput,
+    ) -> ServiceResult<CategoryOutput> {
         let conn = &get_conn_from_ctx(ctx)?;
-        let mut entity = core::Category::create(conn, &category.name)?;
-        entity.update_prices(
-            &conn,
-            &category
-                .prices
-                .iter()
-                .map(|p| p.into())
-                .collect::<Vec<core::Price>>(),
-        )?;
-
-        Ok(Category::from(&entity))
+        let identity = ctx.data::<Identity>()?;
+        repo::create_category(conn, identity, input)
     }
 
     async fn update_category(
         &self,
         ctx: &Context<'_>,
-        category: CategoryUpdateInput,
-    ) -> ServiceResult<Category> {
-        let identity = ctx.data::<Identity>()?;
-        identity.require_account_or_cert(Permission::MEMBER)?;
-
+        id: Uuid,
+        input: CategoryInput,
+    ) -> ServiceResult<CategoryOutput> {
         let conn = &get_conn_from_ctx(ctx)?;
-        let mut entity = core::Category::get(conn, &Uuid::try_from(category.id)?)?;
+        let identity = ctx.data::<Identity>()?;
+        repo::update_category(conn, identity, id, input)
+    }
 
-        entity.name = category.name.clone();
-        entity.update(&conn)?;
-        entity.update_prices(
-            &conn,
-            &category
-                .prices
-                .iter()
-                .map(|p| p.into())
-                .collect::<Vec<core::Price>>(),
-        )?;
-
-        Ok(Category::from(&entity))
+    async fn delete_category(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<String> {
+        let conn = &get_conn_from_ctx(ctx)?;
+        let identity = ctx.data::<Identity>()?;
+        repo::delete_category(conn, identity, id)?;
+        Ok("ok".to_string())
     }
 
     async fn create_product(
         &self,
         ctx: &Context<'_>,
-        product: ProductCreateInput,
-    ) -> ServiceResult<Product> {
-        let identity = ctx.data::<Identity>()?;
-        identity.require_account_or_cert(Permission::MEMBER)?;
-
+        input: ProductInput,
+    ) -> ServiceResult<ProductOutput> {
         let conn = &get_conn_from_ctx(ctx)?;
-
-        let category = if let Some(x) = product.category {
-            Some(core::Category::get(&conn, &Uuid::try_from(x)?)?)
-        } else {
-            None
-        };
-        let mut entity = core::Product::create(conn, &product.name, category)?;
-        entity.update_prices(
-            &conn,
-            &product
-                .prices
-                .iter()
-                .map(|p| p.into())
-                .collect::<Vec<core::Price>>(),
-        )?;
-
-        Ok(Product::from(&entity))
+        let identity = ctx.data::<Identity>()?;
+        repo::create_product(conn, identity, input)
     }
 
     async fn update_product(
         &self,
         ctx: &Context<'_>,
-        product: ProductUpdateInput,
-    ) -> ServiceResult<Product> {
-        let identity = ctx.data::<Identity>()?;
-        identity.require_account_or_cert(Permission::MEMBER)?;
-
+        id: Uuid,
+        input: ProductInput,
+    ) -> ServiceResult<ProductOutput> {
         let conn = &get_conn_from_ctx(ctx)?;
+        let identity = ctx.data::<Identity>()?;
+        repo::update_product(conn, identity, id, input)
+    }
 
-        let category = if let Some(x) = product.category {
-            Some(core::Category::get(&conn, &Uuid::try_from(x)?)?)
-        } else {
-            None
-        };
-        let mut entity = core::Product::get(conn, &Uuid::try_from(product.id)?)?;
-
-        entity.name = product.name.clone();
-        entity.category = category;
-        entity.update(&conn)?;
-        entity.update_prices(
-            &conn,
-            &product
-                .prices
-                .iter()
-                .map(|p| p.into())
-                .collect::<Vec<core::Price>>(),
-        )?;
-
-        Ok(Product::from(&entity))
+    async fn delete_product(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<String> {
+        let conn = &get_conn_from_ctx(ctx)?;
+        let identity = ctx.data::<Identity>()?;
+        repo::delete_product(conn, identity, id)?;
+        Ok("ok".to_string())
     }
 }

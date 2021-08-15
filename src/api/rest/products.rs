@@ -1,9 +1,10 @@
-use crate::core::{Category, Permission, Pool, Product, ServiceError, ServiceResult};
-use crate::identity_service::{Identity, IdentityRequire};
-use crate::web::admin::products::SearchProduct;
-use crate::web::utils::Search;
+use crate::identity_service::Identity;
+use crate::model::{Pool, ServiceResult};
+use crate::repo::{self, ProductInput};
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
+
+use super::Search;
 
 /// GET route for `/api/v1/products`
 pub async fn get_products(
@@ -11,108 +12,52 @@ pub async fn get_products(
     identity: Identity,
     query: web::Query<Search>,
 ) -> ServiceResult<HttpResponse> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
     let conn = &pool.get()?;
-
-    let search = match &query.search {
-        Some(s) => s.clone(),
-        None => "".to_owned(),
-    };
-
-    let lower_search = search.trim().to_ascii_lowercase();
-    let search_products: Vec<SearchProduct> = Product::all(&conn)?
-        .into_iter()
-        .filter_map(|p| SearchProduct::wrap(p, &lower_search))
-        .collect();
-
-    Ok(HttpResponse::Ok().json(&search_products))
+    let result = repo::get_products(conn, &identity, query.search.as_deref())?;
+    Ok(HttpResponse::Ok().json(&result))
 }
 
 /// PUT route for `/api/v1/products`
 pub async fn put_products(
     identity: Identity,
     pool: web::Data<Pool>,
-    product: web::Json<Product>,
+    input: web::Json<ProductInput>,
 ) -> ServiceResult<HttpResponse> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
     let conn = &pool.get()?;
-
-    let category = if let Some(x) = &product.category {
-        Some(Category::get(&conn, &x.id)?)
-    } else {
-        None
-    };
-
-    let mut server_product = Product::create(&conn, &product.name, category)?;
-
-    server_product.barcode = product.barcode.clone();
-    server_product.update(&conn)?;
-
-    server_product.update_prices(&conn, &product.prices)?;
-
-    Ok(HttpResponse::Created().json(json!({
-        "id": server_product.id
-    })))
+    let result = repo::create_product(conn, &identity, input.into_inner())?;
+    Ok(HttpResponse::Ok().json(&result))
 }
 
 /// GET route for `/api/v1/product/{product_id}`
 pub async fn get_product(
     pool: web::Data<Pool>,
     identity: Identity,
-    product_id: web::Path<String>,
+    id: web::Path<Uuid>,
 ) -> ServiceResult<HttpResponse> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
     let conn = &pool.get()?;
-    let product = Product::get(&conn, &Uuid::parse_str(&product_id)?)?;
-
-    Ok(HttpResponse::Ok().json(&product))
+    let result = repo::get_product(conn, &identity, id.into_inner())?;
+    Ok(HttpResponse::Ok().json(&result))
 }
 
 /// POST route for `/api/v1/product/{product_id}`
 pub async fn post_product(
-    identity: Identity,
     pool: web::Data<Pool>,
-    product: web::Json<Product>,
-    product_id: web::Path<Uuid>,
+    identity: Identity,
+    id: web::Path<Uuid>,
+    input: web::Json<ProductInput>,
 ) -> ServiceResult<HttpResponse> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
-
-    if *product_id != product.id {
-        return Err(ServiceError::BadRequest(
-            "Id missmage",
-            "The product id of the url and the json do not match!".to_owned(),
-        ));
-    }
-
     let conn = &pool.get()?;
-
-    let mut server_product = Product::get(&conn, &product_id)?;
-
-    let category = if let Some(x) = &product.category {
-        Some(Category::get(&conn, &x.id)?)
-    } else {
-        None
-    };
-
-    server_product.name = product.name.clone();
-    server_product.barcode = product.barcode.clone();
-    server_product.category = category;
-
-    server_product.update(&conn)?;
-
-    server_product.update_prices(&conn, &product.prices)?;
-
-    Ok(HttpResponse::Ok().finish())
+    let result = repo::update_product(conn, &identity, id.into_inner(), input.into_inner())?;
+    Ok(HttpResponse::Ok().json(&result))
 }
 
 /// DELETE route for `/api/v1/product/{product_id}`
 pub async fn delete_product(
+    pool: web::Data<Pool>,
     identity: Identity,
-    _product_id: web::Path<String>,
+    id: web::Path<Uuid>,
 ) -> ServiceResult<HttpResponse> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
-
-    println!("Delete is not supported!");
-
-    Ok(HttpResponse::MethodNotAllowed().finish())
+    let conn = &pool.get()?;
+    let result = repo::delete_product(conn, &identity, id.into_inner())?;
+    Ok(HttpResponse::Ok().json(&result))
 }

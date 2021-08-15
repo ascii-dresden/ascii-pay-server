@@ -1,38 +1,26 @@
-use crate::{
-    core::{authentication_password, Permission, Pool, ServiceResult},
-    identity_service::{Identity, IdentityMut, IdentityRequire},
-};
 use actix_web::{web, HttpResponse};
 
-#[derive(InputObject, Serialize, Deserialize)]
-pub struct LoginForm {
-    pub username: String,
-    pub password: String,
-}
+use crate::{
+    identity_service::{Identity, IdentityMut},
+    model::{Pool, ServiceResult},
+    repo::{self, LoginInput},
+};
 
 /// GET route for `/api/v1/auth`
 pub async fn get_auth(identity: Identity) -> ServiceResult<HttpResponse> {
-    let identity_account = identity.require_account(Permission::DEFAULT)?;
-    Ok(HttpResponse::Ok().json(identity_account))
+    let result = repo::get_me(&identity)?;
+    Ok(HttpResponse::Ok().json(result))
 }
 
 /// POST route for `/api/v1/auth`
 pub async fn post_auth(
     identity: IdentityMut,
     pool: web::Data<Pool>,
-    params: web::Json<LoginForm>,
+    input: web::Json<LoginInput>,
 ) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
-
-    let login_result = authentication_password::get(conn, &params.username, &params.password);
-    match login_result {
-        Ok(account) => {
-            identity.store(&conn, &account.id)?;
-
-            Ok(HttpResponse::Ok().finish())
-        }
-        Err(_) => Ok(HttpResponse::Unauthorized().finish()),
-    }
+    let result = repo::login_mut(conn, &identity, input.into_inner())?;
+    Ok(HttpResponse::Ok().json(&result))
 }
 
 /// DELETE route for `/api/v1/auth`
@@ -41,8 +29,6 @@ pub async fn delete_auth(
     pool: web::Data<Pool>,
 ) -> ServiceResult<HttpResponse> {
     let conn = &pool.get()?;
-
-    identity.forget(&conn)?;
-
-    Ok(HttpResponse::Ok().finish())
+    let result = repo::logout_mut(conn, &identity)?;
+    Ok(HttpResponse::Ok().json(&result))
 }

@@ -24,17 +24,15 @@ use clap::{App, SubCommand};
 use diesel::r2d2::{self, ConnectionManager};
 
 // Internal services
-mod core;
 mod identity_service;
+mod model;
+mod repo;
 mod server;
 
-// Api endpoints
+// endpoints
 mod api;
 
-// Frontend
-mod web;
-
-use crate::core::{
+use crate::model::{
     authentication_password, env, Account, DbConnection, Permission, Pool, ServiceResult,
 };
 use server::start_server;

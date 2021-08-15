@@ -19,10 +19,10 @@ use actix_web::{
     Error, HttpMessage, Result,
 };
 
-use crate::core::{
-    env, Account, DbConnection, Permission, Pool, ServiceError, ServiceResult, Session,
+use crate::model::{
+    create_token_from_obj, env, parse_obj_from_token, Account, DbConnection, Permission, Pool,
+    ServiceError, ServiceResult, Session,
 };
-use crate::web::utils::{create_token_from_obj, parse_obj_from_token};
 
 const SESSION_COOKIE_NAME: &str = "session";
 
