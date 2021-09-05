@@ -184,8 +184,7 @@ impl IdentityInfo {
             .get(header::AUTHORIZATION)
             .map(|v| v.to_str().unwrap_or(""))
             .map(|t| t.trim_start_matches("Bearer "))
-            .map(|t| Session::from_str(t).ok())
-            .flatten();
+            .map(|t| Session::from(t.to_owned()));
         if let Some(session_id) = authorization_header {
             let session =
                 if let Ok(account) = get_longtime_session(database_conn, redis_conn, &session_id) {
@@ -204,8 +203,7 @@ impl IdentityInfo {
         // If the session cookie contains a valid AuthToken return it
         let session_cookie = request
             .cookie(SESSION_COOKIE_NAME)
-            .map(|c| Session::from_str(c.value()).ok())
-            .flatten();
+            .map(|t| Session::from(t.value().to_owned()));
         if let Some(session_id) = session_cookie {
             let session =
                 if let Ok(account) = get_longtime_session(database_conn, redis_conn, &session_id) {
@@ -231,9 +229,7 @@ impl IdentityInfo {
                 }
             }
         }
-        let auth_token_query = auth_token_query
-            .map(|t| Session::from_str(t).ok())
-            .flatten();
+        let auth_token_query = auth_token_query.map(|t| Session::from(t.to_owned()));
         if let Some(session_id) = auth_token_query {
             let session =
                 if let Ok(account) = get_longtime_session(database_conn, redis_conn, &session_id) {
@@ -259,7 +255,7 @@ impl IdentityInfo {
 
     fn get_cookie(&self) -> ServiceResult<Cookie> {
         if let Some((session, _)) = &self.session {
-            let token = session.to_string()?;
+            let token: String = session.clone().into();
 
             Ok(Cookie::build(SESSION_COOKIE_NAME, token)
                 .path("/")
@@ -405,7 +401,7 @@ impl IdentityRequire for Identity {
 
     fn get_auth_token(&self) -> ServiceResult<Option<String>> {
         if let Some((s, _)) = self.session.lock().unwrap().as_ref() {
-            Ok(Some(s.to_string()?))
+            Ok(Some(s.clone().into()))
         } else {
             Ok(None)
         }
@@ -500,7 +496,7 @@ impl IdentityRequire for IdentityMut {
     fn get_auth_token(&self) -> ServiceResult<Option<String>> {
         if let Some(info) = self.request.extensions().get::<IdentityInfo>() {
             if let Some((s, _)) = &info.session {
-                Ok(Some(s.to_string()?))
+                Ok(Some(s.clone().into()))
             } else {
                 Ok(None)
             }

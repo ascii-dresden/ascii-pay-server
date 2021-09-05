@@ -1,8 +1,3 @@
-use core::fmt;
-
-use async_graphql::{InputType, InputValueError, InputValueResult, Value};
-use serde::de::{Deserialize, Deserializer, Visitor};
-use serde::ser::{Serialize, Serializer};
 use uuid::Uuid;
 
 use crate::utils::{
@@ -17,92 +12,24 @@ struct InnerSession {
     key: Uuid,
 }
 
-#[derive(Debug, Clone, Copy, SimpleObject)]
-pub struct Session {
-    key: Uuid,
-}
+#[derive(Debug, Clone, Serialize, Deserialize, NewType)]
+pub struct Session(String);
 
 impl Session {
-    pub fn new() -> Self {
-        Self {
-            key: generate_uuid(),
-        }
+    pub fn new() -> ServiceResult<(Uuid, Self)> {
+        let key = generate_uuid();
+        let session = Session::from_key(key)?;
+        Ok((key, session))
     }
 
-    pub fn from_str(s: &str) -> ServiceResult<Self> {
-        let obj = parse_obj_from_token::<InnerSession>(s)?;
-        Ok(Self { key: obj.key })
+    pub fn get_key(&self) -> ServiceResult<Uuid> {
+        let obj = parse_obj_from_token::<InnerSession>(&self.0)?;
+        Ok(obj.key)
     }
 
-    #[allow(clippy::wrong_self_convention)]
-    pub fn to_string(&self) -> ServiceResult<String> {
-        create_token_from_obj(&InnerSession { key: self.key })
-    }
-}
-
-impl fmt::Display for Session {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Ok(s) = self.to_string() {
-            write!(f, "{}", s)
-        } else {
-            Err(fmt::Error)
-        }
-    }
-}
-
-impl Serialize for Session {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        if let Ok(s) = self.to_string() {
-            serializer.serialize_str(&s)
-        } else {
-            Err(serde::ser::Error::custom("Cannot serialize Session!"))
-        }
-    }
-}
-impl InputType for Session {
-    fn parse(value: Option<Value>) -> InputValueResult<Self> {
-        if let Some(Value::String(s)) = value {
-            Self::from_str(&s)
-                .map_err(|_| InputValueError::<Self>::custom(format!("Cannot parse session {}", s)))
-        } else {
-            Err(InputValueError::<Self>::custom("Cannot parse empty session".to_owned()))
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        Value::String(self.to_string().unwrap_or_default())
-    }
-}
-
-struct SessionVisitor;
-impl<'de> Visitor<'de> for SessionVisitor {
-    type Value = Session;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("an valid session token")
-    }
-
-    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        if let Ok(s) = Session::from_str(value) {
-            Ok(s)
-        } else {
-            Err(serde::de::Error::custom("Cannot serialize Session!"))
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for Session {
-    fn deserialize<D>(deserializer: D) -> Result<Session, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_str(SessionVisitor)
+    pub fn from_key(key: Uuid) -> ServiceResult<Self> {
+        let s = create_token_from_obj(&InnerSession { key })?;
+        Ok(Session(s))
     }
 }
 
@@ -115,11 +42,11 @@ pub fn create_longtime_session(
     redis_conn: &mut RedisConnection,
     account: &Account,
 ) -> ServiceResult<Session> {
-    let session = Session::new();
+    let (session_key, session) = Session::new()?;
 
     redis::create_data::<LongtimeSession>(
         redis_conn,
-        &uuid_to_str(session.key),
+        &uuid_to_str(session_key),
         &LongtimeSession {
             account_id: account.id,
         },
@@ -135,7 +62,7 @@ pub fn get_longtime_session(
     session: &Session,
 ) -> ServiceResult<Account> {
     let session =
-        redis::get_data::<LongtimeSession>(redis_conn, &uuid_to_str(session.key), 10 * 60)?;
+        redis::get_data::<LongtimeSession>(redis_conn, &uuid_to_str(session.get_key()?), 10 * 60)?;
 
     let account = Account::get(database_conn, session.account_id)?;
 
@@ -146,7 +73,7 @@ pub fn delete_longtime_session(
     redis_conn: &mut RedisConnection,
     session: &Session,
 ) -> ServiceResult<()> {
-    redis::delete_data::<LongtimeSession>(redis_conn, &uuid_to_str(session.key))
+    redis::delete_data::<LongtimeSession>(redis_conn, &uuid_to_str(session.get_key()?))
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -158,11 +85,11 @@ pub fn create_onetime_session(
     redis_conn: &mut RedisConnection,
     account: &Account,
 ) -> ServiceResult<Session> {
-    let session = Session::new();
+    let (session_key, session) = Session::new()?;
 
     redis::create_data::<OnetimeSession>(
         redis_conn,
-        &uuid_to_str(session.key),
+        &uuid_to_str(session_key),
         &OnetimeSession {
             account_id: account.id,
         },
@@ -177,7 +104,8 @@ pub fn get_onetime_session(
     redis_conn: &mut RedisConnection,
     session: &Session,
 ) -> ServiceResult<Account> {
-    let session = redis::get_delete_data::<OnetimeSession>(redis_conn, &uuid_to_str(session.key))?;
+    let session =
+        redis::get_delete_data::<OnetimeSession>(redis_conn, &uuid_to_str(session.get_key()?))?;
 
     let account = Account::get(database_conn, session.account_id)?;
 

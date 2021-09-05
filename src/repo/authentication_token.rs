@@ -39,7 +39,7 @@ pub fn authenticate_account(
     let session = create_onetime_session(redis_conn, &account)?;
 
     Ok(AccountAccessTokenOutput {
-        token: session.to_string()?,
+        token: session.into(),
     })
 }
 
@@ -59,7 +59,7 @@ pub fn authenticate_barcode(
         let account = Account::get(database_conn, account_id)?;
         let session = create_onetime_session(redis_conn, &account)?;
 
-        return Ok((TokenType::AccountAccessToken, session.to_string()?));
+        return Ok((TokenType::AccountAccessToken, session.into()));
     }
 
     Err(ServiceError::NotFound)
@@ -100,7 +100,7 @@ pub fn authenticate_nfc_generic(
     let account = Account::get(database_conn, nfc_entry.account_id)?;
     let session = create_onetime_session(redis_conn, &account)?;
 
-    Ok((TokenType::AccountAccessToken, session.to_string()?))
+    Ok((TokenType::AccountAccessToken, session.into()))
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -211,7 +211,7 @@ pub fn authenticate_nfc_mifare_desfire_phase2(
 
     Ok((
         bytes_to_string(&session_key),
-        (TokenType::AccountAccessToken, session.to_string()?),
+        (TokenType::AccountAccessToken, session.into()),
     ))
 }
 

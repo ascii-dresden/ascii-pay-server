@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::identity_service::Identity;
 use crate::repo::{
     self, AccountAccessTokenOutput, AccountInput, AccountOutput, CategoryInput, CategoryOutput,
-    LoginInput, LoginOutput, ProductInput, ProductOutput,
+    LoginInput, LoginOutput, PaymentInput, PaymentOutput, ProductInput, ProductOutput,
 };
 use crate::utils::ServiceResult;
 
@@ -130,5 +130,16 @@ impl Mutation {
         let identity = ctx.data::<Identity>()?;
         repo::delete_product(database_conn, identity, id)?;
         Ok("ok".to_string())
+    }
+
+    async fn transaction(
+        &self,
+        ctx: &Context<'_>,
+        input: PaymentInput,
+    ) -> ServiceResult<PaymentOutput> {
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
+        let mut redis_conn = get_redis_conn_from_ctx(ctx)?;
+        let identity = ctx.data::<Identity>()?;
+        repo::transaction_payment(database_conn, redis_conn.deref_mut(), identity, input)
     }
 }
