@@ -1,7 +1,6 @@
 use crate::identity_service::{Identity, IdentityRequire};
-use crate::model::{
-    fuzzy_vec_match, Category, DbConnection, Money, Permission, Price, ServiceError, ServiceResult,
-};
+use crate::model::{Category, Permission, Price};
+use crate::utils::{fuzzy_vec_match, DatabaseConnection, Money, ServiceError, ServiceResult};
 use uuid::Uuid;
 
 use super::prices::{PriceInput, PriceOutput};
@@ -59,11 +58,11 @@ fn search_category(entity: Category, search: &str) -> Option<SearchElement<Categ
 }
 
 pub fn get_categories(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     identity: &Identity,
     search: Option<&str>,
 ) -> ServiceResult<Vec<SearchElement<CategoryOutput>>> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
+    identity.require_account_or_cert(Permission::Member)?;
 
     let search = match search {
         Some(s) => s.to_owned(),
@@ -71,7 +70,7 @@ pub fn get_categories(
     };
 
     let lower_search = search.trim().to_ascii_lowercase();
-    let entities: Vec<SearchElement<CategoryOutput>> = Category::all(conn)?
+    let entities: Vec<SearchElement<CategoryOutput>> = Category::all(database_conn)?
         .into_iter()
         .filter_map(|c| search_category(c, &lower_search))
         .collect();
@@ -80,26 +79,26 @@ pub fn get_categories(
 }
 
 pub fn get_category(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     identity: &Identity,
     id: Uuid,
 ) -> ServiceResult<CategoryOutput> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
+    identity.require_account_or_cert(Permission::Member)?;
 
-    let entity = Category::get(conn, &id)?;
+    let entity = Category::get(database_conn, &id)?;
     Ok(entity.into())
 }
 
 pub fn create_category(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     identity: &Identity,
     input: CategoryInput,
 ) -> ServiceResult<CategoryOutput> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
+    identity.require_account_or_cert(Permission::Member)?;
 
-    let mut entity = Category::create(conn, &input.name)?;
+    let mut entity = Category::create(database_conn, &input.name)?;
     entity.update_prices(
-        conn,
+        database_conn,
         &input
             .prices
             .into_iter()
@@ -111,19 +110,19 @@ pub fn create_category(
 }
 
 pub fn update_category(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     identity: &Identity,
     id: Uuid,
     input: CategoryInput,
 ) -> ServiceResult<CategoryOutput> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
+    identity.require_account_or_cert(Permission::Member)?;
 
-    let mut entity = Category::get(conn, &id)?;
+    let mut entity = Category::get(database_conn, &id)?;
     entity.name = input.name.clone();
-    entity.update(conn)?;
+    entity.update(database_conn)?;
 
     entity.update_prices(
-        conn,
+        database_conn,
         &input
             .prices
             .into_iter()
@@ -134,8 +133,12 @@ pub fn update_category(
     Ok(entity.into())
 }
 
-pub fn delete_category(_conn: &DbConnection, identity: &Identity, _id: Uuid) -> ServiceResult<()> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
+pub fn delete_category(
+    _database_conn: &DatabaseConnection,
+    identity: &Identity,
+    _id: Uuid,
+) -> ServiceResult<()> {
+    identity.require_account_or_cert(Permission::Member)?;
 
     println!("Delete is not supported!");
 

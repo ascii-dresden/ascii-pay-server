@@ -10,6 +10,7 @@ services:
       - HOST=0.0.0.0
       - PORT=8080
       - DATABASE_URL=postgres://ascii:ascii@db:5432/ascii-pay
+      - REDIS_URL=redis://redis:6379/1
       - MAIL_SENDER=payments@ascii.coffee
       - MAIL_SENDER_NAME=Ascii Pay Service
       - MAIL_URL=mail.example.local
@@ -30,14 +31,26 @@ services:
       - default
     restart: always
   db:
-    image: postgres:13-buster
+    image: postgres:13-alpine
     container_name: "ascii-pay-postgres-dist"
     environment:
       - POSTGRES_USER=ascii
       - POSTGRES_PASSWORD=ascii
       - POSTGRES_DB=ascii-pay
+    ports:
+      - "5432:5432"
     volumes:
       - ./dist/postgres:/var/lib/postgresql/data
+    networks:
+      - default
+    restart: always
+  redis:
+    image: redis:6-alpine
+    container_name: "ascii-pay-redis-dist"
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./dist/redis:/var/lib/redis
     networks:
       - default
     restart: always

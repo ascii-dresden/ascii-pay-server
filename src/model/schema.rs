@@ -9,6 +9,7 @@ table! {
         account_number -> Nullable<Varchar>,
         permission -> Int2,
         receives_monthly_report -> Bool,
+        allow_nfc_registration -> Bool,
     }
 }
 
@@ -32,25 +33,12 @@ table! {
 }
 
 table! {
-    authentication_barcode (account_id) {
-        account_id -> Uuid,
-        code -> Varchar,
-    }
-}
-
-table! {
-    authentication_nfc (account_id) {
+    authentication_nfc (account_id, card_id) {
         account_id -> Uuid,
         card_id -> Varchar,
-        key -> Nullable<Varchar>,
-        secret -> Nullable<Varchar>,
-    }
-}
-
-table! {
-    authentication_nfc_write_key (account_id, card_id) {
-        account_id -> Uuid,
-        card_id -> Varchar,
+        card_type -> Varchar,
+        name -> Varchar,
+        data -> Varchar,
     }
 }
 
@@ -103,15 +91,6 @@ table! {
 }
 
 table! {
-    session (id) {
-        id -> Uuid,
-        account_id -> Uuid,
-        valid_until -> Timestamp,
-        transaction_total -> Nullable<Int4>,
-    }
-}
-
-table! {
     transaction (id) {
         id -> Uuid,
         account_id -> Uuid,
@@ -135,16 +114,13 @@ allow_tables_to_appear_in_same_query!(
     account,
     apple_wallet_pass,
     apple_wallet_registration,
-    authentication_barcode,
     authentication_nfc,
-    authentication_nfc_write_key,
     authentication_password,
     authentication_password_invitation,
     category,
     category_price,
     product,
     product_price,
-    session,
     transaction,
     transaction_product,
 );

@@ -10,9 +10,6 @@ pub use auth::*;
 pub mod categories;
 pub use categories::*;
 
-pub mod identification;
-pub use identification::*;
-
 pub mod prices;
 pub use prices::*;
 
@@ -21,6 +18,9 @@ pub use products::*;
 
 pub mod transactions;
 pub use transactions::*;
+
+pub mod authentication_token;
+pub use authentication_token::*;
 
 #[derive(Debug, Serialize, SimpleObject)]
 pub struct SearchElement<T>

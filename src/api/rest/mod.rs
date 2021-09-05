@@ -1,7 +1,6 @@
 pub mod accounts;
 pub mod auth;
 pub mod categories;
-pub mod identification;
 pub mod products;
 pub mod transactions;
 
@@ -15,7 +14,6 @@ pub struct Search {
 
 pub fn init(config: &mut web::ServiceConfig) {
     config
-        .service(web::resource("/identify").route(web::post().to(identification::post_identify)))
         .service(
             web::resource("/auth")
                 .route(web::get().to(auth::get_auth))
@@ -29,24 +27,18 @@ pub fn init(config: &mut web::ServiceConfig) {
                 .route(web::put().to(accounts::put_accounts)),
         )
         .service(
-            web::resource("/account/{account_id}/barcode")
-                .route(web::put().to(accounts::put_account_barcode))
-                .route(web::delete().to(accounts::delete_account_barcode)),
+            web::resource("/account/{account_id}/nfc")
+                .route(web::delete().to(accounts::delete_account_nfc)),
         )
         .service(
-            web::resource("/account/{account_id}/nfc")
-                .route(web::put().to(accounts::put_account_nfc))
-                .route(web::delete().to(accounts::delete_account_nfc)),
+            web::resource("/account/{account_id}/access-token")
+                .route(web::get().to(accounts::get_account_access_token)),
         )
         .service(
             web::resource("/account/{account_id}")
                 .route(web::get().to(accounts::get_account))
                 .route(web::post().to(accounts::post_account))
                 .route(web::delete().to(accounts::delete_account)),
-        )
-        .service(
-            web::resource("/transaction/token")
-                .route(web::post().to(transactions::post_transaction_token)),
         )
         .service(
             web::resource("/transaction/payment")

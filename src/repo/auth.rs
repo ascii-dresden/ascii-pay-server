@@ -1,6 +1,7 @@
 use crate::{
     identity_service::{Identity, IdentityMut, IdentityRequire},
-    model::{authentication_password, DbConnection, Permission, ServiceError, ServiceResult},
+    model::{authentication_password, Permission},
+    utils::{DatabaseConnection, RedisConnection, ServiceError, ServiceResult},
 };
 
 use super::accounts::AccountOutput;
@@ -18,19 +19,21 @@ pub struct LoginOutput {
 }
 
 pub fn get_me(identity: &Identity) -> ServiceResult<AccountOutput> {
-    let entity = identity.require_account(Permission::DEFAULT)?;
+    let entity = identity.require_account(Permission::Default)?;
     Ok(entity.into())
 }
 
 pub fn login(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
+    redis_conn: &mut RedisConnection,
     identity: &Identity,
     input: LoginInput,
 ) -> ServiceResult<LoginOutput> {
-    let login_result = authentication_password::get(conn, &input.username, &input.password);
+    let login_result =
+        authentication_password::get(database_conn, &input.username, &input.password);
     match login_result {
         Ok(account) => {
-            identity.store(&conn, &account.id)?;
+            identity.store(database_conn, redis_conn, &account.id)?;
 
             let token = identity.require_auth_token()?;
             Ok(LoginOutput {
@@ -43,14 +46,16 @@ pub fn login(
 }
 
 pub fn login_mut(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
+    redis_conn: &mut RedisConnection,
     identity: &IdentityMut,
     input: LoginInput,
 ) -> ServiceResult<LoginOutput> {
-    let login_result = authentication_password::get(conn, &input.username, &input.password);
+    let login_result =
+        authentication_password::get(database_conn, &input.username, &input.password);
     match login_result {
         Ok(account) => {
-            identity.store(&conn, &account.id)?;
+            identity.store(database_conn, redis_conn, &account.id)?;
 
             let token = identity.require_auth_token()?;
             Ok(LoginOutput {
@@ -62,12 +67,12 @@ pub fn login_mut(
     }
 }
 
-pub fn logout(conn: &DbConnection, identity: &Identity) -> ServiceResult<()> {
-    identity.forget(&conn)?;
+pub fn logout(conn: &mut RedisConnection, identity: &Identity) -> ServiceResult<()> {
+    identity.forget(conn)?;
     Ok(())
 }
 
-pub fn logout_mut(conn: &DbConnection, identity: &IdentityMut) -> ServiceResult<()> {
-    identity.forget(&conn)?;
+pub fn logout_mut(conn: &mut RedisConnection, identity: &IdentityMut) -> ServiceResult<()> {
+    identity.forget(conn)?;
     Ok(())
 }

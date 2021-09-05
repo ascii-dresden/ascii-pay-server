@@ -1,29 +1,32 @@
+use std::ops::DerefMut;
+
 use async_graphql::Context;
 use uuid::Uuid;
 
 use crate::identity_service::Identity;
-use crate::model::ServiceResult;
 use crate::repo::{
-    self, AccountInput, AccountOutput, CategoryInput, CategoryOutput, LoginInput, LoginOutput,
-    ProductInput, ProductOutput,
+    self, AccountAccessTokenOutput, AccountInput, AccountOutput, CategoryInput, CategoryOutput,
+    LoginInput, LoginOutput, ProductInput, ProductOutput,
 };
+use crate::utils::ServiceResult;
 
-use super::get_conn_from_ctx;
+use super::{get_database_conn_from_ctx, get_redis_conn_from_ctx};
 
 pub struct Mutation;
 
 #[Object]
 impl Mutation {
     async fn login(&self, ctx: &Context<'_>, input: LoginInput) -> ServiceResult<LoginOutput> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
+        let mut redis_conn = get_redis_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::login(conn, identity, input)
+        repo::login(database_conn, redis_conn.deref_mut(), identity, input)
     }
 
     async fn logout(&self, ctx: &Context<'_>) -> ServiceResult<String> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let mut redis_conn = get_redis_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::logout(conn, identity)?;
+        repo::logout(redis_conn.deref_mut(), identity)?;
         Ok("ok".to_string())
     }
 
@@ -32,9 +35,9 @@ impl Mutation {
         ctx: &Context<'_>,
         input: AccountInput,
     ) -> ServiceResult<AccountOutput> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::create_account(conn, identity, input)
+        repo::create_account(database_conn, identity, input)
     }
 
     async fn update_account(
@@ -43,16 +46,34 @@ impl Mutation {
         id: Uuid,
         input: AccountInput,
     ) -> ServiceResult<AccountOutput> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::update_account(conn, identity, id, input)
+        repo::update_account(database_conn, identity, id, input)
     }
 
     async fn delete_account(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<String> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
         repo::delete_account(conn, identity, id)?;
         Ok("ok".to_string())
+    }
+
+    async fn delete_account_nfc_card(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<String> {
+        let conn = &get_database_conn_from_ctx(ctx)?;
+        let identity = ctx.data::<Identity>()?;
+        repo::authenticate_nfc_delete_card(conn, identity, id)?;
+        Ok("ok".to_string())
+    }
+
+    async fn get_account_access_token(
+        &self,
+        ctx: &Context<'_>,
+        id: Uuid,
+    ) -> ServiceResult<AccountAccessTokenOutput> {
+        let conn = &get_database_conn_from_ctx(ctx)?;
+        let mut redis_conn = get_redis_conn_from_ctx(ctx)?;
+        let identity = ctx.data::<Identity>()?;
+        repo::authenticate_account(conn, redis_conn.deref_mut(), identity, id)
     }
 
     async fn create_category(
@@ -60,9 +81,9 @@ impl Mutation {
         ctx: &Context<'_>,
         input: CategoryInput,
     ) -> ServiceResult<CategoryOutput> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::create_category(conn, identity, input)
+        repo::create_category(database_conn, identity, input)
     }
 
     async fn update_category(
@@ -71,15 +92,15 @@ impl Mutation {
         id: Uuid,
         input: CategoryInput,
     ) -> ServiceResult<CategoryOutput> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::update_category(conn, identity, id, input)
+        repo::update_category(database_conn, identity, id, input)
     }
 
     async fn delete_category(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<String> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::delete_category(conn, identity, id)?;
+        repo::delete_category(database_conn, identity, id)?;
         Ok("ok".to_string())
     }
 
@@ -88,9 +109,9 @@ impl Mutation {
         ctx: &Context<'_>,
         input: ProductInput,
     ) -> ServiceResult<ProductOutput> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::create_product(conn, identity, input)
+        repo::create_product(database_conn, identity, input)
     }
 
     async fn update_product(
@@ -99,15 +120,15 @@ impl Mutation {
         id: Uuid,
         input: ProductInput,
     ) -> ServiceResult<ProductOutput> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::update_product(conn, identity, id, input)
+        repo::update_product(database_conn, identity, id, input)
     }
 
     async fn delete_product(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<String> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::delete_product(conn, identity, id)?;
+        repo::delete_product(database_conn, identity, id)?;
         Ok("ok".to_string())
     }
 }

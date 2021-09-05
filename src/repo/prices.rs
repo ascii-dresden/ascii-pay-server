@@ -1,6 +1,9 @@
 use chrono::NaiveDateTime;
 
-use crate::model::{naive_date_time_serializer, Money, Price};
+use crate::{
+    model::{naive_date_time_serializer, Price},
+    utils::Money,
+};
 
 #[derive(Debug, Deserialize, InputObject)]
 pub struct PriceInput {

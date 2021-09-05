@@ -1,7 +1,7 @@
 use chrono::NaiveDateTime;
 use uuid::Uuid;
 
-use crate::model::{Money, DB};
+use crate::utils::{Money, DB};
 
 /// Represent a price of a product or category with a validity
 ///

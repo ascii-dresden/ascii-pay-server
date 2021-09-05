@@ -4,9 +4,8 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::model::schema::transaction;
-use crate::model::{
-    generate_uuid, wallet, Account, DbConnection, Money, Product, ServiceError, ServiceResult,
-};
+use crate::model::{Account, Product};
+use crate::utils::{generate_uuid, DatabaseConnection, Money, ServiceError, ServiceResult};
 
 /// Represent a transaction
 #[derive(
@@ -33,7 +32,7 @@ pub struct Transaction {
 /// * 5 Create and save the transaction (with optional cashier refernece)
 /// * 6 Save the new credit to the account
 fn execute_at(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     account: &mut Account,
     cashier: Option<&Account>,
     total: Money,
@@ -41,21 +40,11 @@ fn execute_at(
 ) -> ServiceResult<Transaction> {
     use crate::model::schema::transaction::dsl;
 
-    // TODO: Are empty transaction useful? You can still assign products
-    /*
-    if total == 0 {
-        return Err(ServiceError::BadRequest(
-            "Empty transaction",
-            "Cannot perform a transaction with a total of zero".to_owned()
-        ))
-    }
-    */
-
     let before_credit = account.credit;
     let mut after_credit = account.credit;
 
-    let result = conn.build_transaction().serializable().run(|| {
-        let mut account = Account::get(conn, &account.id)?;
+    let result = database_conn.build_transaction().serializable().run(|| {
+        let mut account = Account::get(database_conn, &account.id)?;
         after_credit = account.credit + total;
 
         if after_credit < account.minimum_credit && after_credit < account.credit {
@@ -79,9 +68,9 @@ fn execute_at(
 
         diesel::insert_into(dsl::transaction)
             .values(&a)
-            .execute(conn)?;
+            .execute(database_conn)?;
 
-        account.update(conn)?;
+        account.update(database_conn)?;
 
         Ok(a)
     });
@@ -103,12 +92,18 @@ fn execute_at(
 /// * 5 Create and save the transaction (with optional cashier refernece)
 /// * 6 Save the new credit to the account
 pub fn execute(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     account: &mut Account,
     cashier: Option<&Account>,
     total: Money,
 ) -> ServiceResult<Transaction> {
-    let transaction = execute_at(conn, account, cashier, total, Local::now().naive_local())?;
+    let transaction = execute_at(
+        database_conn,
+        account,
+        cashier,
+        total,
+        Local::now().naive_local(),
+    )?;
 
     Ok(transaction)
 }
@@ -116,7 +111,7 @@ pub fn execute(
 // Pagination reference: https://github.com/diesel-rs/diesel/blob/v1.3.0/examples/postgres/advanced-blog-cli/src/pagination.rs
 /// List all transactions of a account between the given datetimes
 pub fn get_by_account(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     account: &Account,
     from: &NaiveDateTime,
     to: &NaiveDateTime,
@@ -130,13 +125,13 @@ pub fn get_by_account(
                 .and(dsl::date.between(from, to)),
         )
         .order(dsl::date.desc())
-        .load::<Transaction>(conn)?;
+        .load::<Transaction>(database_conn)?;
 
     Ok(results)
 }
 
 pub fn get_by_account_and_id(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     account: &Account,
     id: &Uuid,
 ) -> ServiceResult<Transaction> {
@@ -144,7 +139,7 @@ pub fn get_by_account_and_id(
 
     let mut results = dsl::transaction
         .filter(dsl::account_id.eq(&account.id).and(dsl::id.eq(id)))
-        .load::<Transaction>(conn)?;
+        .load::<Transaction>(database_conn)?;
 
     results.pop().ok_or(ServiceError::NotFound)
 }
@@ -172,16 +167,19 @@ pub enum ValidationResult {
 }
 
 /// Check if the credit of an account is valid to its transactions
-fn validate_account(conn: &DbConnection, account: &Account) -> ServiceResult<ValidationResult> {
+fn validate_account(
+    database_conn: &DatabaseConnection,
+    account: &Account,
+) -> ServiceResult<ValidationResult> {
     use crate::model::schema::transaction::dsl;
 
-    conn.build_transaction().serializable().run(|| {
-        let account = Account::get(conn, &account.id)?;
+    database_conn.build_transaction().serializable().run(|| {
+        let account = Account::get(database_conn, &account.id)?;
 
         let results = dsl::transaction
             .filter(dsl::account_id.eq(&account.id))
             .order(dsl::date.asc())
-            .load::<Transaction>(conn)?;
+            .load::<Transaction>(database_conn)?;
 
         let mut last_credit = 0;
 
@@ -215,13 +213,15 @@ fn validate_account(conn: &DbConnection, account: &Account) -> ServiceResult<Val
 }
 
 /// List all accounts with validation erros of their credit to their transactions
-pub fn validate_all(conn: &DbConnection) -> ServiceResult<HashMap<Uuid, ValidationResult>> {
-    let accounts = Account::all(conn)?;
+pub fn validate_all(
+    database_conn: &DatabaseConnection,
+) -> ServiceResult<HashMap<Uuid, ValidationResult>> {
+    let accounts = Account::all(database_conn)?;
 
     let map = accounts
         .into_iter()
         .map(|a| {
-            let r = validate_account(conn, &a).unwrap_or(ValidationResult::Error);
+            let r = validate_account(database_conn, &a).unwrap_or(ValidationResult::Error);
             (a.id, r)
         })
         .collect::<HashMap<_, _>>();
@@ -233,13 +233,13 @@ impl Transaction {
     /// Assign products with amounts to this transaction
     pub fn add_products(
         &self,
-        conn: &DbConnection,
+        database_conn: &DatabaseConnection,
         products: Vec<(Product, i32)>,
     ) -> ServiceResult<()> {
         use crate::model::schema::transaction_product::dsl;
 
         let current_products = self
-            .get_products(&conn)?
+            .get_products(database_conn)?
             .into_iter()
             .collect::<HashMap<Product, i32>>();
 
@@ -254,7 +254,7 @@ impl Transaction {
                         ),
                     )
                     .set(dsl::amount.eq(current_amount + amount))
-                    .execute(conn)?;
+                    .execute(database_conn)?;
                 }
                 None => {
                     diesel::insert_into(dsl::transaction_product)
@@ -263,7 +263,7 @@ impl Transaction {
                             dsl::product_id.eq(&product.id),
                             dsl::amount.eq(amount),
                         ))
-                        .execute(conn)?;
+                        .execute(database_conn)?;
                 }
             }
         }
@@ -274,13 +274,13 @@ impl Transaction {
     /// Remove products with amounts from this transaction
     pub fn remove_products(
         &self,
-        conn: &DbConnection,
+        database_conn: &DatabaseConnection,
         products: Vec<(Product, i32)>,
     ) -> ServiceResult<()> {
         use crate::model::schema::transaction_product::dsl;
 
         let current_products = self
-            .get_products(&conn)?
+            .get_products(database_conn)?
             .into_iter()
             .collect::<HashMap<Product, i32>>();
 
@@ -294,7 +294,7 @@ impl Transaction {
                                 .and(dsl::product_id.eq(&product.id)),
                         ),
                     )
-                    .execute(conn)?;
+                    .execute(database_conn)?;
                 } else {
                     diesel::update(
                         dsl::transaction_product.filter(
@@ -304,7 +304,7 @@ impl Transaction {
                         ),
                     )
                     .set(dsl::amount.eq(current_amount - amount))
-                    .execute(conn)?;
+                    .execute(database_conn)?;
                 }
             }
         }
@@ -313,117 +313,30 @@ impl Transaction {
     }
 
     /// List assigned products with amounts of this transaction
-    pub fn get_products(&self, conn: &DbConnection) -> ServiceResult<Vec<(Product, i32)>> {
+    pub fn get_products(
+        &self,
+        database_conn: &DatabaseConnection,
+    ) -> ServiceResult<Vec<(Product, i32)>> {
         use crate::model::schema::transaction_product::dsl;
 
         Ok(dsl::transaction_product
             .filter(dsl::transaction.eq(&self.id))
-            .load::<(Uuid, Uuid, i32)>(conn)?
+            .load::<(Uuid, Uuid, i32)>(database_conn)?
             .into_iter()
-            .filter_map(|(_, p, a)| match Product::get(conn, &p) {
+            .filter_map(|(_, p, a)| match Product::get(database_conn, &p) {
                 Ok(p) => Some((p, a)),
                 _ => None,
             })
             .collect())
     }
 
-    pub fn all(conn: &DbConnection) -> ServiceResult<Vec<Transaction>> {
+    pub fn all(database_conn: &DatabaseConnection) -> ServiceResult<Vec<Transaction>> {
         use crate::model::schema::transaction::dsl;
 
         let results = dsl::transaction
             .order(dsl::date.desc())
-            .load::<Transaction>(conn)?;
+            .load::<Transaction>(database_conn)?;
 
         Ok(results)
     }
-}
-
-pub async fn generate_transactions(
-    conn: &DbConnection,
-    account: &mut Account,
-    from: NaiveDateTime,
-    to: NaiveDateTime,
-    count_per_day: u32,
-    avg_down: Money,
-    avg_up: Money,
-) -> ServiceResult<()> {
-    use chrono::Duration;
-    use chrono::NaiveTime;
-    use rand::seq::SliceRandom;
-
-    let days = (to - from).num_days();
-    let start_date = from.date();
-
-    let products = Product::all(conn)?;
-    let mut rng = rand::thread_rng();
-
-    for day_offset in 0..days {
-        let offset = Duration::days(day_offset);
-        let date = start_date + offset;
-
-        for time_offset in 0..count_per_day {
-            let offset = 9.0 / ((count_per_day - 1) as f32) * time_offset as f32;
-
-            let hr = offset as u32;
-            let mn = ((offset - hr as f32) * 60.0) as u32;
-
-            let time = NaiveTime::from_hms(9 + hr, mn, 0);
-
-            let date_time = NaiveDateTime::new(date, time);
-
-            let mut seconds = 0;
-
-            let mut price = 0;
-            let mut transaction_products: HashMap<Product, i32> = HashMap::new();
-            while price < avg_down.abs() {
-                let p = products.choose(&mut rng);
-
-                if let Some(p) = p {
-                    let pr = p.current_price;
-
-                    if let Some(pr) = pr {
-                        price += pr;
-                    }
-
-                    let amount = transaction_products.get(p).copied().unwrap_or(0) + 1;
-                    transaction_products.insert(p.clone(), amount);
-                } else {
-                    price = avg_down;
-                }
-            }
-
-            while account.credit - price < account.minimum_credit {
-                execute_at(
-                    conn,
-                    account,
-                    None,
-                    avg_up,
-                    date_time + Duration::seconds(seconds),
-                )?;
-                seconds += 1;
-            }
-
-            let transaction = execute_at(
-                conn,
-                account,
-                None,
-                -price,
-                date_time + Duration::seconds(seconds),
-            )?;
-
-            transaction.add_products(
-                conn,
-                transaction_products
-                    .into_iter()
-                    .map(|(k, v)| (k, v))
-                    .collect(),
-            )?;
-        }
-    }
-
-    if let Err(e) = wallet::send_update_notification(conn, &account.id).await {
-        eprintln!("Error while communicating with APNS: {:?}", e);
-    }
-
-    Ok(())
 }

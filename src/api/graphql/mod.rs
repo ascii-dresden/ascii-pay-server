@@ -9,27 +9,37 @@ use async_graphql::{
     Context, EmptySubscription, Schema,
 };
 use async_graphql_actix_web::{Request, Response};
+use diesel::r2d2::ConnectionManager;
+use r2d2_redis::RedisConnectionManager;
 
 use crate::{
     identity_service::Identity,
-    model::{Pool, ServiceResult},
+    utils::{DatabasePool, RedisPool, ServiceResult},
 };
 
 use self::{mutation::Mutation, query::Query};
 
 pub type AppSchema = Schema<Query, Mutation, EmptySubscription>;
 
-pub fn get_conn_from_ctx(
+pub fn get_database_conn_from_ctx(
     ctx: &Context<'_>,
-) -> ServiceResult<r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>> {
-    Ok(ctx.data::<Arc<Pool>>()?.get()?)
+) -> ServiceResult<r2d2::PooledConnection<ConnectionManager<diesel::PgConnection>>> {
+    Ok(ctx.data::<Arc<DatabasePool>>()?.get()?)
 }
 
-pub fn create_schema_with_context(pool: Pool) -> AppSchema {
-    let arc_pool = Arc::new(pool);
+pub fn get_redis_conn_from_ctx(
+    ctx: &Context<'_>,
+) -> ServiceResult<r2d2::PooledConnection<RedisConnectionManager>> {
+    Ok(ctx.data::<Arc<RedisPool>>()?.get()?)
+}
+
+pub fn create_schema_with_context(databse_pool: DatabasePool, redis_pool: RedisPool) -> AppSchema {
+    let arc_database_pool = Arc::new(databse_pool);
+    let arc_redis_pool = Arc::new(redis_pool);
 
     Schema::build(Query, Mutation, EmptySubscription)
-        .data(arc_pool)
+        .data(arc_database_pool)
+        .data(arc_redis_pool)
         .finish()
 }
 

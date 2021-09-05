@@ -2,7 +2,9 @@ use chrono::{Local, NaiveDateTime};
 use diesel::prelude::*;
 use uuid::Uuid;
 
-use crate::model::{generate_uuid, DbConnection, Money, Price, ServiceError, ServiceResult, DB};
+use crate::utils::{generate_uuid, DatabaseConnection, Money, ServiceError, ServiceResult, DB};
+
+use super::Price;
 
 /// Represent a category
 #[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone)]
@@ -33,7 +35,7 @@ impl diesel::Queryable<(diesel::sql_types::Uuid, diesel::sql_types::Text), DB> f
 
 impl Category {
     /// Create a new category with the given name and category
-    pub fn create(conn: &DbConnection, name: &str) -> ServiceResult<Category> {
+    pub fn create(database_conn: &DatabaseConnection, name: &str) -> ServiceResult<Category> {
         use crate::model::schema::category::dsl;
 
         let p = Category {
@@ -45,7 +47,7 @@ impl Category {
 
         diesel::insert_into(dsl::category)
             .values((dsl::id.eq(&p.id), dsl::name.eq(&p.name)))
-            .execute(conn)?;
+            .execute(database_conn)?;
 
         Ok(p)
     }
@@ -53,12 +55,12 @@ impl Category {
     /// Save the current category data to the database
     ///
     /// This ignores all changes to the `prices` vec
-    pub fn update(&self, conn: &DbConnection) -> ServiceResult<()> {
+    pub fn update(&self, database_conn: &DatabaseConnection) -> ServiceResult<()> {
         use crate::model::schema::category::dsl;
 
         diesel::update(dsl::category.find(&self.id))
             .set(dsl::name.eq(&self.name))
-            .execute(conn)?;
+            .execute(database_conn)?;
 
         Ok(())
     }
@@ -68,7 +70,7 @@ impl Category {
     /// This updates the `prices` vec and the `current_price`
     pub fn add_price(
         &mut self,
-        conn: &DbConnection,
+        database_conn: &DatabaseConnection,
         validity_start: NaiveDateTime,
         value: Money,
     ) -> ServiceResult<()> {
@@ -85,7 +87,7 @@ impl Category {
                 dsl::validity_start.eq(&p.validity_start),
                 dsl::value.eq(&p.value),
             ))
-            .execute(conn)?;
+            .execute(database_conn)?;
 
         self.prices.push(p);
 
@@ -99,7 +101,7 @@ impl Category {
     /// This updates the `prices` vec and the `current_price`
     pub fn remove_price(
         &mut self,
-        conn: &DbConnection,
+        database_conn: &DatabaseConnection,
         validity_start: NaiveDateTime,
     ) -> ServiceResult<()> {
         use crate::model::schema::category_price::dsl;
@@ -119,7 +121,7 @@ impl Category {
                     .and(dsl::validity_start.eq(validity_start)),
             ),
         )
-        .execute(conn)?;
+        .execute(database_conn)?;
 
         self.prices.remove(index);
 
@@ -130,12 +132,13 @@ impl Category {
 
     pub fn update_prices(
         &mut self,
-        conn: &DbConnection,
+        database_conn: &DatabaseConnection,
         new_prices: &[Price],
     ) -> ServiceResult<()> {
         use crate::model::schema::category_price::dsl;
 
-        diesel::delete(dsl::category_price.filter(dsl::category_id.eq(&self.id))).execute(conn)?;
+        diesel::delete(dsl::category_price.filter(dsl::category_id.eq(&self.id)))
+            .execute(database_conn)?;
         self.prices.clear();
 
         for p in new_prices {
@@ -145,7 +148,7 @@ impl Category {
                     dsl::validity_start.eq(&p.validity_start),
                     dsl::value.eq(&p.value),
                 ))
-                .execute(conn)?;
+                .execute(database_conn)?;
 
             self.prices.push(p.clone());
         }
@@ -157,12 +160,12 @@ impl Category {
     /// Load the prices for this category
     ///
     /// This updates the `prices` vec and the `current_price`
-    fn load_prices(&mut self, conn: &DbConnection) -> ServiceResult<()> {
+    fn load_prices(&mut self, database_conn: &DatabaseConnection) -> ServiceResult<()> {
         use crate::model::schema::category_price::dsl;
 
         let results = dsl::category_price
             .filter(dsl::category_id.eq(&self.id))
-            .load::<Price>(conn)?;
+            .load::<Price>(database_conn)?;
 
         self.prices = results;
 
@@ -187,31 +190,31 @@ impl Category {
     }
 
     /// List all categorys
-    pub fn all(conn: &DbConnection) -> ServiceResult<Vec<Category>> {
+    pub fn all(database_conn: &DatabaseConnection) -> ServiceResult<Vec<Category>> {
         use crate::model::schema::category::dsl;
 
         let mut results = dsl::category
             .order(dsl::name.asc())
-            .load::<Category>(conn)?;
+            .load::<Category>(database_conn)?;
 
         for p in &mut results {
-            p.load_prices(conn)?;
+            p.load_prices(database_conn)?;
         }
 
         Ok(results)
     }
 
     /// Get a category by the `id`
-    pub fn get(conn: &DbConnection, id: &Uuid) -> ServiceResult<Category> {
+    pub fn get(database_conn: &DatabaseConnection, id: &Uuid) -> ServiceResult<Category> {
         use crate::model::schema::category::dsl;
 
         let mut results = dsl::category
             .filter(dsl::id.eq(id))
-            .load::<Category>(conn)?;
+            .load::<Category>(database_conn)?;
 
         let mut category = results.pop().ok_or(ServiceError::NotFound)?;
 
-        category.load_prices(conn)?;
+        category.load_prices(database_conn)?;
 
         Ok(category)
     }

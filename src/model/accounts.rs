@@ -7,7 +7,7 @@ use std::io;
 use uuid::Uuid;
 
 use crate::model::schema::account;
-use crate::model::{generate_uuid, DbConnection, Money, ServiceError, ServiceResult};
+use crate::utils::{generate_uuid, DatabaseConnection, Money, ServiceError, ServiceResult};
 
 /// Represent a account
 #[derive(
@@ -34,8 +34,8 @@ pub struct Account {
     pub username: Option<String>,
     pub account_number: Option<String>,
     pub permission: Permission,
-    /// Whether the user want's to receive a monthly report about his/her/* account activities
     pub receives_monthly_report: bool,
+    pub allow_nfc_registration: bool,
 }
 
 /// Represents the permission level of an account
@@ -45,11 +45,11 @@ pub struct Account {
 #[sql_type = "SmallInt"]
 pub enum Permission {
     /// default user without the ability to edit anything
-    DEFAULT,
+    Default,
     /// ascii member who can perform transactions
-    MEMBER,
+    Member,
     /// ascii executive or admin who can do everything
-    ADMIN,
+    Admin,
 }
 
 impl PartialOrd for Permission {
@@ -67,24 +67,24 @@ impl Ord for Permission {
 impl Permission {
     /// Check if the permission level is `Permission::DEFAULT`
     pub fn is_default(self) -> bool {
-        Permission::DEFAULT == self
+        Permission::Default == self
     }
 
     /// Check if the permission level is `Permission::MEMBER`
     pub fn is_member(self) -> bool {
-        Permission::MEMBER == self
+        Permission::Member == self
     }
 
     /// Check if the permission level is `Permission::ADMIN`
     pub fn is_admin(self) -> bool {
-        Permission::ADMIN == self
+        Permission::Admin == self
     }
 
     pub fn level(self) -> u32 {
         match self {
-            Permission::DEFAULT => 0,
-            Permission::MEMBER => 1,
-            Permission::ADMIN => 2,
+            Permission::Default => 0,
+            Permission::Member => 1,
+            Permission::Admin => 2,
         }
     }
 }
@@ -99,9 +99,9 @@ where
         W: io::Write,
     {
         let v = match *self {
-            Permission::DEFAULT => 0,
-            Permission::MEMBER => 1,
-            Permission::ADMIN => 2,
+            Permission::Default => 0,
+            Permission::Member => 1,
+            Permission::Admin => 2,
         };
         v.to_sql(out)
     }
@@ -115,9 +115,9 @@ where
     fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {
         let v = i16::from_sql(bytes)?;
         Ok(match v {
-            0 => Permission::DEFAULT,
-            1 => Permission::MEMBER,
-            2 => Permission::ADMIN,
+            0 => Permission::Default,
+            1 => Permission::Member,
+            2 => Permission::Admin,
             _ => panic!("'{}' is not a valid permission!", &v),
         })
     }
@@ -126,7 +126,7 @@ where
 impl Account {
     /// Create a new account with the given permission level
     pub fn create(
-        conn: &DbConnection,
+        database_conn: &DatabaseConnection,
         name: &str,
         permission: Permission,
     ) -> ServiceResult<Account> {
@@ -142,25 +142,28 @@ impl Account {
             account_number: None,
             permission,
             receives_monthly_report: false,
+            allow_nfc_registration: false,
         };
 
-        if !a.exist_conficting_account(conn)? {
+        if !a.exist_conficting_account(database_conn)? {
             return Err(ServiceError::InternalServerError(
                 "Conficting account settings",
                 "The given account settings conflict with the other existing accounts".to_owned(),
             ));
         }
 
-        diesel::insert_into(dsl::account).values(&a).execute(conn)?;
+        diesel::insert_into(dsl::account)
+            .values(&a)
+            .execute(database_conn)?;
 
         Ok(a)
     }
 
     /// Save the current account data to the database
-    pub fn update(&self, conn: &DbConnection) -> ServiceResult<()> {
+    pub fn update(&self, database_conn: &DatabaseConnection) -> ServiceResult<()> {
         use crate::model::schema::account::dsl;
 
-        if !self.exist_conficting_account(conn)? {
+        if !self.exist_conficting_account(database_conn)? {
             return Err(ServiceError::InternalServerError(
                 "Conficting account settings",
                 "The given account settings conflict with the other existing accounts".to_owned(),
@@ -169,37 +172,44 @@ impl Account {
 
         diesel::update(dsl::account.find(&self.id))
             .set(self)
-            .execute(conn)?;
+            .execute(database_conn)?;
 
         Ok(())
     }
 
     /// List all accounts
-    pub fn all(conn: &DbConnection) -> ServiceResult<Vec<Account>> {
+    pub fn all(database_conn: &DatabaseConnection) -> ServiceResult<Vec<Account>> {
         use crate::model::schema::account::dsl;
 
-        let results = dsl::account.order(dsl::name.asc()).load::<Account>(conn)?;
+        let results = dsl::account
+            .order(dsl::name.asc())
+            .load::<Account>(database_conn)?;
 
         Ok(results)
     }
 
     /// Get an account by the `id`
-    pub fn get(conn: &DbConnection, id: &Uuid) -> ServiceResult<Account> {
+    pub fn get(database_conn: &DatabaseConnection, id: &Uuid) -> ServiceResult<Account> {
         use crate::model::schema::account::dsl;
 
-        let mut results = dsl::account.filter(dsl::id.eq(id)).load::<Account>(conn)?;
+        let mut results = dsl::account
+            .filter(dsl::id.eq(id))
+            .load::<Account>(database_conn)?;
 
         results.pop().ok_or(ServiceError::NotFound)
     }
 
     /// Get an account by the `id`
-    pub fn find_by_login(conn: &DbConnection, login: &str) -> ServiceResult<Account> {
+    pub fn find_by_login(
+        database_conn: &DatabaseConnection,
+        login: &str,
+    ) -> ServiceResult<Account> {
         use crate::model::schema::account::dsl;
 
         let mut results = match Uuid::parse_str(login) {
             Ok(uuid) => dsl::account
                 .filter(dsl::id.eq(uuid))
-                .load::<Account>(conn)?,
+                .load::<Account>(database_conn)?,
             Err(_) => dsl::account
                 .filter(
                     dsl::mail
@@ -207,7 +217,7 @@ impl Account {
                         .or(dsl::username.eq(login))
                         .or(dsl::account_number.eq(login)),
                 )
-                .load::<Account>(conn)?,
+                .load::<Account>(database_conn)?,
         };
 
         if results.len() > 1 {
@@ -217,13 +227,13 @@ impl Account {
         results.pop().ok_or(ServiceError::NotFound)
     }
 
-    fn exist_conficting_account(&self, conn: &DbConnection) -> ServiceResult<bool> {
+    fn exist_conficting_account(&self, database_conn: &DatabaseConnection) -> ServiceResult<bool> {
         use crate::model::schema::account::dsl;
 
         if let Some(mail) = &self.mail {
             let results = dsl::account
                 .filter(dsl::id.ne(self.id).and(dsl::mail.eq(mail)))
-                .load::<Account>(conn)?;
+                .load::<Account>(database_conn)?;
             if !results.is_empty() {
                 return Ok(false);
             }
@@ -232,7 +242,7 @@ impl Account {
         if let Some(username) = &self.username {
             let results = dsl::account
                 .filter(dsl::id.ne(self.id).and(dsl::username.eq(username)))
-                .load::<Account>(conn)?;
+                .load::<Account>(database_conn)?;
             if !results.is_empty() {
                 return Ok(false);
             }
@@ -245,7 +255,7 @@ impl Account {
                         .ne(self.id)
                         .and(dsl::account_number.eq(account_number)),
                 )
-                .load::<Account>(conn)?;
+                .load::<Account>(database_conn)?;
             if !results.is_empty() {
                 return Ok(false);
             }

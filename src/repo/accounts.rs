@@ -1,8 +1,6 @@
 use crate::identity_service::{Identity, IdentityRequire};
-use crate::model::{
-    authentication_barcode, authentication_nfc, fuzzy_vec_match, Account, DbConnection, Money,
-    Permission, ServiceError, ServiceResult,
-};
+use crate::model::{Account, Permission};
+use crate::utils::{fuzzy_vec_match, DatabaseConnection, Money, ServiceError, ServiceResult};
 use uuid::Uuid;
 
 use super::SearchElement;
@@ -16,17 +14,7 @@ pub struct AccountInput {
     pub account_number: Option<String>,
     pub permission: Permission,
     pub receives_monthly_report: bool,
-}
-
-#[derive(Debug, Deserialize, InputObject)]
-pub struct AccountInputBarcode {
-    pub barcode: String,
-}
-
-#[derive(Debug, Deserialize, InputObject)]
-pub struct AccountInputNfc {
-    pub nfc: String,
-    pub writeable: bool,
+    pub allow_nfc_registration: bool,
 }
 
 #[derive(Debug, Serialize, SimpleObject)]
@@ -40,6 +28,7 @@ pub struct AccountOutput {
     pub account_number: Option<String>,
     pub permission: Permission,
     pub receives_monthly_report: bool,
+    pub allow_nfc_registration: bool,
 }
 
 impl From<Account> for AccountOutput {
@@ -54,6 +43,7 @@ impl From<Account> for AccountOutput {
             account_number: entity.account_number,
             permission: entity.permission,
             receives_monthly_report: entity.receives_monthly_report,
+            allow_nfc_registration: entity.allow_nfc_registration,
         }
     }
 }
@@ -73,9 +63,9 @@ fn search_account(entity: Account, search: &str) -> Option<SearchElement<Account
             .clone()
             .unwrap_or_else(|| "".to_owned()),
         match entity.permission {
-            Permission::DEFAULT => "",
-            Permission::MEMBER => "member",
-            Permission::ADMIN => "admin",
+            Permission::Default => "",
+            Permission::Member => "member",
+            Permission::Admin => "admin",
         }
         .to_owned(),
     ];
@@ -102,11 +92,11 @@ fn search_account(entity: Account, search: &str) -> Option<SearchElement<Account
 }
 
 pub fn get_accounts(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     identity: &Identity,
     search: Option<&str>,
 ) -> ServiceResult<Vec<SearchElement<AccountOutput>>> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
+    identity.require_account_or_cert(Permission::Member)?;
 
     let search = match search {
         Some(s) => s.to_owned(),
@@ -114,7 +104,7 @@ pub fn get_accounts(
     };
 
     let lower_search = search.trim().to_ascii_lowercase();
-    let entities: Vec<SearchElement<AccountOutput>> = Account::all(conn)?
+    let entities: Vec<SearchElement<AccountOutput>> = Account::all(database_conn)?
         .into_iter()
         .filter_map(|a| search_account(a, &lower_search))
         .collect();
@@ -123,45 +113,46 @@ pub fn get_accounts(
 }
 
 pub fn get_account(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     identity: &Identity,
     id: Uuid,
 ) -> ServiceResult<AccountOutput> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
+    identity.require_account_or_cert(Permission::Member)?;
 
-    let entity = Account::get(conn, &id)?;
+    let entity = Account::get(database_conn, &id)?;
     Ok(entity.into())
 }
 
 pub fn create_account(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     identity: &Identity,
     input: AccountInput,
 ) -> ServiceResult<AccountOutput> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
+    identity.require_account_or_cert(Permission::Member)?;
 
-    let mut entity = Account::create(conn, &input.name, input.permission)?;
+    let mut entity = Account::create(database_conn, &input.name, input.permission)?;
 
     entity.minimum_credit = input.minimum_credit;
     entity.mail = input.mail.clone();
     entity.username = input.username.clone();
     entity.account_number = input.account_number.clone();
     entity.receives_monthly_report = input.receives_monthly_report;
+    entity.allow_nfc_registration = input.allow_nfc_registration;
 
-    entity.update(conn)?;
+    entity.update(database_conn)?;
 
     Ok(entity.into())
 }
 
 pub fn update_account(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     identity: &Identity,
     id: Uuid,
     input: AccountInput,
 ) -> ServiceResult<AccountOutput> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
+    identity.require_account_or_cert(Permission::Member)?;
 
-    let mut entity = Account::get(conn, &id)?;
+    let mut entity = Account::get(database_conn, &id)?;
 
     entity.minimum_credit = input.minimum_credit;
     entity.name = input.name.clone();
@@ -170,14 +161,19 @@ pub fn update_account(
     entity.account_number = input.account_number.clone();
     entity.permission = input.permission;
     entity.receives_monthly_report = input.receives_monthly_report;
+    entity.allow_nfc_registration = input.allow_nfc_registration;
 
-    entity.update(conn)?;
+    entity.update(database_conn)?;
 
     Ok(entity.into())
 }
 
-pub fn delete_account(_conn: &DbConnection, identity: &Identity, _id: Uuid) -> ServiceResult<()> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
+pub fn delete_account(
+    _database_conn: &DatabaseConnection,
+    identity: &Identity,
+    _id: Uuid,
+) -> ServiceResult<()> {
+    identity.require_account_or_cert(Permission::Member)?;
 
     println!("Delete is not supported!");
 
@@ -185,54 +181,4 @@ pub fn delete_account(_conn: &DbConnection, identity: &Identity, _id: Uuid) -> S
         "Method not supported",
         "Delete operation is not supported!".to_owned(),
     ))
-}
-
-pub fn add_account_barcode(
-    conn: &DbConnection,
-    identity: &Identity,
-    id: Uuid,
-    input: AccountInputBarcode,
-) -> ServiceResult<()> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
-
-    let entity = Account::get(conn, &id)?;
-    authentication_barcode::register(conn, &entity, &input.barcode)?;
-
-    Ok(())
-}
-
-pub fn delete_account_barcode(
-    conn: &DbConnection,
-    identity: &Identity,
-    id: Uuid,
-) -> ServiceResult<()> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
-
-    let entity = Account::get(conn, &id)?;
-    authentication_barcode::remove(conn, &entity)?;
-
-    Ok(())
-}
-
-pub fn add_account_nfc(
-    conn: &DbConnection,
-    identity: &Identity,
-    id: Uuid,
-    input: AccountInputNfc,
-) -> ServiceResult<()> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
-
-    let entity = Account::get(conn, &id)?;
-    authentication_nfc::register(conn, &entity, &input.nfc, input.writeable)?;
-
-    Ok(())
-}
-
-pub fn delete_account_nfc(conn: &DbConnection, identity: &Identity, id: Uuid) -> ServiceResult<()> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
-
-    let entity = Account::get(conn, &id)?;
-    authentication_nfc::remove(conn, &entity)?;
-
-    Ok(())
 }

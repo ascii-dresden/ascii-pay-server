@@ -5,11 +5,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 use wallet_pass::{template, Pass};
 
-use crate::model::apns::APNS;
 use crate::model::schema::{apple_wallet_pass, apple_wallet_registration};
-use crate::model::{generate_uuid, DbConnection, ServiceError, ServiceResult};
+use crate::utils::{
+    env, generate_uuid, ApplePushNotificationService, DatabaseConnection, ServiceError,
+    ServiceResult,
+};
 
-use super::{env, Account};
+use super::Account;
 
 pub fn get_current_time() -> i32 {
     let start = SystemTime::now();
@@ -46,7 +48,7 @@ struct AppleWalletRegistration {
 }
 
 pub fn check_pass_authorization(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     serial_number: &Uuid,
     authentication_token: &Uuid,
 ) -> ServiceResult<bool> {
@@ -54,13 +56,13 @@ pub fn check_pass_authorization(
     let results = dsl::apple_wallet_pass
         .filter(dsl::serial_number.eq(serial_number))
         .filter(dsl::authentication_token.eq(authentication_token))
-        .load::<AppleWalletPass>(conn)?;
+        .load::<AppleWalletPass>(database_conn)?;
 
     Ok(!results.is_empty())
 }
 
 pub fn is_pass_registered_on_device(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     device_id: &str,
     serial_number: &Uuid,
 ) -> ServiceResult<bool> {
@@ -68,13 +70,13 @@ pub fn is_pass_registered_on_device(
     let results = dsl::apple_wallet_registration
         .filter(dsl::device_id.eq(device_id))
         .filter(dsl::serial_number.eq(serial_number))
-        .load::<AppleWalletRegistration>(conn)?;
+        .load::<AppleWalletRegistration>(database_conn)?;
 
     Ok(!results.is_empty())
 }
 
 pub fn register_pass_on_device(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     device_id: &str,
     serial_number: &Uuid,
     pass_type_id: &str,
@@ -91,12 +93,12 @@ pub fn register_pass_on_device(
 
     diesel::insert_into(dsl::apple_wallet_registration)
         .values(&r)
-        .execute(conn)?;
+        .execute(database_conn)?;
     Ok(())
 }
 
 pub fn unregister_pass_on_device(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     device_id: &str,
     serial_number: &Uuid,
 ) -> ServiceResult<()> {
@@ -107,22 +109,25 @@ pub fn unregister_pass_on_device(
             .filter(dsl::device_id.eq(device_id))
             .filter(dsl::serial_number.eq(serial_number)),
     )
-    .execute(conn)?;
+    .execute(database_conn)?;
     Ok(())
 }
 
-pub fn is_device_registered(conn: &DbConnection, device_id: &str) -> ServiceResult<bool> {
+pub fn is_device_registered(
+    database_conn: &DatabaseConnection,
+    device_id: &str,
+) -> ServiceResult<bool> {
     use crate::model::schema::apple_wallet_registration::dsl;
 
     let results = dsl::apple_wallet_registration
         .filter(dsl::device_id.eq(device_id))
-        .load::<AppleWalletRegistration>(conn)?;
+        .load::<AppleWalletRegistration>(database_conn)?;
 
     Ok(!results.is_empty())
 }
 
 pub fn list_passes_for_device(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     device_id: &str,
     pass_type_id: &str,
 ) -> ServiceResult<Vec<Uuid>> {
@@ -130,16 +135,19 @@ pub fn list_passes_for_device(
     let results = dsl::apple_wallet_registration
         .filter(dsl::device_id.eq(device_id))
         .filter(dsl::pass_type_id.eq(pass_type_id))
-        .load::<AppleWalletRegistration>(conn)?;
+        .load::<AppleWalletRegistration>(database_conn)?;
 
     Ok(results.into_iter().map(|r| r.serial_number).collect())
 }
 
-pub fn get_pass_updated_at(conn: &DbConnection, serial_number: &Uuid) -> ServiceResult<i32> {
+pub fn get_pass_updated_at(
+    database_conn: &DatabaseConnection,
+    serial_number: &Uuid,
+) -> ServiceResult<i32> {
     use crate::model::schema::apple_wallet_pass::dsl;
     let mut results = dsl::apple_wallet_pass
         .filter(dsl::serial_number.eq(serial_number))
-        .load::<AppleWalletPass>(conn)?;
+        .load::<AppleWalletPass>(database_conn)?;
 
     if results.len() != 1 {
         return Err(ServiceError::NotFound);
@@ -148,11 +156,11 @@ pub fn get_pass_updated_at(conn: &DbConnection, serial_number: &Uuid) -> Service
     Ok(results.pop().ok_or(ServiceError::NoneError)?.updated_at)
 }
 
-pub fn get_by_qr_code(conn: &DbConnection, qr_code: &str) -> ServiceResult<Uuid> {
+pub fn get_by_qr_code(database_conn: &DatabaseConnection, qr_code: &str) -> ServiceResult<Uuid> {
     use crate::model::schema::apple_wallet_pass::dsl;
     let mut results = dsl::apple_wallet_pass
         .filter(dsl::qr_code.eq(qr_code))
-        .load::<AppleWalletPass>(conn)?;
+        .load::<AppleWalletPass>(database_conn)?;
 
     if results.len() != 1 {
         return Err(ServiceError::NotFound);
@@ -161,12 +169,15 @@ pub fn get_by_qr_code(conn: &DbConnection, qr_code: &str) -> ServiceResult<Uuid>
     Ok(results.pop().ok_or(ServiceError::NoneError)?.serial_number)
 }
 
-pub fn create_pass(conn: &DbConnection, account: &Account) -> ServiceResult<Vec<u8>> {
+pub fn create_pass(
+    database_conn: &DatabaseConnection,
+    account: &Account,
+) -> ServiceResult<Vec<u8>> {
     use crate::model::schema::apple_wallet_pass::dsl;
 
     let mut results = dsl::apple_wallet_pass
         .filter(dsl::serial_number.eq(&account.id))
-        .load::<AppleWalletPass>(conn)?;
+        .load::<AppleWalletPass>(database_conn)?;
 
     let db_pass = match results.len() {
         0 => {
@@ -191,7 +202,7 @@ pub fn create_pass(conn: &DbConnection, account: &Account) -> ServiceResult<Vec<
 
             diesel::insert_into(dsl::apple_wallet_pass)
                 .values(&db_pass)
-                .execute(conn)?;
+                .execute(database_conn)?;
             db_pass
         }
         1 => results.pop().ok_or(ServiceError::NoneError)?,
@@ -242,7 +253,7 @@ pub fn create_pass(conn: &DbConnection, account: &Account) -> ServiceResult<Vec<
     store_card.add_secondary_field(field);
 
     if let Some(account_number) = &account.account_number {
-        let mut field = template::Field::new_string("account_number", &account_number);
+        let mut field = template::Field::new_string("account_number", account_number);
         field.label("account_number");
         store_card.add_secondary_field(field);
 
@@ -268,7 +279,7 @@ pub fn create_pass(conn: &DbConnection, account: &Account) -> ServiceResult<Vec<
     Ok(cursor.into_inner())
 }
 
-pub fn delete_pass(conn: &DbConnection, account_id: &Uuid) -> ServiceResult<()> {
+pub fn delete_pass(database_conn: &DatabaseConnection, account_id: &Uuid) -> ServiceResult<()> {
     use crate::model::schema::apple_wallet_pass::dsl as dsl_pass;
     use crate::model::schema::apple_wallet_registration::dsl as dsl_registration;
 
@@ -276,40 +287,46 @@ pub fn delete_pass(conn: &DbConnection, account_id: &Uuid) -> ServiceResult<()> 
         dsl_registration::apple_wallet_registration
             .filter(dsl_registration::serial_number.eq(account_id)),
     )
-    .execute(conn)?;
+    .execute(database_conn)?;
 
     diesel::delete(dsl_pass::apple_wallet_pass.filter(dsl_pass::serial_number.eq(account_id)))
-        .execute(conn)?;
+        .execute(database_conn)?;
 
     Ok(())
 }
 
-pub fn set_pass_updated_at(conn: &DbConnection, serial_number: &Uuid) -> ServiceResult<()> {
+pub fn set_pass_updated_at(
+    database_conn: &DatabaseConnection,
+    serial_number: &Uuid,
+) -> ServiceResult<()> {
     use crate::model::schema::apple_wallet_pass::dsl;
 
     diesel::update(
         dsl::apple_wallet_pass.filter(apple_wallet_pass::serial_number.eq(serial_number)),
     )
     .set(dsl::updated_at.eq(get_current_time()))
-    .execute(conn)?;
+    .execute(database_conn)?;
 
     Ok(())
 }
 
-pub async fn send_update_notification(conn: &DbConnection, account_id: &Uuid) -> ServiceResult<()> {
+pub async fn send_update_notification(
+    database_conn: &DatabaseConnection,
+    account_id: &Uuid,
+) -> ServiceResult<()> {
     use crate::model::schema::apple_wallet_registration::dsl;
 
-    set_pass_updated_at(conn, account_id)?;
+    set_pass_updated_at(database_conn, account_id)?;
 
     let results = dsl::apple_wallet_registration
         .filter(dsl::serial_number.eq(account_id))
-        .load::<AppleWalletRegistration>(conn)?;
+        .load::<AppleWalletRegistration>(database_conn)?;
 
     println!("Send APNS message for account: {:?}", account_id);
 
     let mut unregister_vec = Vec::<String>::new();
 
-    let apns = APNS::new()?;
+    let apns = ApplePushNotificationService::new()?;
     for registration in results {
         let response_code = match apns.send(&registration.push_token).await {
             Ok(response_code) => response_code,
@@ -336,7 +353,7 @@ pub async fn send_update_notification(conn: &DbConnection, account_id: &Uuid) ->
     }
 
     for device_id in unregister_vec {
-        if let Err(e) = unregister_pass_on_device(conn, &device_id, account_id) {
+        if let Err(e) = unregister_pass_on_device(database_conn, &device_id, account_id) {
             eprintln!(
                 "Cannot unregister device {} as APNS requested: {:?}",
                 &device_id, e

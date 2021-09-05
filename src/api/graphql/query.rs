@@ -2,9 +2,9 @@ use async_graphql::{Context, Object};
 use uuid::Uuid;
 
 use crate::repo::{self, AccountOutput, CategoryOutput, ProductOutput, SearchElement};
-use crate::{identity_service::Identity, model::ServiceResult};
+use crate::{identity_service::Identity, utils::ServiceResult};
 
-use super::get_conn_from_ctx;
+use super::get_database_conn_from_ctx;
 
 pub struct Query;
 
@@ -20,15 +20,15 @@ impl Query {
         ctx: &Context<'_>,
         search: Option<String>,
     ) -> ServiceResult<Vec<SearchElement<AccountOutput>>> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::get_accounts(conn, identity, search.as_deref())
+        repo::get_accounts(database_conn, identity, search.as_deref())
     }
 
     async fn get_account(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<AccountOutput> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::get_account(conn, identity, id)
+        repo::get_account(database_conn, identity, id)
     }
 
     #[graphql(entity)]
@@ -37,9 +37,9 @@ impl Query {
         ctx: &Context<'_>,
         id: Uuid,
     ) -> ServiceResult<AccountOutput> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::get_account(conn, identity, id)
+        repo::get_account(database_conn, identity, id)
     }
 
     async fn get_categories(
@@ -47,15 +47,15 @@ impl Query {
         ctx: &Context<'_>,
         search: Option<String>,
     ) -> ServiceResult<Vec<SearchElement<CategoryOutput>>> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::get_categories(conn, identity, search.as_deref())
+        repo::get_categories(database_conn, identity, search.as_deref())
     }
 
     async fn get_category(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<CategoryOutput> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::get_category(conn, identity, id)
+        repo::get_category(database_conn, identity, id)
     }
 
     #[graphql(entity)]
@@ -64,9 +64,9 @@ impl Query {
         ctx: &Context<'_>,
         id: Uuid,
     ) -> ServiceResult<CategoryOutput> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::get_category(conn, identity, id)
+        repo::get_category(database_conn, identity, id)
     }
 
     async fn get_products(
@@ -74,15 +74,15 @@ impl Query {
         ctx: &Context<'_>,
         search: Option<String>,
     ) -> ServiceResult<Vec<SearchElement<ProductOutput>>> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::get_products(conn, identity, search.as_deref())
+        repo::get_products(database_conn, identity, search.as_deref())
     }
 
     async fn get_product(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<ProductOutput> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::get_product(conn, identity, id)
+        repo::get_product(database_conn, identity, id)
     }
 
     #[graphql(entity)]
@@ -91,8 +91,8 @@ impl Query {
         ctx: &Context<'_>,
         id: Uuid,
     ) -> ServiceResult<ProductOutput> {
-        let conn = &get_conn_from_ctx(ctx)?;
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::get_product(conn, identity, id)
+        repo::get_product(database_conn, identity, id)
     }
 }

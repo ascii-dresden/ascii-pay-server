@@ -1,8 +1,6 @@
 use crate::identity_service::{Identity, IdentityRequire};
-use crate::model::{
-    fuzzy_vec_match, Category, DbConnection, Money, Permission, Price, Product, ServiceError,
-    ServiceResult,
-};
+use crate::model::{Category, Permission, Price, Product};
+use crate::utils::{fuzzy_vec_match, DatabaseConnection, Money, ServiceError, ServiceResult};
 use uuid::Uuid;
 
 use super::categories::CategoryOutput;
@@ -77,11 +75,11 @@ fn serach_product(entity: Product, search: &str) -> Option<SearchElement<Product
 }
 
 pub fn get_products(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     identity: &Identity,
     search: Option<&str>,
 ) -> ServiceResult<Vec<SearchElement<ProductOutput>>> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
+    identity.require_account_or_cert(Permission::Member)?;
 
     let search = match search {
         Some(s) => s.to_owned(),
@@ -89,7 +87,7 @@ pub fn get_products(
     };
 
     let lower_search = search.trim().to_ascii_lowercase();
-    let entities: Vec<SearchElement<ProductOutput>> = Product::all(conn)?
+    let entities: Vec<SearchElement<ProductOutput>> = Product::all(database_conn)?
         .into_iter()
         .filter_map(|p| serach_product(p, &lower_search))
         .collect();
@@ -98,36 +96,36 @@ pub fn get_products(
 }
 
 pub fn get_product(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     identity: &Identity,
     id: Uuid,
 ) -> ServiceResult<ProductOutput> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
+    identity.require_account_or_cert(Permission::Member)?;
 
-    let entity = Product::get(conn, &id)?;
+    let entity = Product::get(database_conn, &id)?;
     Ok(entity.into())
 }
 
 pub fn create_product(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     identity: &Identity,
     input: ProductInput,
 ) -> ServiceResult<ProductOutput> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
+    identity.require_account_or_cert(Permission::Member)?;
 
     let category = if let Some(category) = &input.category {
-        Some(Category::get(conn, &category)?)
+        Some(Category::get(database_conn, category)?)
     } else {
         None
     };
 
-    let mut entity = Product::create(conn, &input.name, category)?;
+    let mut entity = Product::create(database_conn, &input.name, category)?;
 
     entity.barcode = input.barcode.clone();
-    entity.update(conn)?;
+    entity.update(database_conn)?;
 
     entity.update_prices(
-        conn,
+        database_conn,
         &input
             .prices
             .into_iter()
@@ -139,17 +137,17 @@ pub fn create_product(
 }
 
 pub fn update_product(
-    conn: &DbConnection,
+    database_conn: &DatabaseConnection,
     identity: &Identity,
     id: Uuid,
     input: ProductInput,
 ) -> ServiceResult<ProductOutput> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
+    identity.require_account_or_cert(Permission::Member)?;
 
-    let mut entity = Product::get(conn, &id)?;
+    let mut entity = Product::get(database_conn, &id)?;
 
     let category = if let Some(category) = &input.category {
-        Some(Category::get(conn, category)?)
+        Some(Category::get(database_conn, category)?)
     } else {
         None
     };
@@ -158,10 +156,10 @@ pub fn update_product(
     entity.barcode = input.barcode;
     entity.category = category;
 
-    entity.update(conn)?;
+    entity.update(database_conn)?;
 
     entity.update_prices(
-        conn,
+        database_conn,
         &input
             .prices
             .into_iter()
@@ -173,8 +171,12 @@ pub fn update_product(
 }
 
 /// DELETE route for `/api/v1/product/{product_id}`
-pub fn delete_product(_conn: &DbConnection, identity: &Identity, _id: Uuid) -> ServiceResult<()> {
-    identity.require_account_or_cert(Permission::MEMBER)?;
+pub fn delete_product(
+    _database_conn: &DatabaseConnection,
+    identity: &Identity,
+    _id: Uuid,
+) -> ServiceResult<()> {
+    identity.require_account_or_cert(Permission::Member)?;
 
     println!("Delete is not supported!");
 

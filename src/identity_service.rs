@@ -10,7 +10,10 @@ use futures_util::future::{ready, LocalBoxFuture, Ready};
 
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
+use std::ops::DerefMut;
 use std::rc::Rc;
+use std::str::from_utf8;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
@@ -19,12 +22,16 @@ use actix_web::{
     Error, HttpMessage, Result,
 };
 
-use crate::model::{
-    create_token_from_obj, env, parse_obj_from_token, Account, DbConnection, Permission, Pool,
-    ServiceError, ServiceResult, Session,
+use crate::model::session::{
+    create_longtime_session, delete_longtime_session, get_longtime_session, Session,
+};
+use crate::model::{Account, Permission};
+use crate::utils::{
+    env, DatabaseConnection, DatabasePool, RedisConnection, RedisPool, ServiceError, ServiceResult,
 };
 
 const SESSION_COOKIE_NAME: &str = "session";
+const API_ACCESS_KEY_HEADER: &str = "X-Client-Cert";
 
 lazy_static::lazy_static! {
     pub static ref SECURE_COOKIE: bool = env::BASE_URL.as_str().starts_with("https");
@@ -70,8 +77,8 @@ where
     S::Future: 'static,
 {
     async fn on_request(req: &mut ServiceRequest) -> ServiceResult<()> {
-        let app_data = req.app_data::<web::Data<Pool>>();
-        let pool: &web::Data<Pool> = match app_data {
+        let app_data_database = req.app_data::<web::Data<DatabasePool>>();
+        let database_pool: &web::Data<DatabasePool> = match app_data_database {
             Some(pool) => pool,
             None => {
                 return Err(ServiceError::InternalServerError(
@@ -80,9 +87,20 @@ where
                 ))
             }
         };
-        let conn = &pool.get()?;
+        let database_conn = &database_pool.get()?;
 
-        let identity_info = IdentityInfo::get(&req, &conn)?;
+        let app_data_redis = req.app_data::<web::Data<RedisPool>>();
+        let redis_pool: &web::Data<RedisPool> = match app_data_redis {
+            Some(pool) => pool,
+            None => {
+                return Err(ServiceError::InternalServerError(
+                    "r2d2 error",
+                    "Cannot extract redis from request".to_owned(),
+                ))
+            }
+        };
+
+        let identity_info = IdentityInfo::get(req, database_conn, redis_pool.get()?.deref_mut())?;
         req.extensions_mut().insert(identity_info);
         Ok(())
     }
@@ -140,25 +158,6 @@ where
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct AuthToken {
-    session_id: Uuid,
-}
-
-impl AuthToken {
-    pub fn parse_session_id_from_token(token: &str) -> ServiceResult<Uuid> {
-        let auth_token: AuthToken = parse_obj_from_token(&token)?;
-        Ok(auth_token.session_id)
-    }
-
-    pub fn create_token_from_session_id(session_id: &Uuid) -> ServiceResult<String> {
-        let auth_token = AuthToken {
-            session_id: *session_id,
-        };
-        create_token_from_obj(&auth_token)
-    }
-}
-
 #[derive(Debug)]
 struct IdentityInfo {
     session: Option<(Session, Account)>,
@@ -167,12 +166,17 @@ struct IdentityInfo {
 }
 
 impl IdentityInfo {
-    fn get(request: &ServiceRequest, conn: &DbConnection) -> ServiceResult<Self> {
-        let is_cert_present = if let Some(auth_header) = request.headers().get("X-Client-Cert") {
-            auth_header.to_str().unwrap_or("") == env::API_ACCESS_KEY.as_str()
-        } else {
-            false
-        };
+    fn get(
+        request: &ServiceRequest,
+        database_conn: &DatabaseConnection,
+        redis_conn: &mut RedisConnection,
+    ) -> ServiceResult<Self> {
+        let is_cert_present =
+            if let Some(auth_header) = request.headers().get(API_ACCESS_KEY_HEADER) {
+                auth_header.to_str().unwrap_or("") == env::API_ACCESS_KEY.as_str()
+            } else {
+                false
+            };
 
         // If the http authorization header contains a valid AuthToken return it
         let authorization_header = request
@@ -180,15 +184,15 @@ impl IdentityInfo {
             .get(header::AUTHORIZATION)
             .map(|v| v.to_str().unwrap_or(""))
             .map(|t| t.trim_start_matches("Bearer "))
-            .map(|t| AuthToken::parse_session_id_from_token(t).ok())
+            .map(|t| Session::from_str(t).ok())
             .flatten();
         if let Some(session_id) = authorization_header {
-            let session = if let Ok(session) = Session::get(&conn, &session_id) {
-                let account = Account::get(&conn, &session.account_id)?;
-                Some((session, account))
-            } else {
-                None
-            };
+            let session =
+                if let Ok(account) = get_longtime_session(database_conn, redis_conn, &session_id) {
+                    Some((session_id, account))
+                } else {
+                    None
+                };
 
             return Ok(Self {
                 session,
@@ -200,15 +204,15 @@ impl IdentityInfo {
         // If the session cookie contains a valid AuthToken return it
         let session_cookie = request
             .cookie(SESSION_COOKIE_NAME)
-            .map(|c| AuthToken::parse_session_id_from_token(c.value()).ok())
+            .map(|c| Session::from_str(c.value()).ok())
             .flatten();
         if let Some(session_id) = session_cookie {
-            let session = if let Ok(session) = Session::get(&conn, &session_id) {
-                let account = Account::get(&conn, &session.account_id)?;
-                Some((session, account))
-            } else {
-                None
-            };
+            let session =
+                if let Ok(account) = get_longtime_session(database_conn, redis_conn, &session_id) {
+                    Some((session_id, account))
+                } else {
+                    None
+                };
 
             return Ok(Self {
                 session,
@@ -228,15 +232,15 @@ impl IdentityInfo {
             }
         }
         let auth_token_query = auth_token_query
-            .map(|t| AuthToken::parse_session_id_from_token(t).ok())
+            .map(|t| Session::from_str(t).ok())
             .flatten();
         if let Some(session_id) = auth_token_query {
-            let session = if let Ok(session) = Session::get(&conn, &session_id) {
-                let account = Account::get(&conn, &session.account_id)?;
-                Some((session, account))
-            } else {
-                None
-            };
+            let session =
+                if let Ok(account) = get_longtime_session(database_conn, redis_conn, &session_id) {
+                    Some((session_id, account))
+                } else {
+                    None
+                };
 
             return Ok(Self {
                 session,
@@ -255,7 +259,7 @@ impl IdentityInfo {
 
     fn get_cookie(&self) -> ServiceResult<Cookie> {
         if let Some((session, _)) = &self.session {
-            let token = AuthToken::create_token_from_session_id(&session.id)?;
+            let token = session.to_string()?;
 
             Ok(Cookie::build(SESSION_COOKIE_NAME, token)
                 .path("/")
@@ -343,7 +347,7 @@ pub trait IdentityRequire {
 #[allow(clippy::mutex_atomic)]
 pub struct Identity {
     session: Arc<Mutex<Option<(Session, Account)>>>,
-    is_cert_present: Arc<Mutex<bool>>,
+    is_cert_present: AtomicBool,
 }
 
 impl FromRequest for Identity {
@@ -351,34 +355,38 @@ impl FromRequest for Identity {
     type Future = Ready<Result<Self, Error>>;
     type Config = ();
 
-    #[allow(clippy::mutex_atomic)]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         if let Some(info) = req.extensions().get::<IdentityInfo>() {
             ok(Self {
                 session: Arc::new(Mutex::new(info.session.as_ref().cloned())),
-                is_cert_present: Arc::new(Mutex::new(info.is_cert_present)),
+                is_cert_present: AtomicBool::new(info.is_cert_present),
             })
         } else {
             ok(Self {
                 session: Arc::new(Mutex::new(None)),
-                is_cert_present: Arc::new(Mutex::new(false)),
+                is_cert_present: AtomicBool::new(false),
             })
         }
     }
 }
 
 impl Identity {
-    pub fn store(&self, conn: &DbConnection, account_id: &Uuid) -> ServiceResult<()> {
-        let account = Account::get(&conn, account_id)?;
-        let session = Session::create_default(&conn, account_id)?;
+    pub fn store(
+        &self,
+        database_conn: &DatabaseConnection,
+        redis_conn: &mut RedisConnection,
+        account_id: &Uuid,
+    ) -> ServiceResult<()> {
+        let account = Account::get(database_conn, account_id)?;
+        let session = create_longtime_session(redis_conn, &account)?;
         let mut s = self.session.lock().unwrap();
         *s = Some((session, account));
         Ok(())
     }
 
-    pub fn forget(&self, conn: &DbConnection) -> ServiceResult<()> {
+    pub fn forget(&self, conn: &mut RedisConnection) -> ServiceResult<()> {
         if let Some((session, _)) = self.session.lock().unwrap().as_ref() {
-            session.delete(&conn)?;
+            delete_longtime_session(conn, session)?;
         }
         let mut s = self.session.lock().unwrap();
         *s = None;
@@ -392,14 +400,29 @@ impl IdentityRequire for Identity {
     }
 
     fn is_cert_present(&self) -> ServiceResult<bool> {
-        Ok(*self.is_cert_present.lock().unwrap())
+        Ok(self.is_cert_present.load(Ordering::Relaxed))
     }
 
     fn get_auth_token(&self) -> ServiceResult<Option<String>> {
         if let Some((s, _)) = self.session.lock().unwrap().as_ref() {
-            Ok(Some(AuthToken::create_token_from_session_id(&s.id)?))
+            Ok(Some(s.to_string()?))
         } else {
             Ok(None)
+        }
+    }
+}
+
+impl From<grpc::Metadata> for Identity {
+    fn from(metadata: grpc::Metadata) -> Self {
+        let is_cert_present = if let Some(auth_header) = metadata.get(API_ACCESS_KEY_HEADER) {
+            from_utf8(auth_header).unwrap_or("") == env::API_ACCESS_KEY.as_str()
+        } else {
+            false
+        };
+
+        Self {
+            session: Arc::new(Mutex::new(None)),
+            is_cert_present: AtomicBool::new(is_cert_present),
         }
     }
 }
@@ -422,9 +445,14 @@ impl FromRequest for IdentityMut {
 }
 
 impl IdentityMut {
-    pub fn store(&self, conn: &DbConnection, account_id: &Uuid) -> ServiceResult<()> {
-        let account = Account::get(&conn, account_id)?;
-        let session = Session::create_default(&conn, account_id)?;
+    pub fn store(
+        &self,
+        database_conn: &DatabaseConnection,
+        redis_conn: &mut RedisConnection,
+        account_id: &Uuid,
+    ) -> ServiceResult<()> {
+        let account = Account::get(database_conn, account_id)?;
+        let session = create_longtime_session(redis_conn, &account)?;
 
         if let Some(info) = self.request.extensions_mut().get_mut::<IdentityInfo>() {
             info.session = Some((session, account));
@@ -436,10 +464,10 @@ impl IdentityMut {
         }
     }
 
-    pub fn forget(&self, conn: &DbConnection) -> ServiceResult<()> {
+    pub fn forget(&self, conn: &mut RedisConnection) -> ServiceResult<()> {
         if let Some(info) = self.request.extensions_mut().get_mut::<IdentityInfo>() {
             if let Some((s, _)) = &info.session {
-                s.delete(&conn)?;
+                delete_longtime_session(conn, s)?;
             }
 
             info.session = None;
@@ -472,7 +500,7 @@ impl IdentityRequire for IdentityMut {
     fn get_auth_token(&self) -> ServiceResult<Option<String>> {
         if let Some(info) = self.request.extensions().get::<IdentityInfo>() {
             if let Some((s, _)) = &info.session {
-                Ok(Some(AuthToken::create_token_from_session_id(&s.id)?))
+                Ok(Some(s.to_string()?))
             } else {
                 Ok(None)
             }

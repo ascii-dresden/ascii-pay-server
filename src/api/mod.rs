@@ -1,7 +1,6 @@
 pub mod graphql;
 pub mod rest;
 pub mod wallet;
-pub mod web;
 
 use actix_web::web as a_web;
 
@@ -12,5 +11,4 @@ pub fn init(config: &mut a_web::ServiceConfig) {
             .configure(rest::init),
     );
     wallet::init(config);
-    web::init(config);
 }

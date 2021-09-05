@@ -9,7 +9,6 @@ extern crate serde_json;
 extern crate block_modes;
 #[macro_use]
 extern crate clap;
-extern crate handlebars;
 extern crate uuid;
 #[macro_use]
 extern crate hex_literal;
@@ -22,20 +21,24 @@ use std::io::Write;
 
 use clap::{App, SubCommand};
 use diesel::r2d2::{self, ConnectionManager};
+use r2d2_redis::RedisConnectionManager;
 
 // Internal services
+mod grpc;
+mod http_server;
 mod identity_service;
 mod model;
 mod repo;
-mod server;
+mod tcp_server;
+mod utils;
 
 // endpoints
 mod api;
 
-use crate::model::{
-    authentication_password, env, Account, DbConnection, Permission, Pool, ServiceResult,
-};
-use server::start_server;
+use crate::model::{authentication_password, Account, Permission};
+use crate::utils::{env, DatabaseConnection, DatabasePool, ServiceResult};
+use http_server::start_http_server;
+use tcp_server::start_tcp_server;
 
 embed_migrations!();
 
@@ -60,10 +63,14 @@ async fn init() -> ServiceResult<()> {
     env_logger::init();
 
     // Setup database connection
-    let manager = ConnectionManager::<DbConnection>::new(env::DATABASE_URL.as_str());
-    let pool = r2d2::Pool::builder().build(manager)?;
+    let database_manager = ConnectionManager::<DatabaseConnection>::new(env::DATABASE_URL.as_str());
+    let database_pool = r2d2::Pool::builder().build(database_manager)?;
 
-    let conn = pool.get()?;
+    // Setup redis connection
+    let redis_manager = RedisConnectionManager::new(env::REDIS_URL.as_str())?;
+    let redis_pool = r2d2::Pool::builder().build(redis_manager)?;
+
+    let conn = database_pool.get()?;
     embedded_migrations::run_with_output(&conn, &mut std::io::stdout())?;
 
     let matches = App::new(crate_name!())
@@ -76,13 +83,14 @@ async fn init() -> ServiceResult<()> {
 
     if let Some(_matches) = matches.subcommand_matches("run") {
         // Setup web server
-        start_server(pool).await?;
+        start_tcp_server(database_pool.clone(), redis_pool.clone());
+        start_http_server(database_pool, redis_pool).await?;
         return Ok(());
     }
 
     if let Some(_matches) = matches.subcommand_matches("admin") {
         // Check if admin exists, create otherwise
-        create_admin_user(&pool).await?;
+        create_admin_user(&database_pool)?;
         return Ok(());
     }
 
@@ -115,17 +123,17 @@ fn read_value(prompt: &str, hide_input: bool) -> String {
     }
 }
 
-async fn create_admin_user(pool: &Pool) -> ServiceResult<()> {
-    let conn = &pool.get()?;
+fn create_admin_user(database_pool: &DatabasePool) -> ServiceResult<()> {
+    let database_conn = &database_pool.get()?;
 
     let fullname = read_value("Fullname: ", false);
     let username = read_value("Username: ", false);
     let password = read_value("Password: ", true);
 
-    let mut account = Account::create(&conn, &fullname, Permission::ADMIN)?;
+    let mut account = Account::create(database_conn, &fullname, Permission::Admin)?;
     account.username = Some(username.clone());
-    account.update(&conn)?;
-    authentication_password::register(&conn, &account, &password)?;
+    account.update(database_conn)?;
+    authentication_password::register(database_conn, &account, &password)?;
 
     println!("Admin user '{}' was successfully created!", username);
 

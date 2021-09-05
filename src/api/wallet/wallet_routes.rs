@@ -1,4 +1,5 @@
-use crate::model::{env, wallet, Account, Pool, ServiceError, ServiceResult};
+use crate::model::{wallet, Account};
+use crate::utils::{env, DatabasePool, ServiceError, ServiceResult};
 use actix_web::{web, HttpRequest, HttpResponse};
 use uuid::Uuid;
 
@@ -37,7 +38,7 @@ fn get_authentication_token(request: &HttpRequest) -> Option<Uuid> {
 /// --> if this serial number was already registered for this device: 304
 /// --> if not authorized: 401
 pub async fn register_device(
-    pool: web::Data<Pool>,
+    database_pool: web::Data<DatabasePool>,
     path: web::Path<RegisterDevicePath>,
     data: web::Json<RegisterDeviceResponse>,
     request: HttpRequest,
@@ -47,14 +48,19 @@ pub async fn register_device(
         None => return Ok(HttpResponse::Unauthorized().finish()),
     };
 
-    let conn = &pool.get()?;
+    let database_conn = &database_pool.get()?;
 
-    if wallet::check_pass_authorization(conn, &path.serial_number, &authentication_token)? {
-        if wallet::is_pass_registered_on_device(conn, &path.device_id, &path.serial_number)? {
+    if wallet::check_pass_authorization(database_conn, &path.serial_number, &authentication_token)?
+    {
+        if wallet::is_pass_registered_on_device(
+            database_conn,
+            &path.device_id,
+            &path.serial_number,
+        )? {
             Ok(HttpResponse::NotModified().finish())
         } else {
             wallet::register_pass_on_device(
-                conn,
+                database_conn,
                 &path.device_id,
                 &path.serial_number,
                 &path.pass_type_id,
@@ -94,20 +100,21 @@ pub struct RegisterDeviceResponse {
 /// --> if there are no matching passes: 204
 /// --> if unknown device identifier: 404
 pub async fn update_passes(
-    pool: web::Data<Pool>,
+    database_pool: web::Data<DatabasePool>,
     path: web::Path<UpdatePassesPath>,
     query: web::Query<UpdatePassesQuery>,
 ) -> ServiceResult<HttpResponse> {
-    let conn = &pool.get()?;
+    let database_conn = &database_pool.get()?;
 
-    if wallet::is_device_registered(conn, &path.device_id)? {
-        let passes = wallet::list_passes_for_device(conn, &path.device_id, &path.pass_type_id)?;
+    if wallet::is_device_registered(database_conn, &path.device_id)? {
+        let passes =
+            wallet::list_passes_for_device(database_conn, &path.device_id, &path.pass_type_id)?;
 
         let updated_passes = if let Some(passes_updated_since) = query.passes_updated_since {
             let mut updated_passes = Vec::<Uuid>::new();
 
             for pass in passes {
-                if wallet::get_pass_updated_at(conn, &pass)? > passes_updated_since {
+                if wallet::get_pass_updated_at(database_conn, &pass)? > passes_updated_since {
                     updated_passes.push(pass);
                 }
             }
@@ -171,7 +178,7 @@ pub struct UpdatedPassesResponse {
 /// --> if disassociation succeeded: 200
 /// --> if not authorized: 401
 pub async fn unregister_device(
-    pool: web::Data<Pool>,
+    database_pool: web::Data<DatabasePool>,
     path: web::Path<UnregisterDevicePath>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
@@ -180,11 +187,16 @@ pub async fn unregister_device(
         None => return Ok(HttpResponse::Unauthorized().finish()),
     };
 
-    let conn = &pool.get()?;
+    let database_conn = &database_pool.get()?;
 
-    if wallet::check_pass_authorization(conn, &path.serial_number, &authentication_token)? {
-        if wallet::is_pass_registered_on_device(conn, &path.device_id, &path.serial_number)? {
-            wallet::unregister_pass_on_device(conn, &path.device_id, &path.serial_number)?;
+    if wallet::check_pass_authorization(database_conn, &path.serial_number, &authentication_token)?
+    {
+        if wallet::is_pass_registered_on_device(
+            database_conn,
+            &path.device_id,
+            &path.serial_number,
+        )? {
+            wallet::unregister_pass_on_device(database_conn, &path.device_id, &path.serial_number)?;
             Ok(HttpResponse::Ok().finish())
         } else {
             Ok(HttpResponse::NotFound().finish())
@@ -210,7 +222,7 @@ pub struct UnregisterDevicePath {
 /// --> if auth token is correct: 200, with pass data payload
 /// --> if auth token is incorrect: 401
 pub async fn pass_delivery(
-    pool: web::Data<Pool>,
+    database_pool: web::Data<DatabasePool>,
     path: web::Path<PassDeliveryPath>,
     request: HttpRequest,
 ) -> ServiceResult<HttpResponse> {
@@ -219,21 +231,22 @@ pub async fn pass_delivery(
         None => return Ok(HttpResponse::Unauthorized().finish()),
     };
 
-    let conn = &pool.get()?;
+    let database_conn = &database_pool.get()?;
 
-    if wallet::check_pass_authorization(conn, &path.serial_number, &authentication_token)? {
+    if wallet::check_pass_authorization(database_conn, &path.serial_number, &authentication_token)?
+    {
         if path.pass_type_id != env::APPLE_WALLET_PASS_TYPE_IDENTIFIER.to_string() {
             return Err(ServiceError::NotFound);
         }
 
-        let updated_at = wallet::get_pass_updated_at(conn, &path.serial_number)?;
+        let updated_at = wallet::get_pass_updated_at(database_conn, &path.serial_number)?;
 
         let last_modified = chrono::NaiveDateTime::from_timestamp(updated_at as i64, 0)
             .format("%a, %d %b %G %T GMT")
             .to_string();
 
-        let account = Account::get(conn, &path.serial_number)?;
-        let vec = wallet::create_pass(conn, &account)?;
+        let account = Account::get(database_conn, &path.serial_number)?;
+        let vec = wallet::create_pass(database_conn, &account)?;
         Ok(HttpResponse::Ok()
             .content_type("application/vnd.apple.pkpass")
             .header(http::header::LAST_MODIFIED, last_modified)
