@@ -35,6 +35,14 @@ pub fn init(config: &mut web::ServiceConfig) {
                 .route(web::get().to(accounts::get_account_access_token)),
         )
         .service(
+            web::resource("/account/{account_id}/transactions")
+                .route(web::get().to(transactions::get_transactions_by_account)),
+        )
+        .service(
+            web::resource("/account/{account_id}/transaction/{transaction_id}")
+                .route(web::get().to(transactions::get_transaction_by_account)),
+        )
+        .service(
             web::resource("/account/{account_id}")
                 .route(web::get().to(accounts::get_account))
                 .route(web::post().to(accounts::post_account))

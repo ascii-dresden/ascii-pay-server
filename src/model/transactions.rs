@@ -44,7 +44,7 @@ fn execute_at(
     let mut after_credit = account.credit;
 
     let result = database_conn.build_transaction().serializable().run(|| {
-        let mut account = Account::get(database_conn, &account.id)?;
+        let mut account = Account::get(database_conn, account.id)?;
         after_credit = account.credit + total;
 
         if after_credit < account.minimum_credit && after_credit < account.credit {
@@ -113,19 +113,33 @@ pub fn execute(
 pub fn get_by_account(
     database_conn: &DatabaseConnection,
     account: &Account,
-    from: &NaiveDateTime,
-    to: &NaiveDateTime,
+    from: Option<NaiveDateTime>,
+    to: Option<NaiveDateTime>,
 ) -> ServiceResult<Vec<Transaction>> {
     use crate::model::schema::transaction::dsl;
 
-    let results = dsl::transaction
-        .filter(
-            dsl::account_id
-                .eq(&account.id)
-                .and(dsl::date.between(from, to)),
-        )
-        .order(dsl::date.desc())
-        .load::<Transaction>(database_conn)?;
+    let results = match from {
+        Some(f) => match to {
+            Some(t) => dsl::transaction
+                .filter(dsl::account_id.eq(&account.id).and(dsl::date.between(f, t)))
+                .order(dsl::date.desc())
+                .load::<Transaction>(database_conn)?,
+            None => dsl::transaction
+                .filter(dsl::account_id.eq(&account.id).and(dsl::date.ge(f)))
+                .order(dsl::date.desc())
+                .load::<Transaction>(database_conn)?,
+        },
+        None => match to {
+            Some(t) => dsl::transaction
+                .filter(dsl::account_id.eq(&account.id).and(dsl::date.le(t)))
+                .order(dsl::date.desc())
+                .load::<Transaction>(database_conn)?,
+            None => dsl::transaction
+                .filter(dsl::account_id.eq(&account.id))
+                .order(dsl::date.desc())
+                .load::<Transaction>(database_conn)?,
+        },
+    };
 
     Ok(results)
 }
@@ -133,12 +147,16 @@ pub fn get_by_account(
 pub fn get_by_account_and_id(
     database_conn: &DatabaseConnection,
     account: &Account,
-    id: &Uuid,
+    transaction_id: Uuid,
 ) -> ServiceResult<Transaction> {
     use crate::model::schema::transaction::dsl;
 
     let mut results = dsl::transaction
-        .filter(dsl::account_id.eq(&account.id).and(dsl::id.eq(id)))
+        .filter(
+            dsl::account_id
+                .eq(&account.id)
+                .and(dsl::id.eq(transaction_id)),
+        )
         .load::<Transaction>(database_conn)?;
 
     results.pop().ok_or(ServiceError::NotFound)
@@ -174,7 +192,7 @@ fn validate_account(
     use crate::model::schema::transaction::dsl;
 
     database_conn.build_transaction().serializable().run(|| {
-        let account = Account::get(database_conn, &account.id)?;
+        let account = Account::get(database_conn, account.id)?;
 
         let results = dsl::transaction
             .filter(dsl::account_id.eq(&account.id))
@@ -323,7 +341,7 @@ impl Transaction {
             .filter(dsl::transaction.eq(&self.id))
             .load::<(Uuid, Uuid, i32)>(database_conn)?
             .into_iter()
-            .filter_map(|(_, p, a)| match Product::get(database_conn, &p) {
+            .filter_map(|(_, p, a)| match Product::get(database_conn, p) {
                 Ok(p) => Some((p, a)),
                 _ => None,
             })

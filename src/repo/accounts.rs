@@ -119,7 +119,7 @@ pub fn get_account(
 ) -> ServiceResult<AccountOutput> {
     identity.require_account_or_cert(Permission::Member)?;
 
-    let entity = Account::get(database_conn, &id)?;
+    let entity = Account::get(database_conn, id)?;
     Ok(entity.into())
 }
 
@@ -152,7 +152,7 @@ pub fn update_account(
 ) -> ServiceResult<AccountOutput> {
     identity.require_account_or_cert(Permission::Member)?;
 
-    let mut entity = Account::get(database_conn, &id)?;
+    let mut entity = Account::get(database_conn, id)?;
 
     entity.minimum_credit = input.minimum_credit;
     entity.name = input.name.clone();

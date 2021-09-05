@@ -205,7 +205,7 @@ impl Category {
     }
 
     /// Get a category by the `id`
-    pub fn get(database_conn: &DatabaseConnection, id: &Uuid) -> ServiceResult<Category> {
+    pub fn get(database_conn: &DatabaseConnection, id: Uuid) -> ServiceResult<Category> {
         use crate::model::schema::category::dsl;
 
         let mut results = dsl::category

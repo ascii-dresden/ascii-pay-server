@@ -33,7 +33,7 @@ pub fn login(
         authentication_password::get(database_conn, &input.username, &input.password);
     match login_result {
         Ok(account) => {
-            identity.store(database_conn, redis_conn, &account.id)?;
+            identity.store(database_conn, redis_conn, account.id)?;
 
             let token = identity.require_auth_token()?;
             Ok(LoginOutput {
@@ -55,7 +55,7 @@ pub fn login_mut(
         authentication_password::get(database_conn, &input.username, &input.password);
     match login_result {
         Ok(account) => {
-            identity.store(database_conn, redis_conn, &account.id)?;
+            identity.store(database_conn, redis_conn, account.id)?;
 
             let token = identity.require_auth_token()?;
             Ok(LoginOutput {

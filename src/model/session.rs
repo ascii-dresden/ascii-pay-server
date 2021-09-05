@@ -1,5 +1,6 @@
 use core::fmt;
 
+use async_graphql::{InputType, InputValueError, InputValueResult, Value};
 use serde::de::{Deserialize, Deserializer, Visitor};
 use serde::ser::{Serialize, Serializer};
 use uuid::Uuid;
@@ -16,7 +17,7 @@ struct InnerSession {
     key: Uuid,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, SimpleObject)]
 pub struct Session {
     key: Uuid,
 }
@@ -59,6 +60,20 @@ impl Serialize for Session {
         } else {
             Err(serde::ser::Error::custom("Cannot serialize Session!"))
         }
+    }
+}
+impl InputType for Session {
+    fn parse(value: Option<Value>) -> InputValueResult<Self> {
+        if let Some(Value::String(s)) = value {
+            Self::from_str(&s)
+                .map_err(|_| InputValueError::<Self>::custom(format!("Cannot parse session {}", s)))
+        } else {
+            Err(InputValueError::<Self>::custom("Cannot parse empty session".to_owned()))
+        }
+    }
+
+    fn to_value(&self) -> Value {
+        Value::String(self.to_string().unwrap_or_default())
     }
 }
 
@@ -104,7 +119,7 @@ pub fn create_longtime_session(
 
     redis::create_data::<LongtimeSession>(
         redis_conn,
-        &uuid_to_str(&session.key),
+        &uuid_to_str(session.key),
         &LongtimeSession {
             account_id: account.id,
         },
@@ -120,9 +135,9 @@ pub fn get_longtime_session(
     session: &Session,
 ) -> ServiceResult<Account> {
     let session =
-        redis::get_data::<LongtimeSession>(redis_conn, &uuid_to_str(&session.key), 10 * 60)?;
+        redis::get_data::<LongtimeSession>(redis_conn, &uuid_to_str(session.key), 10 * 60)?;
 
-    let account = Account::get(database_conn, &session.account_id)?;
+    let account = Account::get(database_conn, session.account_id)?;
 
     Ok(account)
 }
@@ -131,7 +146,7 @@ pub fn delete_longtime_session(
     redis_conn: &mut RedisConnection,
     session: &Session,
 ) -> ServiceResult<()> {
-    redis::delete_data::<LongtimeSession>(redis_conn, &uuid_to_str(&session.key))
+    redis::delete_data::<LongtimeSession>(redis_conn, &uuid_to_str(session.key))
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -147,7 +162,7 @@ pub fn create_onetime_session(
 
     redis::create_data::<OnetimeSession>(
         redis_conn,
-        &uuid_to_str(&session.key),
+        &uuid_to_str(session.key),
         &OnetimeSession {
             account_id: account.id,
         },
@@ -162,9 +177,9 @@ pub fn get_onetime_session(
     redis_conn: &mut RedisConnection,
     session: &Session,
 ) -> ServiceResult<Account> {
-    let session = redis::get_delete_data::<OnetimeSession>(redis_conn, &uuid_to_str(&session.key))?;
+    let session = redis::get_delete_data::<OnetimeSession>(redis_conn, &uuid_to_str(session.key))?;
 
-    let account = Account::get(database_conn, &session.account_id)?;
+    let account = Account::get(database_conn, session.account_id)?;
 
     Ok(account)
 }

@@ -35,7 +35,7 @@ pub fn authenticate_account(
 ) -> ServiceResult<AccountAccessTokenOutput> {
     identity.require_account(Permission::Admin)?;
 
-    let account = Account::get(database_conn, &account_id)?;
+    let account = Account::get(database_conn, account_id)?;
     let session = create_onetime_session(redis_conn, &account)?;
 
     Ok(AccountAccessTokenOutput {
@@ -52,11 +52,11 @@ pub fn authenticate_barcode(
     identity.require_cert()?;
 
     if let Ok(product) = Product::get_by_barcode(database_conn, code) {
-        return Ok((TokenType::ProductId, uuid_to_str(&product.id)));
+        return Ok((TokenType::ProductId, uuid_to_str(product.id)));
     }
 
     if let Ok(account_id) = wallet::get_by_qr_code(database_conn, code) {
-        let account = Account::get(database_conn, &account_id)?;
+        let account = Account::get(database_conn, account_id)?;
         let session = create_onetime_session(redis_conn, &account)?;
 
         return Ok((TokenType::AccountAccessToken, session.to_string()?));
@@ -97,7 +97,7 @@ pub fn authenticate_nfc_generic(
         return Err(ServiceError::Unauthorized);
     }
 
-    let account = Account::get(database_conn, &nfc_entry.account_id)?;
+    let account = Account::get(database_conn, nfc_entry.account_id)?;
     let session = create_onetime_session(redis_conn, &account)?;
 
     Ok((TokenType::AccountAccessToken, session.to_string()?))
@@ -206,7 +206,7 @@ pub fn authenticate_nfc_mifare_desfire_phase2(
         session_key.extend(&rndB[4..8]);
     }
 
-    let account = Account::get(database_conn, &nfc_entry.account_id)?;
+    let account = Account::get(database_conn, nfc_entry.account_id)?;
     let session = create_onetime_session(redis_conn, &account)?;
 
     Ok((
@@ -222,7 +222,7 @@ pub fn authenticate_nfc_delete_card(
 ) -> ServiceResult<()> {
     identity.require_cert()?;
 
-    let account = Account::get(database_conn, &account_id)?;
+    let account = Account::get(database_conn, account_id)?;
 
     authentication_nfc::remove(database_conn, &account)
 }
@@ -235,7 +235,7 @@ pub fn authenticate_nfc_generic_init_card(
 ) -> ServiceResult<()> {
     identity.require_cert()?;
 
-    let account = Account::get(database_conn, &account_id)?;
+    let account = Account::get(database_conn, account_id)?;
 
     authentication_nfc::register(
         database_conn,
@@ -255,7 +255,7 @@ pub fn authenticate_nfc_mifare_desfire_init_card(
 ) -> ServiceResult<String> {
     identity.require_cert()?;
 
-    let account = Account::get(database_conn, &account_id)?;
+    let account = Account::get(database_conn, account_id)?;
     let key = bytes_to_string(&generate_key_array::<16>());
 
     authentication_nfc::register(

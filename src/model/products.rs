@@ -208,7 +208,7 @@ impl Product {
 
     fn load_category(&mut self, database_conn: &DatabaseConnection) -> ServiceResult<()> {
         self.category = match &self.category {
-            Some(category) => Some(Category::get(database_conn, &category.id)?),
+            Some(category) => Some(Category::get(database_conn, category.id)?),
             None => None,
         };
 
@@ -315,7 +315,7 @@ impl Product {
     }
 
     /// Get a product by the `id`
-    pub fn get(database_conn: &DatabaseConnection, id: &Uuid) -> ServiceResult<Product> {
+    pub fn get(database_conn: &DatabaseConnection, id: Uuid) -> ServiceResult<Product> {
         use crate::model::schema::product::dsl;
 
         let mut results = dsl::product

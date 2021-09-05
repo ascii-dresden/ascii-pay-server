@@ -2,31 +2,51 @@ use crate::{
     identity_service::{Identity, IdentityRequire},
     model::{
         session::{get_onetime_session, Session},
-        transactions, Product, Transaction,
+        transactions, Account, Permission, Product, Transaction,
     },
     utils::{DatabaseConnection, Money, RedisConnection, ServiceResult},
 };
 
 use chrono::NaiveDateTime;
-use std::collections::HashMap;
 use uuid::Uuid;
 
 use super::accounts::AccountOutput;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, InputObject)]
 pub struct PaymentInput {
     pub account_access_token: Session,
     pub amount: i32,
-    pub products: HashMap<Uuid, i32>,
+    pub products: Vec<PaymentProductInput>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, InputObject)]
+pub struct PaymentProductInput {
+    pub id: Uuid,
+    pub amount: i32,
+}
+
+#[derive(Debug, Serialize, SimpleObject)]
 pub struct PaymentOutput {
     pub account: AccountOutput,
     pub transaction: TransactionOutput,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, InputObject)]
+pub struct TransactionFilterInput {
+    pub from: Option<NaiveDateTime>,
+    pub to: Option<NaiveDateTime>,
+}
+
+impl Default for TransactionFilterInput {
+    fn default() -> Self {
+        Self {
+            from: None,
+            to: None,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, SimpleObject)]
 pub struct TransactionOutput {
     pub id: Uuid,
     pub account_id: Uuid,
@@ -64,9 +84,9 @@ pub fn transaction_payment(
 
     let mut products: Vec<(Product, i32)> = Vec::new();
 
-    for (product_id, amount) in &input.products {
-        if let Ok(product) = Product::get(database_conn, product_id) {
-            products.push((product, *amount));
+    for payment_product in &input.products {
+        if let Ok(product) = Product::get(database_conn, payment_product.id) {
+            products.push((product, payment_product.amount));
         }
     }
 
@@ -76,4 +96,42 @@ pub fn transaction_payment(
         account: account.into(),
         transaction: transaction.into(),
     })
+}
+
+pub fn get_transactions_by_account(
+    database_conn: &DatabaseConnection,
+    identity: &Identity,
+    account_id: Uuid,
+    transaction_filer: Option<TransactionFilterInput>,
+) -> ServiceResult<Vec<TransactionOutput>> {
+    identity.require_account_or_cert(Permission::Member)?;
+
+    let transaction_filer = transaction_filer.unwrap_or_default();
+    let account = Account::get(database_conn, account_id)?;
+    let entities = transactions::get_by_account(
+        database_conn,
+        &account,
+        transaction_filer.from,
+        transaction_filer.to,
+    )?
+    .into_iter()
+    .map(TransactionOutput::from)
+    .collect();
+
+    Ok(entities)
+}
+
+pub fn get_transaction_by_account(
+    database_conn: &DatabaseConnection,
+    identity: &Identity,
+    account_id: Uuid,
+    transaction_id: Uuid,
+) -> ServiceResult<TransactionOutput> {
+    identity.require_account_or_cert(Permission::Member)?;
+
+    let account = Account::get(database_conn, account_id)?;
+    let entity =
+        transactions::get_by_account_and_id(database_conn, &account, transaction_id)?.into();
+
+    Ok(entity)
 }

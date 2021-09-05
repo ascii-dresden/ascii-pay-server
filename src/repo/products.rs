@@ -102,7 +102,7 @@ pub fn get_product(
 ) -> ServiceResult<ProductOutput> {
     identity.require_account_or_cert(Permission::Member)?;
 
-    let entity = Product::get(database_conn, &id)?;
+    let entity = Product::get(database_conn, id)?;
     Ok(entity.into())
 }
 
@@ -113,7 +113,7 @@ pub fn create_product(
 ) -> ServiceResult<ProductOutput> {
     identity.require_account_or_cert(Permission::Member)?;
 
-    let category = if let Some(category) = &input.category {
+    let category = if let Some(category) = input.category {
         Some(Category::get(database_conn, category)?)
     } else {
         None
@@ -144,9 +144,9 @@ pub fn update_product(
 ) -> ServiceResult<ProductOutput> {
     identity.require_account_or_cert(Permission::Member)?;
 
-    let mut entity = Product::get(database_conn, &id)?;
+    let mut entity = Product::get(database_conn, id)?;
 
-    let category = if let Some(category) = &input.category {
+    let category = if let Some(category) = input.category {
         Some(Category::get(database_conn, category)?)
     } else {
         None

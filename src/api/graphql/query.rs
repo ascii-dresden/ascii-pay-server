@@ -1,7 +1,10 @@
 use async_graphql::{Context, Object};
 use uuid::Uuid;
 
-use crate::repo::{self, AccountOutput, CategoryOutput, ProductOutput, SearchElement};
+use crate::repo::{
+    self, AccountOutput, CategoryOutput, ProductOutput, SearchElement, TransactionFilterInput,
+    TransactionOutput,
+};
 use crate::{identity_service::Identity, utils::ServiceResult};
 
 use super::get_database_conn_from_ctx;
@@ -40,6 +43,28 @@ impl Query {
         let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
         repo::get_account(database_conn, identity, id)
+    }
+
+    async fn get_transcations(
+        &self,
+        ctx: &Context<'_>,
+        account_id: Uuid,
+        transaction_filter: Option<TransactionFilterInput>,
+    ) -> ServiceResult<Vec<TransactionOutput>> {
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
+        let identity = ctx.data::<Identity>()?;
+        repo::get_transactions_by_account(database_conn, identity, account_id, transaction_filter)
+    }
+
+    async fn get_transaction(
+        &self,
+        ctx: &Context<'_>,
+        account_id: Uuid,
+        transaction_id: Uuid,
+    ) -> ServiceResult<TransactionOutput> {
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
+        let identity = ctx.data::<Identity>()?;
+        repo::get_transaction_by_account(database_conn, identity, account_id, transaction_id)
     }
 
     async fn get_categories(

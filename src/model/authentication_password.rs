@@ -104,7 +104,7 @@ pub fn get_account_by_invitation_link(
     let invitation_link = results.pop();
 
     match invitation_link {
-        Some(invitation_link) => Account::get(database_conn, &invitation_link.account_id),
+        Some(invitation_link) => Account::get(database_conn, invitation_link.account_id),
         None => Err(ServiceError::InternalServerError(
             "Invalid link",
             "".to_owned(),
@@ -176,7 +176,7 @@ pub fn get(
         return Err(ServiceError::NotFound);
     }
 
-    let a = Account::get(database_conn, &entry.account_id)?;
+    let a = Account::get(database_conn, entry.account_id)?;
 
     Ok(a)
 }

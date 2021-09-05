@@ -49,8 +49,8 @@ struct AppleWalletRegistration {
 
 pub fn check_pass_authorization(
     database_conn: &DatabaseConnection,
-    serial_number: &Uuid,
-    authentication_token: &Uuid,
+    serial_number: Uuid,
+    authentication_token: Uuid,
 ) -> ServiceResult<bool> {
     use crate::model::schema::apple_wallet_pass::dsl;
     let results = dsl::apple_wallet_pass
@@ -64,7 +64,7 @@ pub fn check_pass_authorization(
 pub fn is_pass_registered_on_device(
     database_conn: &DatabaseConnection,
     device_id: &str,
-    serial_number: &Uuid,
+    serial_number: Uuid,
 ) -> ServiceResult<bool> {
     use crate::model::schema::apple_wallet_registration::dsl;
     let results = dsl::apple_wallet_registration
@@ -78,7 +78,7 @@ pub fn is_pass_registered_on_device(
 pub fn register_pass_on_device(
     database_conn: &DatabaseConnection,
     device_id: &str,
-    serial_number: &Uuid,
+    serial_number: Uuid,
     pass_type_id: &str,
     push_token: &str,
 ) -> ServiceResult<()> {
@@ -100,7 +100,7 @@ pub fn register_pass_on_device(
 pub fn unregister_pass_on_device(
     database_conn: &DatabaseConnection,
     device_id: &str,
-    serial_number: &Uuid,
+    serial_number: Uuid,
 ) -> ServiceResult<()> {
     use crate::model::schema::apple_wallet_registration::dsl;
 
@@ -142,7 +142,7 @@ pub fn list_passes_for_device(
 
 pub fn get_pass_updated_at(
     database_conn: &DatabaseConnection,
-    serial_number: &Uuid,
+    serial_number: Uuid,
 ) -> ServiceResult<i32> {
     use crate::model::schema::apple_wallet_pass::dsl;
     let mut results = dsl::apple_wallet_pass
@@ -279,7 +279,7 @@ pub fn create_pass(
     Ok(cursor.into_inner())
 }
 
-pub fn delete_pass(database_conn: &DatabaseConnection, account_id: &Uuid) -> ServiceResult<()> {
+pub fn delete_pass(database_conn: &DatabaseConnection, account_id: Uuid) -> ServiceResult<()> {
     use crate::model::schema::apple_wallet_pass::dsl as dsl_pass;
     use crate::model::schema::apple_wallet_registration::dsl as dsl_registration;
 
@@ -297,7 +297,7 @@ pub fn delete_pass(database_conn: &DatabaseConnection, account_id: &Uuid) -> Ser
 
 pub fn set_pass_updated_at(
     database_conn: &DatabaseConnection,
-    serial_number: &Uuid,
+    serial_number: Uuid,
 ) -> ServiceResult<()> {
     use crate::model::schema::apple_wallet_pass::dsl;
 
@@ -312,7 +312,7 @@ pub fn set_pass_updated_at(
 
 pub async fn send_update_notification(
     database_conn: &DatabaseConnection,
-    account_id: &Uuid,
+    account_id: Uuid,
 ) -> ServiceResult<()> {
     use crate::model::schema::apple_wallet_registration::dsl;
 

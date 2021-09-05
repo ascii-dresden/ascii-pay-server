@@ -85,7 +85,7 @@ pub fn get_category(
 ) -> ServiceResult<CategoryOutput> {
     identity.require_account_or_cert(Permission::Member)?;
 
-    let entity = Category::get(database_conn, &id)?;
+    let entity = Category::get(database_conn, id)?;
     Ok(entity.into())
 }
 
@@ -117,7 +117,7 @@ pub fn update_category(
 ) -> ServiceResult<CategoryOutput> {
     identity.require_account_or_cert(Permission::Member)?;
 
-    let mut entity = Category::get(database_conn, &id)?;
+    let mut entity = Category::get(database_conn, id)?;
     entity.name = input.name.clone();
     entity.update(database_conn)?;
 

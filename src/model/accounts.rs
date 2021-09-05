@@ -189,7 +189,7 @@ impl Account {
     }
 
     /// Get an account by the `id`
-    pub fn get(database_conn: &DatabaseConnection, id: &Uuid) -> ServiceResult<Account> {
+    pub fn get(database_conn: &DatabaseConnection, id: Uuid) -> ServiceResult<Account> {
         use crate::model::schema::account::dsl;
 
         let mut results = dsl::account

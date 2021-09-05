@@ -50,19 +50,15 @@ pub async fn register_device(
 
     let database_conn = &database_pool.get()?;
 
-    if wallet::check_pass_authorization(database_conn, &path.serial_number, &authentication_token)?
-    {
-        if wallet::is_pass_registered_on_device(
-            database_conn,
-            &path.device_id,
-            &path.serial_number,
-        )? {
+    if wallet::check_pass_authorization(database_conn, path.serial_number, authentication_token)? {
+        if wallet::is_pass_registered_on_device(database_conn, &path.device_id, path.serial_number)?
+        {
             Ok(HttpResponse::NotModified().finish())
         } else {
             wallet::register_pass_on_device(
                 database_conn,
                 &path.device_id,
-                &path.serial_number,
+                path.serial_number,
                 &path.pass_type_id,
                 &data.push_token,
             )?;
@@ -114,7 +110,7 @@ pub async fn update_passes(
             let mut updated_passes = Vec::<Uuid>::new();
 
             for pass in passes {
-                if wallet::get_pass_updated_at(database_conn, &pass)? > passes_updated_since {
+                if wallet::get_pass_updated_at(database_conn, pass)? > passes_updated_since {
                     updated_passes.push(pass);
                 }
             }
@@ -189,14 +185,10 @@ pub async fn unregister_device(
 
     let database_conn = &database_pool.get()?;
 
-    if wallet::check_pass_authorization(database_conn, &path.serial_number, &authentication_token)?
-    {
-        if wallet::is_pass_registered_on_device(
-            database_conn,
-            &path.device_id,
-            &path.serial_number,
-        )? {
-            wallet::unregister_pass_on_device(database_conn, &path.device_id, &path.serial_number)?;
+    if wallet::check_pass_authorization(database_conn, path.serial_number, authentication_token)? {
+        if wallet::is_pass_registered_on_device(database_conn, &path.device_id, path.serial_number)?
+        {
+            wallet::unregister_pass_on_device(database_conn, &path.device_id, path.serial_number)?;
             Ok(HttpResponse::Ok().finish())
         } else {
             Ok(HttpResponse::NotFound().finish())
@@ -233,19 +225,18 @@ pub async fn pass_delivery(
 
     let database_conn = &database_pool.get()?;
 
-    if wallet::check_pass_authorization(database_conn, &path.serial_number, &authentication_token)?
-    {
+    if wallet::check_pass_authorization(database_conn, path.serial_number, authentication_token)? {
         if path.pass_type_id != env::APPLE_WALLET_PASS_TYPE_IDENTIFIER.to_string() {
             return Err(ServiceError::NotFound);
         }
 
-        let updated_at = wallet::get_pass_updated_at(database_conn, &path.serial_number)?;
+        let updated_at = wallet::get_pass_updated_at(database_conn, path.serial_number)?;
 
         let last_modified = chrono::NaiveDateTime::from_timestamp(updated_at as i64, 0)
             .format("%a, %d %b %G %T GMT")
             .to_string();
 
-        let account = Account::get(database_conn, &path.serial_number)?;
+        let account = Account::get(database_conn, path.serial_number)?;
         let vec = wallet::create_pass(database_conn, &account)?;
         Ok(HttpResponse::Ok()
             .content_type("application/vnd.apple.pkpass")

@@ -375,7 +375,7 @@ impl Identity {
         &self,
         database_conn: &DatabaseConnection,
         redis_conn: &mut RedisConnection,
-        account_id: &Uuid,
+        account_id: Uuid,
     ) -> ServiceResult<()> {
         let account = Account::get(database_conn, account_id)?;
         let session = create_longtime_session(redis_conn, &account)?;
@@ -449,7 +449,7 @@ impl IdentityMut {
         &self,
         database_conn: &DatabaseConnection,
         redis_conn: &mut RedisConnection,
-        account_id: &Uuid,
+        account_id: Uuid,
     ) -> ServiceResult<()> {
         let account = Account::get(database_conn, account_id)?;
         let session = create_longtime_session(redis_conn, &account)?;
