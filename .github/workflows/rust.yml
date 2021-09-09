@@ -11,7 +11,7 @@ jobs:
     - uses: actions/checkout@v1
 
     - name: Install dependencies
-      run: sudo apt-get install libpq-dev
+      run: sudo apt-get install libpq-dev protobuf-compiler libprotobuf-dev
 
     - name: Install Rust stable
       run: |
