@@ -2,9 +2,11 @@ FROM rust:1.53-buster as builder
 
 WORKDIR /usr/src/ascii-pay-server
 ENV CARGO_TERM_COLOR always
-RUN apt-get update && apt-get install -y libpq-dev libssl-dev build-essential clang llvm-dev libclang-dev
+RUN apt-get update && apt-get install -y libpq-dev libssl-dev build-essential clang llvm-dev libclang-dev protobuf-compiler libprotobuf-dev
 
-RUN cargo new --bin /usr/src/ascii-pay-server
+RUN mkdir src/
+RUN echo "fn main() {println!(\"if you see this, the build broke\")}" > src/main.rs
+RUN echo "fn main() {println!(\"if you see this, the build broke\")}" > build.rs
 COPY Cargo.lock ./
 COPY Cargo.toml ./
 RUN cargo install --path . --locked
@@ -19,5 +21,4 @@ RUN mkdir /opt/ascii-pay-server
 WORKDIR /opt/ascii-pay-server
 ENTRYPOINT /opt/ascii-pay-server/ascii-pay-server run
 
-COPY --from=builder /usr/local/cargo/bin/ascii-pay-server /usr/src/ascii-pay-server/static /opt/ascii-pay-server/
-COPY ./static /opt/ascii-pay-server/static
+COPY --from=builder /usr/local/cargo/bin/ascii-pay-server /opt/ascii-pay-server/

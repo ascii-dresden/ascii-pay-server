@@ -3,4 +3,5 @@ dist/
 .vscode/
 backup/
 target/
+docker/
 Dockerfile

@@ -1,15 +1,15 @@
 # configuration shared between dev and release
 version: "3"
 services:
-  web:
+  server:
     build:
       context: .
-      dockerfile: docker/web.Dockerfile
+      dockerfile: docker/server.Dockerfile
     container_name: "ascii-pay-server-dist"
     environment:
       - HOST=0.0.0.0
       - PORT=8080
-      - DATABASE_URL=postgres://ascii:ascii@db:5432/ascii-pay
+      - DATABASE_URL=postgres://ascii:ascii@postgres:5432/ascii-pay
       - REDIS_URL=redis://redis:6379/1
       - MAIL_SENDER=payments@ascii.coffee
       - MAIL_SENDER_NAME=Ascii Pay Service
@@ -21,16 +21,19 @@ services:
       - BASE_URL=https://ascii.pixix4.com/
     expose:
       - "8080"
+    ports:
+      - "8080:8080"
     volumes:
       - ./dist/img:/opt/ascii-pay-server/img
       - ./certificates:/opt/ascii-pay-server/certificates
       - ./AsciiPayCard.pass:/opt/ascii-pay-server/AsciiPayCard.pass
     depends_on:
-      - db
+      - postgres
+      - redis
     networks:
       - default
     restart: always
-  db:
+  postgres:
     image: postgres:13-alpine
     container_name: "ascii-pay-postgres-dist"
     environment:
