@@ -2,7 +2,7 @@ use crate::{
     identity_service::{Identity, IdentityRequire},
     model::{
         session::{get_onetime_session, Session},
-        transactions, Account, Permission, Product, Transaction,
+        transactions, Account, Permission, Product, Transaction
     },
     utils::{DatabaseConnection, Money, RedisConnection, ServiceResult},
 };
@@ -10,7 +10,7 @@ use crate::{
 use chrono::NaiveDateTime;
 use uuid::Uuid;
 
-use super::accounts::AccountOutput;
+use super::{ProductOutput, accounts::AccountOutput};
 
 #[derive(Debug, Deserialize, InputObject)]
 pub struct PaymentInput {
@@ -31,21 +31,6 @@ pub struct PaymentOutput {
     pub transaction: TransactionOutput,
 }
 
-#[derive(Debug, Deserialize, InputObject)]
-pub struct TransactionFilterInput {
-    pub from: Option<NaiveDateTime>,
-    pub to: Option<NaiveDateTime>,
-}
-
-impl Default for TransactionFilterInput {
-    fn default() -> Self {
-        Self {
-            from: None,
-            to: None,
-        }
-    }
-}
-
 #[derive(Debug, Serialize, SimpleObject)]
 pub struct TransactionOutput {
     pub id: Uuid,
@@ -55,6 +40,13 @@ pub struct TransactionOutput {
     pub before_credit: Money,
     pub after_credit: Money,
     pub date: NaiveDateTime,
+    pub products: Vec<TransactionProductOutput>
+}
+
+#[derive(Debug, Serialize, SimpleObject)]
+pub struct TransactionProductOutput {
+    pub product: ProductOutput,
+    pub amount: i32,
 }
 
 impl From<Transaction> for TransactionOutput {
@@ -67,6 +59,25 @@ impl From<Transaction> for TransactionOutput {
             before_credit: entity.before_credit,
             after_credit: entity.after_credit,
             date: entity.date,
+            products: Vec::new()
+        }
+    }
+}
+
+impl From<(Transaction, Vec<(Product, i32)>)> for TransactionOutput {
+    fn from(entity: (Transaction, Vec<(Product, i32)>)) -> Self {
+        Self {
+            id: entity.0.id,
+            account_id: entity.0.account_id,
+            cashier_id: entity.0.cashier_id,
+            total: entity.0.total,
+            before_credit: entity.0.before_credit,
+            after_credit: entity.0.after_credit,
+            date: entity.0.date,
+            products: entity.1.into_iter().map(|(product, amount)| TransactionProductOutput {
+                product: product.into(),
+                amount
+            }).collect()
         }
     }
 }
@@ -102,19 +113,23 @@ pub fn get_transactions_by_account(
     database_conn: &DatabaseConnection,
     identity: &Identity,
     account_id: Uuid,
-    transaction_filer: Option<TransactionFilterInput>,
+    transaction_filer_from: Option<NaiveDateTime>,
+    transaction_filer_to: Option<NaiveDateTime>,
 ) -> ServiceResult<Vec<TransactionOutput>> {
     identity.require_account_or_cert(Permission::Member)?;
 
-    let transaction_filer = transaction_filer.unwrap_or_default();
     let account = Account::get(database_conn, account_id)?;
     let entities = transactions::get_by_account(
         database_conn,
         &account,
-        transaction_filer.from,
-        transaction_filer.to,
+        transaction_filer_from,
+        transaction_filer_to,
     )?
     .into_iter()
+    .map(|t| {
+        let p = t.get_products(database_conn).unwrap_or_default();
+        (t, p)
+    })
     .map(TransactionOutput::from)
     .collect();
 

@@ -1,8 +1,9 @@
 use async_graphql::{Context, Object};
+use chrono::NaiveDate;
 use uuid::Uuid;
 
 use crate::repo::{
-    self, AccountOutput, CategoryOutput, ProductOutput, SearchElement, TransactionFilterInput,
+    self, AccountOutput, CategoryOutput, ProductOutput, SearchElement,
     TransactionOutput,
 };
 use crate::{identity_service::Identity, utils::ServiceResult};
@@ -45,15 +46,26 @@ impl Query {
         repo::get_account(database_conn, identity, id)
     }
 
-    async fn get_transcations(
+    async fn get_transactions(
         &self,
         ctx: &Context<'_>,
         account_id: Uuid,
-        transaction_filter: Option<TransactionFilterInput>,
+        transaction_filter_from: Option<String>,
+        transaction_filter_to: Option<String>,
     ) -> ServiceResult<Vec<TransactionOutput>> {
         let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
-        repo::get_transactions_by_account(database_conn, identity, account_id, transaction_filter)
+        repo::get_transactions_by_account(
+            database_conn,
+            identity,
+            account_id,
+            transaction_filter_from.map(|s|
+                NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()
+                    .map(|d| d.and_hms(0, 0, 0))).flatten(),
+            transaction_filter_to.map(|s|
+                NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()
+                    .map(|d| d.and_hms(0, 0, 0))).flatten(),
+        )
     }
 
     async fn get_transaction(

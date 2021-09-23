@@ -1,12 +1,13 @@
 use std::ops::DerefMut;
 
 use actix_web::{web, HttpResponse};
+use chrono::NaiveDateTime;
 use uuid::Uuid;
 
 use crate::{
     identity_service::Identity,
     model::wallet,
-    repo::{self, PaymentInput, TransactionFilterInput},
+    repo::{self, PaymentInput},
     utils::{DatabasePool, RedisPool, ServiceResult},
 };
 
@@ -33,6 +34,12 @@ pub async fn post_transaction_payment(
     Ok(HttpResponse::Ok().json(&result))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct TransactionFilterInput {
+    pub from: Option<NaiveDateTime>,
+    pub to: Option<NaiveDateTime>,
+}
+
 /// GET route for `/api/v1/account/{account_id}/transactions`
 pub async fn get_transactions_by_account(
     database_pool: web::Data<DatabasePool>,
@@ -41,11 +48,14 @@ pub async fn get_transactions_by_account(
     transaction_filter: web::Query<TransactionFilterInput>,
 ) -> ServiceResult<HttpResponse> {
     let conn = &database_pool.get()?;
+
+    let TransactionFilterInput { from, to} = transaction_filter.into_inner();
     let result = repo::get_transactions_by_account(
         conn,
         &identity,
         id.into_inner(),
-        Some(transaction_filter.into_inner()),
+        from,
+        to,
     )?;
     Ok(HttpResponse::Ok().json(&result))
 }
