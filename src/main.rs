@@ -31,10 +31,12 @@ mod model;
 mod repo;
 mod tcp_server;
 mod utils;
+mod demo_data;
 
 // endpoints
 mod api;
 
+use crate::demo_data::load_demo_data;
 use crate::model::{authentication_password, Account, Permission};
 use crate::utils::{env, DatabaseConnection, DatabasePool, ServiceResult};
 use http_server::start_http_server;
@@ -78,6 +80,7 @@ async fn init() -> ServiceResult<()> {
         .about(crate_description!())
         .author(crate_authors!("\n"))
         .subcommand(SubCommand::with_name("run").about("Start the web server"))
+        .subcommand(SubCommand::with_name("load-demo-data").about("Initilize the database with demo data. This requires an empty database!"))
         .subcommand(SubCommand::with_name("admin").about("Create a new admin user"))
         .get_matches();
 
@@ -91,6 +94,11 @@ async fn init() -> ServiceResult<()> {
     if let Some(_matches) = matches.subcommand_matches("admin") {
         // Check if admin exists, create otherwise
         create_admin_user(&database_pool)?;
+        return Ok(());
+    }
+
+    if let Some(_matches) = matches.subcommand_matches("load-demo-data") {
+        load_demo_data(&database_pool)?;
         return Ok(());
     }
 

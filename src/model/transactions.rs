@@ -31,7 +31,7 @@ pub struct Transaction {
 /// * 4 Check if the account minimum_credit allows the new credit
 /// * 5 Create and save the transaction (with optional cashier refernece)
 /// * 6 Save the new credit to the account
-fn execute_at(
+pub fn execute_at(
     database_conn: &DatabaseConnection,
     account: &mut Account,
     cashier: Option<&Account>,
