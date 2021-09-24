@@ -1,6 +1,7 @@
 use std::ops::DerefMut;
 use std::thread;
 
+use log::info;
 use uuid::Uuid;
 
 use crate::grpc::authentication::*;
@@ -244,7 +245,7 @@ pub fn start_tcp_server(database_pool: DatabasePool, redis_pool: RedisPool) {
         ));
         let server = server_builder.build().expect("build");
 
-        println!("Start grpc server at {}", server.local_addr());
+        info!("Start grpc server at {}", server.local_addr());
 
         loop {
             thread::park();

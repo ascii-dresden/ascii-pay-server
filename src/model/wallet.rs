@@ -1,4 +1,5 @@
 use diesel::prelude::*;
+use log::{error, info};
 use std::io::Cursor;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -322,7 +323,7 @@ pub async fn send_update_notification(
         .filter(dsl::serial_number.eq(account_id))
         .load::<AppleWalletRegistration>(database_conn)?;
 
-    println!("Send APNS message for account: {:?}", account_id);
+    info!("Send APNS message for account: {:?}", account_id);
 
     let mut unregister_vec = Vec::<String>::new();
 
@@ -331,7 +332,7 @@ pub async fn send_update_notification(
         let response_code = match apns.send(&registration.push_token).await {
             Ok(response_code) => response_code,
             Err(e) => {
-                eprintln!("Error while communicating with APNS: {:?}", e);
+                error!("Error while communicating with APNS: {:?}", e);
                 continue;
             }
         };
@@ -354,7 +355,7 @@ pub async fn send_update_notification(
 
     for device_id in unregister_vec {
         if let Err(e) = unregister_pass_on_device(database_conn, &device_id, account_id) {
-            eprintln!(
+            error!(
                 "Cannot unregister device {} as APNS requested: {:?}",
                 &device_id, e
             );

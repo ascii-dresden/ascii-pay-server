@@ -2,6 +2,7 @@ use actix_web::http::header::ToStrError;
 use actix_web::{error::ResponseError, Error as ActixError, HttpResponse};
 use derive_more::Display;
 use lettre::smtp::error::Error as LettreError;
+use log::warn;
 
 /// Represent errors in the application
 ///
@@ -44,7 +45,7 @@ pub type ServiceResult<T> = Result<T, ServiceError>;
 
 impl From<diesel::result::Error> for ServiceError {
     fn from(error: diesel::result::Error) -> Self {
-        println!("Database error: {}", error);
+        warn!("Database error: {}", error);
         ServiceError::InternalServerError("Database error", format!("{}", error))
     }
 }
@@ -57,7 +58,7 @@ impl From<diesel_migrations::RunMigrationsError> for ServiceError {
 
 impl From<r2d2_redis::redis::RedisError> for ServiceError {
     fn from(error: r2d2_redis::redis::RedisError) -> Self {
-        println!("Redis error: {}", error);
+        warn!("Redis error: {}", error);
         ServiceError::InternalServerError("Redis error", format!("{}", error))
     }
 }

@@ -1,4 +1,5 @@
 use actix_web::{middleware, App, HttpServer};
+use log::info;
 
 use crate::api as module_api;
 use crate::api::graphql;
@@ -12,7 +13,7 @@ async fn start_server(database_pool: DatabasePool, redis_pool: RedisPool) -> Ser
     let address = format!("{}:{}", env::HOST.as_str(), *env::PORT);
     let schema = graphql::create_schema_with_context(database_pool.clone(), redis_pool.clone());
 
-    println!("Start http server at {}", address);
+    info!("Start http server at {}", address);
 
     HttpServer::new(move || {
         App::new()

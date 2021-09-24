@@ -4,6 +4,7 @@ use crate::utils::{env, ServiceError, ServiceResult};
 use lettre::smtp::authentication::Credentials;
 use lettre::{SendableEmail, SmtpClient, Transport};
 use lettre_email::EmailBuilder;
+use log::trace;
 
 fn send_standard_mail(account: &Account, subj: &str, message: String) -> ServiceResult<()> {
     let mail_address = if let Some(m) = account.mail.as_ref() {
@@ -26,7 +27,7 @@ fn send_standard_mail(account: &Account, subj: &str, message: String) -> Service
     if env::MAIL_SERVER.as_str().ends_with(".local") {
         // dump the mail to the log
         let m: SendableEmail = email.into();
-        println!(
+        trace!(
             "{}",
             m.message_to_string()
                 .expect("This was unrealistic to happen")

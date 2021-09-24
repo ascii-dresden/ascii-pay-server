@@ -21,6 +21,7 @@ use std::io::Write;
 
 use clap::{App, SubCommand};
 use diesel::r2d2::{self, ConnectionManager};
+use log::{error, info, warn};
 use r2d2_redis::RedisConnectionManager;
 
 // Internal services
@@ -46,12 +47,16 @@ embed_migrations!();
 
 #[actix_web::main]
 async fn main() {
+    dotenv::dotenv().ok();
+    std::env::set_var("RUST_LOG", "actix_web=info,actix_server=info,ascii_pay_server=info");
+    env_logger::init();
+
     let result = init().await;
 
     let exit_code = match result {
         Ok(_) => 0,
         Err(e) => {
-            eprintln!("{}", e);
+            error!("{}", e);
             1
         }
     };
@@ -60,10 +65,6 @@ async fn main() {
 }
 
 async fn init() -> ServiceResult<()> {
-    dotenv::dotenv().ok();
-    std::env::set_var("RUST_LOG", "actix_web=info,actix_server=info");
-    env_logger::init();
-
     // Setup database connection
     let database_manager = ConnectionManager::<DatabaseConnection>::new(env::DATABASE_URL.as_str());
     let database_pool = r2d2::Pool::builder().build(database_manager)?;
@@ -119,7 +120,7 @@ fn read_value(prompt: &str, hide_input: bool) -> String {
             if p1 == p2 {
                 return p1;
             } else {
-                println!("Passwords does not match, retry.");
+                warn!("Passwords does not match, retry.");
             }
         }
     } else {
@@ -143,7 +144,7 @@ fn create_admin_user(database_pool: &DatabasePool) -> ServiceResult<()> {
     account.update(database_conn)?;
     authentication_password::register(database_conn, &account, &password)?;
 
-    println!("Admin user '{}' was successfully created!", username);
+    info!("Admin user '{}' was successfully created!", username);
 
     Ok(())
 }

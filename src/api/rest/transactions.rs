@@ -2,6 +2,7 @@ use std::ops::DerefMut;
 
 use actix_web::{web, HttpResponse};
 use chrono::NaiveDateTime;
+use log::error;
 use uuid::Uuid;
 
 use crate::{
@@ -28,7 +29,7 @@ pub async fn post_transaction_payment(
     )?;
 
     if let Err(e) = wallet::send_update_notification(database_conn, result.account.id).await {
-        eprintln!("Error while communicating with APNS: {:?}", e);
+        error!("Error while communicating with APNS: {:?}", e);
     }
 
     Ok(HttpResponse::Ok().json(&result))

@@ -1,5 +1,6 @@
 use chrono::{Local, NaiveDateTime};
 use diesel::prelude::*;
+use log::info;
 use std::fs::{self, File};
 use std::path::Path;
 use uuid::Uuid;
@@ -267,7 +268,7 @@ impl Product {
 
         fs::create_dir_all(env::IMAGE_PATH.as_str())?;
         let file = File::create(format!("{}/{}", env::IMAGE_PATH.as_str(), name))?;
-        println!(
+        info!(
             "Save image '{}'",
             format!("{}/{}", env::IMAGE_PATH.as_str(), name)
         );

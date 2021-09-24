@@ -1,6 +1,7 @@
 use crate::identity_service::{Identity, IdentityRequire};
 use crate::model::{Category, Permission, Price};
 use crate::utils::{fuzzy_vec_match, DatabaseConnection, Money, ServiceError, ServiceResult};
+use log::warn;
 use uuid::Uuid;
 
 use super::prices::{PriceInput, PriceOutput};
@@ -140,7 +141,7 @@ pub fn delete_category(
 ) -> ServiceResult<()> {
     identity.require_account_or_cert(Permission::Member)?;
 
-    println!("Delete is not supported!");
+    warn!("Delete is not supported!");
 
     Err(ServiceError::InternalServerError(
         "Method not supported",

@@ -6,6 +6,7 @@ use std::{
 
 use actix_http::client::Connector;
 use actix_web::client::Client;
+use log::error;
 use openssl::{
     pkcs12::Pkcs12,
     ssl::{SslConnector, SslMethod, SslVerifyMode},
@@ -70,7 +71,7 @@ impl ApplePushNotificationService {
         let response = match builder.send_body(payload_json).await {
             Ok(v) => v,
             Err(e) => {
-                eprintln!("{:?}", e);
+                error!("{:?}", e);
                 return Err(e.into());
             }
         };

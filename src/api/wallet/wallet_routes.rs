@@ -1,6 +1,7 @@
 use crate::model::{wallet, Account};
 use crate::utils::{env, DatabasePool, ServiceError, ServiceResult};
 use actix_web::{web, HttpRequest, HttpResponse};
+use log::info;
 use uuid::Uuid;
 
 fn get_authentication_token(request: &HttpRequest) -> Option<Uuid> {
@@ -254,6 +255,6 @@ pub struct PassDeliveryPath {
 }
 
 pub async fn log(body: web::Bytes) -> ServiceResult<HttpResponse> {
-    println!("{}", std::str::from_utf8(&body).unwrap());
+    info!("{}", std::str::from_utf8(&body).unwrap());
     Ok(HttpResponse::Ok().finish())
 }
