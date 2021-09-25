@@ -1,3 +1,4 @@
+use actix_cors::Cors;
 use actix_web::{middleware, App, HttpServer};
 use log::info;
 
@@ -16,11 +17,17 @@ async fn start_server(database_pool: DatabasePool, redis_pool: RedisPool) -> Ser
     info!("Start http server at {}", address);
 
     HttpServer::new(move || {
+        let cors = Cors::default()
+            .allow_any_header()
+            .allow_any_method()
+            .allow_any_origin();
+
         App::new()
             // Move database pool
             .data(database_pool.clone())
             .data(redis_pool.clone())
             .data(schema.clone())
+            .wrap(cors)
             // Enable request/response compression support
             .wrap(middleware::Compress::default())
             // Enable logger
