@@ -254,6 +254,18 @@ impl Product {
         }
     }
 
+    pub fn get_image(&self) -> ServiceResult<String> {
+        if let Some(name) = self.image.clone() {
+            let p = format!("{}/{}", env::IMAGE_PATH.as_str(), name);
+
+            if Path::new(&p).exists() {
+                return Ok(p);
+            }
+        }
+
+        Err(ServiceError::NotFound)
+    }
+
     pub fn set_image(
         &mut self,
         database_conn: &DatabaseConnection,

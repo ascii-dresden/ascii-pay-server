@@ -1,7 +1,8 @@
 use crate::identity_service::Identity;
 use crate::repo::{self, ProductInput};
 use crate::utils::{DatabasePool, ServiceResult};
-use actix_web::{web, HttpResponse};
+use actix_files::NamedFile;
+use actix_web::{web, HttpRequest, HttpResponse};
 use uuid::Uuid;
 
 use super::Search;
@@ -37,6 +38,19 @@ pub async fn get_product(
     let database_conn = &database_pool.get()?;
     let result = repo::get_product(database_conn, &identity, id.into_inner())?;
     Ok(HttpResponse::Ok().json(&result))
+}
+
+/// GET route for `/api/v1/product/{product_id}/image`
+pub async fn get_product_image(
+    req: HttpRequest,
+    database_pool: web::Data<DatabasePool>,
+    identity: Identity,
+    id: web::Path<Uuid>,
+) -> ServiceResult<HttpResponse> {
+    let database_conn = &database_pool.get()?;
+    let path = repo::get_product_image(database_conn, &identity, id.into_inner())?;
+
+    Ok(NamedFile::open(path)?.into_response(&req)?)
 }
 
 /// POST route for `/api/v1/product/{product_id}`

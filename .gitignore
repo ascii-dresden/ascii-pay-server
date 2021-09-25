@@ -13,3 +13,5 @@ backup/
 certificates/*
 .DS_Store
 ._.DS_Store
+ascii.pass
+*.pkpass

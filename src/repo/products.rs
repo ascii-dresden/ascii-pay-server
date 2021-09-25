@@ -1,6 +1,11 @@
+use std::fs::File;
+use std::io::{Read, Write};
+
 use crate::identity_service::{Identity, IdentityRequire};
 use crate::model::{Category, Permission, Price, Product};
-use crate::utils::{fuzzy_vec_match, DatabaseConnection, Money, ServiceError, ServiceResult};
+use crate::utils::{
+    fuzzy_vec_match, uuid_to_str, DatabaseConnection, Money, ServiceError, ServiceResult,
+};
 use log::warn;
 use uuid::Uuid;
 
@@ -29,11 +34,15 @@ pub struct ProductOutput {
 
 impl From<Product> for ProductOutput {
     fn from(entity: Product) -> Self {
+        let image = entity
+            .image
+            .as_ref()
+            .map(|_| format!("/api/v1/product/{}/image", uuid_to_str(entity.id)));
         Self {
             id: entity.id,
             name: entity.name,
             category: entity.category.map(CategoryOutput::from),
-            image: entity.image,
+            image,
             prices: entity.prices.into_iter().map(PriceOutput::from).collect(),
             current_price: entity.current_price,
             barcode: entity.barcode,
@@ -107,6 +116,17 @@ pub fn get_product(
     Ok(entity.into())
 }
 
+pub fn get_product_image(
+    database_conn: &DatabaseConnection,
+    identity: &Identity,
+    id: Uuid,
+) -> ServiceResult<String> {
+    identity.require_account_or_cert(Permission::Member)?;
+
+    let entity = Product::get(database_conn, id)?;
+    entity.get_image()
+}
+
 pub fn create_product(
     database_conn: &DatabaseConnection,
     identity: &Identity,
@@ -169,6 +189,69 @@ pub fn update_product(
     )?;
 
     Ok(entity.into())
+}
+
+pub fn remove_product_image(
+    database_conn: &DatabaseConnection,
+    identity: &Identity,
+    id: Uuid,
+) -> ServiceResult<()> {
+    identity.require_account_or_cert(Permission::Member)?;
+
+    let mut entity = Product::get(database_conn, id)?;
+    entity.remove_image(database_conn)?;
+
+    Ok(())
+}
+
+pub fn set_product_image(
+    database_conn: &DatabaseConnection,
+    identity: &Identity,
+    id: Uuid,
+    _filename: &str,
+    content_type: Option<&str>,
+    content: &mut File,
+) -> ServiceResult<()> {
+    identity.require_account_or_cert(Permission::Member)?;
+
+    let mut entity = Product::get(database_conn, id)?;
+
+    let mut file_extension = "png";
+
+    if let Some(content_type) = content_type {
+        match content_type.to_ascii_lowercase().as_str() {
+            "image/png" => file_extension = "png",
+            "image/jpg" => file_extension = "jpg",
+            "image/jpeg" => file_extension = "jpg",
+            _ => {}
+        }
+    }
+
+    let mut file = entity.set_image(database_conn, file_extension)?;
+
+    let chunk_size = 0x4000;
+    loop {
+        let mut chunk = Vec::with_capacity(chunk_size);
+        let n = std::io::Read::by_ref(content)
+            .take(chunk_size as u64)
+            .read_to_end(&mut chunk)?;
+        if n == 0 {
+            break;
+        }
+
+        let mut pos = 0;
+        while pos < chunk.len() {
+            let bytes_written = file.write(&chunk[pos..])?;
+            pos += bytes_written;
+        }
+
+        if n < chunk_size {
+            break;
+        }
+    }
+
+    file.flush()?;
+    Ok(())
 }
 
 /// DELETE route for `/api/v1/product/{product_id}`

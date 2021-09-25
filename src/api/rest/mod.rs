@@ -59,6 +59,10 @@ pub fn init(config: &mut web::ServiceConfig) {
                 .route(web::put().to(products::put_products)),
         )
         .service(
+            web::resource("/product/{product_id}/image")
+                .route(web::get().to(products::get_product_image)),
+        )
+        .service(
             web::resource("/product/{product_id}")
                 .route(web::get().to(products::get_product))
                 .route(web::post().to(products::post_product))

@@ -1,6 +1,6 @@
 use std::ops::DerefMut;
 
-use async_graphql::Context;
+use async_graphql::{Context, Upload};
 use uuid::Uuid;
 
 use crate::identity_service::Identity;
@@ -141,5 +141,34 @@ impl Mutation {
         let mut redis_conn = get_redis_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
         repo::transaction_payment(database_conn, redis_conn.deref_mut(), identity, input)
+    }
+
+    async fn remove_product_image(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<String> {
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
+        let identity = ctx.data::<Identity>()?;
+
+        repo::remove_product_image(database_conn, identity, id)?;
+        Ok("ok".to_string())
+    }
+
+    async fn set_product_image(
+        &self,
+        ctx: &Context<'_>,
+        id: Uuid,
+        image: Upload,
+    ) -> ServiceResult<String> {
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
+        let identity = ctx.data::<Identity>()?;
+
+        let mut upload_data = image.value(ctx).unwrap();
+        repo::set_product_image(
+            database_conn,
+            identity,
+            id,
+            &upload_data.filename,
+            upload_data.content_type.as_deref(),
+            &mut upload_data.content,
+        )?;
+        Ok("ok".to_string())
     }
 }

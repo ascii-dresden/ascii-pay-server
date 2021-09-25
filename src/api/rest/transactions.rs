@@ -50,14 +50,8 @@ pub async fn get_transactions_by_account(
 ) -> ServiceResult<HttpResponse> {
     let conn = &database_pool.get()?;
 
-    let TransactionFilterInput { from, to} = transaction_filter.into_inner();
-    let result = repo::get_transactions_by_account(
-        conn,
-        &identity,
-        id.into_inner(),
-        from,
-        to,
-    )?;
+    let TransactionFilterInput { from, to } = transaction_filter.into_inner();
+    let result = repo::get_transactions_by_account(conn, &identity, id.into_inner(), from, to)?;
     Ok(HttpResponse::Ok().json(&result))
 }
 

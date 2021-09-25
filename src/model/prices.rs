@@ -1,5 +1,5 @@
-use uuid::Uuid;
 use chrono::NaiveDateTime;
+use uuid::Uuid;
 
 use crate::utils::{Money, DB};
 

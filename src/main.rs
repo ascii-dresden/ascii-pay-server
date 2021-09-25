@@ -25,6 +25,7 @@ use log::{error, info, warn};
 use r2d2_redis::RedisConnectionManager;
 
 // Internal services
+mod demo_data;
 mod grpc;
 mod http_server;
 mod identity_service;
@@ -32,7 +33,6 @@ mod model;
 mod repo;
 mod tcp_server;
 mod utils;
-mod demo_data;
 
 // endpoints
 mod api;
@@ -48,7 +48,10 @@ embed_migrations!();
 #[actix_web::main]
 async fn main() {
     dotenv::dotenv().ok();
-    std::env::set_var("RUST_LOG", "actix_web=info,actix_server=info,ascii_pay_server=info");
+    std::env::set_var(
+        "RUST_LOG",
+        "actix_web=info,actix_server=info,ascii_pay_server=info",
+    );
     env_logger::init();
 
     let result = init().await;
@@ -81,7 +84,10 @@ async fn init() -> ServiceResult<()> {
         .about(crate_description!())
         .author(crate_authors!("\n"))
         .subcommand(SubCommand::with_name("run").about("Start the web server"))
-        .subcommand(SubCommand::with_name("load-demo-data").about("Initilize the database with demo data. This requires an empty database!"))
+        .subcommand(
+            SubCommand::with_name("load-demo-data")
+                .about("Initilize the database with demo data. This requires an empty database!"),
+        )
         .subcommand(SubCommand::with_name("admin").about("Create a new admin user"))
         .get_matches();
 

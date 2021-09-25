@@ -3,8 +3,7 @@ use chrono::NaiveDate;
 use uuid::Uuid;
 
 use crate::repo::{
-    self, AccountOutput, CategoryOutput, ProductOutput, SearchElement,
-    TransactionOutput,
+    self, AccountOutput, CategoryOutput, ProductOutput, SearchElement, TransactionOutput,
 };
 use crate::{identity_service::Identity, utils::ServiceResult};
 
@@ -59,12 +58,20 @@ impl Query {
             database_conn,
             identity,
             account_id,
-            transaction_filter_from.map(|s|
-                NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()
-                    .map(|d| d.and_hms(0, 0, 0))).flatten(),
-            transaction_filter_to.map(|s|
-                NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()
-                    .map(|d| d.and_hms(0, 0, 0))).flatten(),
+            transaction_filter_from
+                .map(|s| {
+                    NaiveDate::parse_from_str(&s, "%Y-%m-%d")
+                        .ok()
+                        .map(|d| d.and_hms(0, 0, 0))
+                })
+                .flatten(),
+            transaction_filter_to
+                .map(|s| {
+                    NaiveDate::parse_from_str(&s, "%Y-%m-%d")
+                        .ok()
+                        .map(|d| d.and_hms(0, 0, 0))
+                })
+                .flatten(),
         )
     }
 

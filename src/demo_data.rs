@@ -4,7 +4,7 @@ use chrono::{Duration, Local, NaiveDateTime, NaiveTime};
 use rand::prelude::SliceRandom;
 
 use crate::model::transactions::execute_at;
-use crate::model::{Account, Category, Permission, Product, authentication_password};
+use crate::model::{authentication_password, Account, Category, Permission, Product};
 use crate::utils::{DatabaseConnection, DatabasePool, Money, ServiceResult};
 
 fn add_account(
@@ -133,9 +133,20 @@ fn generate_transactions(
 pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
     let database_conn = &database_pool.get()?;
 
-    let mut account_admin = add_account(database_conn, "admin", "Demo Admin User", Permission::Admin)?;
-    let mut account_member = add_account(database_conn, "member", "Demo Member User", Permission::Admin)?;
-    let mut account_default = add_account(database_conn, "default", "Demo Default User", Permission::Admin)?;
+    let mut account_admin =
+        add_account(database_conn, "admin", "Demo Admin User", Permission::Admin)?;
+    let mut account_member = add_account(
+        database_conn,
+        "member",
+        "Demo Member User",
+        Permission::Admin,
+    )?;
+    let mut account_default = add_account(
+        database_conn,
+        "default",
+        "Demo Default User",
+        Permission::Admin,
+    )?;
 
     let kaltgetraenke_0_5 = add_category(database_conn, "Kaltgetränke 0,5l", Some(150))?;
     let kaltgetraenke_0_33 = add_category(database_conn, "Kaltgetränke 0,33l", Some(110))?;
@@ -143,32 +154,182 @@ pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
     let _heisgetraenke = add_category(database_conn, "Heißgetränke", Some(100))?;
     let snacks = add_category(database_conn, "Snacks", None)?;
 
-    add_product(database_conn, "Kolle Mate", Some("4280001274044"), Some(&kaltgetraenke_0_5), None)?;
-    add_product(database_conn, "Zotrine", Some("4280001274006"), Some(&kaltgetraenke_0_5), None)?;
-    add_product(database_conn, "Flora Mate", Some("4260031874056"), Some(&kaltgetraenke_0_5), None)?;
-    add_product(database_conn, "Premium Cola", None, Some(&kaltgetraenke_0_5), None)?;
-    add_product(database_conn, "Club Mate", Some("4029764001807"), Some(&kaltgetraenke_0_5), None)?;
-    add_product(database_conn, "Club Mate Eistee", Some("4029764001814"), Some(&kaltgetraenke_0_5), None)?;
-    add_product(database_conn, "Club Mate Granat", Some("4029764001401"), Some(&kaltgetraenke_0_5), None)?;
-    add_product(database_conn, "Fritz Limo Orange", Some("4260107222989"), Some(&kaltgetraenke_0_5), None)?;
-    add_product(database_conn, "Fritz-Spritz Apfelschorle", Some("4260107222576"), Some(&kaltgetraenke_0_5), None)?;
-    add_product(database_conn, "Wostok Aprikose Mandel", Some("4260189210096"), Some(&kaltgetraenke_0_33), None)?;
-    add_product(database_conn, "Wostok Dattel Granatapfel", Some("4260189210034"), Some(&kaltgetraenke_0_33), None)?;
-    add_product(database_conn, "Wostok Estragon-Ingwer", Some("4260189210058"), Some(&kaltgetraenke_0_33), None)?;
-    add_product(database_conn, "Wostok Tannenwald", Some("4260189210010"), Some(&kaltgetraenke_0_33), None)?;
-    add_product(database_conn, "Biozisch Matcha", Some("4015533025419"), Some(&kaltgetraenke_0_33_bio), None)?;
-    add_product(database_conn, "Biozisch Ginger Life", Some("4015533019586"), Some(&kaltgetraenke_0_33_bio), None)?;
-    add_product(database_conn, "BioZisch Gurke", Some("4015533028236"), Some(&kaltgetraenke_0_33_bio), None)?;
+    add_product(
+        database_conn,
+        "Kolle Mate",
+        Some("4280001274044"),
+        Some(&kaltgetraenke_0_5),
+        None,
+    )?;
+    add_product(
+        database_conn,
+        "Zotrine",
+        Some("4280001274006"),
+        Some(&kaltgetraenke_0_5),
+        None,
+    )?;
+    add_product(
+        database_conn,
+        "Flora Mate",
+        Some("4260031874056"),
+        Some(&kaltgetraenke_0_5),
+        None,
+    )?;
+    add_product(
+        database_conn,
+        "Premium Cola",
+        None,
+        Some(&kaltgetraenke_0_5),
+        None,
+    )?;
+    add_product(
+        database_conn,
+        "Club Mate",
+        Some("4029764001807"),
+        Some(&kaltgetraenke_0_5),
+        None,
+    )?;
+    add_product(
+        database_conn,
+        "Club Mate Eistee",
+        Some("4029764001814"),
+        Some(&kaltgetraenke_0_5),
+        None,
+    )?;
+    add_product(
+        database_conn,
+        "Club Mate Granat",
+        Some("4029764001401"),
+        Some(&kaltgetraenke_0_5),
+        None,
+    )?;
+    add_product(
+        database_conn,
+        "Fritz Limo Orange",
+        Some("4260107222989"),
+        Some(&kaltgetraenke_0_5),
+        None,
+    )?;
+    add_product(
+        database_conn,
+        "Fritz-Spritz Apfelschorle",
+        Some("4260107222576"),
+        Some(&kaltgetraenke_0_5),
+        None,
+    )?;
+    add_product(
+        database_conn,
+        "Wostok Aprikose Mandel",
+        Some("4260189210096"),
+        Some(&kaltgetraenke_0_33),
+        None,
+    )?;
+    add_product(
+        database_conn,
+        "Wostok Dattel Granatapfel",
+        Some("4260189210034"),
+        Some(&kaltgetraenke_0_33),
+        None,
+    )?;
+    add_product(
+        database_conn,
+        "Wostok Estragon-Ingwer",
+        Some("4260189210058"),
+        Some(&kaltgetraenke_0_33),
+        None,
+    )?;
+    add_product(
+        database_conn,
+        "Wostok Tannenwald",
+        Some("4260189210010"),
+        Some(&kaltgetraenke_0_33),
+        None,
+    )?;
+    add_product(
+        database_conn,
+        "Biozisch Matcha",
+        Some("4015533025419"),
+        Some(&kaltgetraenke_0_33_bio),
+        None,
+    )?;
+    add_product(
+        database_conn,
+        "Biozisch Ginger Life",
+        Some("4015533019586"),
+        Some(&kaltgetraenke_0_33_bio),
+        None,
+    )?;
+    add_product(
+        database_conn,
+        "BioZisch Gurke",
+        Some("4015533028236"),
+        Some(&kaltgetraenke_0_33_bio),
+        None,
+    )?;
 
-    add_product(database_conn, "Mr. Tom", Some("4021700800000"), Some(&snacks), Some(40))?;
-    add_product(database_conn, "Die Gute Bio Schokolade", Some("7610815028774"), Some(&snacks), Some(140))?;
-    add_product(database_conn, "Kinder Riegel", Some("40084077"), Some(&snacks), Some(30))?;
-    add_product(database_conn, "Kinder Bueno", Some("4008400935225"), Some(&snacks), Some(80))?;
-    add_product(database_conn, "Snickers", Some("5000159461122"), Some(&snacks), Some(80))?;
-    add_product(database_conn, "Twix", Some("5000159459228"), Some(&snacks), Some(80))?;
-    add_product(database_conn, "Knoppers", Some("40358802"), Some(&snacks), Some(60))?;
-    add_product(database_conn, "Hanuta", Some("7120873518730"), Some(&snacks), Some(60))?;
-    add_product(database_conn, "Pickup", Some("4017100213045"), Some(&snacks), Some(40))?;
+    add_product(
+        database_conn,
+        "Mr. Tom",
+        Some("4021700800000"),
+        Some(&snacks),
+        Some(40),
+    )?;
+    add_product(
+        database_conn,
+        "Die Gute Bio Schokolade",
+        Some("7610815028774"),
+        Some(&snacks),
+        Some(140),
+    )?;
+    add_product(
+        database_conn,
+        "Kinder Riegel",
+        Some("40084077"),
+        Some(&snacks),
+        Some(30),
+    )?;
+    add_product(
+        database_conn,
+        "Kinder Bueno",
+        Some("4008400935225"),
+        Some(&snacks),
+        Some(80),
+    )?;
+    add_product(
+        database_conn,
+        "Snickers",
+        Some("5000159461122"),
+        Some(&snacks),
+        Some(80),
+    )?;
+    add_product(
+        database_conn,
+        "Twix",
+        Some("5000159459228"),
+        Some(&snacks),
+        Some(80),
+    )?;
+    add_product(
+        database_conn,
+        "Knoppers",
+        Some("40358802"),
+        Some(&snacks),
+        Some(60),
+    )?;
+    add_product(
+        database_conn,
+        "Hanuta",
+        Some("7120873518730"),
+        Some(&snacks),
+        Some(60),
+    )?;
+    add_product(
+        database_conn,
+        "Pickup",
+        Some("4017100213045"),
+        Some(&snacks),
+        Some(40),
+    )?;
 
     let now = Local::now().naive_local();
 
@@ -179,7 +340,7 @@ pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
         now,
         3,
         150,
-        2000
+        2000,
     )?;
     generate_transactions(
         database_conn,
@@ -188,7 +349,7 @@ pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
         now,
         2,
         150,
-        2000
+        2000,
     )?;
     generate_transactions(
         database_conn,
@@ -197,7 +358,7 @@ pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
         now,
         1,
         150,
-        2000
+        2000,
     )?;
 
     Ok(())

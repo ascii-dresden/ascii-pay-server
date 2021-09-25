@@ -2,7 +2,7 @@ use crate::{
     identity_service::{Identity, IdentityRequire},
     model::{
         session::{get_onetime_session, Session},
-        transactions, Account, Permission, Product, Transaction
+        transactions, Account, Permission, Product, Transaction,
     },
     utils::{DatabaseConnection, Money, RedisConnection, ServiceResult},
 };
@@ -10,7 +10,7 @@ use crate::{
 use chrono::NaiveDateTime;
 use uuid::Uuid;
 
-use super::{ProductOutput, accounts::AccountOutput};
+use super::{accounts::AccountOutput, ProductOutput};
 
 #[derive(Debug, Deserialize, InputObject)]
 pub struct PaymentInput {
@@ -40,7 +40,7 @@ pub struct TransactionOutput {
     pub before_credit: Money,
     pub after_credit: Money,
     pub date: NaiveDateTime,
-    pub products: Vec<TransactionProductOutput>
+    pub products: Vec<TransactionProductOutput>,
 }
 
 #[derive(Debug, Serialize, SimpleObject)]
@@ -59,7 +59,7 @@ impl From<Transaction> for TransactionOutput {
             before_credit: entity.before_credit,
             after_credit: entity.after_credit,
             date: entity.date,
-            products: Vec::new()
+            products: Vec::new(),
         }
     }
 }
@@ -74,10 +74,14 @@ impl From<(Transaction, Vec<(Product, i32)>)> for TransactionOutput {
             before_credit: entity.0.before_credit,
             after_credit: entity.0.after_credit,
             date: entity.0.date,
-            products: entity.1.into_iter().map(|(product, amount)| TransactionProductOutput {
-                product: product.into(),
-                amount
-            }).collect()
+            products: entity
+                .1
+                .into_iter()
+                .map(|(product, amount)| TransactionProductOutput {
+                    product: product.into(),
+                    amount,
+                })
+                .collect(),
         }
     }
 }
