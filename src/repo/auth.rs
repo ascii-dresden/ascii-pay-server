@@ -1,6 +1,10 @@
 use crate::{
     identity_service::{Identity, IdentityMut, IdentityRequire},
-    model::{authentication_password, Permission},
+    model::{
+        authentication_password,
+        session::{get_onetime_session, Session},
+        Permission,
+    },
     utils::{DatabaseConnection, RedisConnection, ServiceError, ServiceResult},
 };
 
@@ -8,8 +12,9 @@ use super::accounts::AccountOutput;
 
 #[derive(Debug, Deserialize, InputObject)]
 pub struct LoginInput {
-    pub username: String,
-    pub password: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub account_access_token: Option<Session>,
 }
 
 #[derive(Debug, Serialize, SimpleObject)]
@@ -29,8 +34,27 @@ pub fn login(
     identity: &Identity,
     input: LoginInput,
 ) -> ServiceResult<LoginOutput> {
-    let login_result =
-        authentication_password::get(database_conn, &input.username, &input.password);
+    if let Some(account_access_token) = input.account_access_token {
+        let login_result = get_onetime_session(database_conn, redis_conn, &account_access_token);
+
+        return match login_result {
+            Ok(account) => {
+                identity.store(database_conn, redis_conn, account.id)?;
+
+                let token = identity.require_auth_token()?;
+                Ok(LoginOutput {
+                    authorization: format!("Bearer {}", &token),
+                    token,
+                })
+            }
+            Err(_) => Err(ServiceError::Unauthorized),
+        };
+    }
+
+    let username = input.username.unwrap_or_default();
+    let password = input.password.unwrap_or_default();
+
+    let login_result = authentication_password::get(database_conn, &username, &password);
     match login_result {
         Ok(account) => {
             identity.store(database_conn, redis_conn, account.id)?;
@@ -51,8 +75,27 @@ pub fn login_mut(
     identity: &IdentityMut,
     input: LoginInput,
 ) -> ServiceResult<LoginOutput> {
-    let login_result =
-        authentication_password::get(database_conn, &input.username, &input.password);
+    if let Some(account_access_token) = input.account_access_token {
+        let login_result = get_onetime_session(database_conn, redis_conn, &account_access_token);
+
+        return match login_result {
+            Ok(account) => {
+                identity.store(database_conn, redis_conn, account.id)?;
+
+                let token = identity.require_auth_token()?;
+                Ok(LoginOutput {
+                    authorization: format!("Bearer {}", &token),
+                    token,
+                })
+            }
+            Err(_) => Err(ServiceError::Unauthorized),
+        };
+    }
+
+    let username = input.username.unwrap_or_default();
+    let password = input.password.unwrap_or_default();
+
+    let login_result = authentication_password::get(database_conn, &username, &password);
     match login_result {
         Ok(account) => {
             identity.store(database_conn, redis_conn, account.id)?;

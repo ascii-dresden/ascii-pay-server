@@ -19,9 +19,9 @@ pub fn create_data_str(
         .arg("NX")
         .arg("EX")
         .arg(ttl)
-        .query::<String>(redis_conn)?;
+        .query::<bool>(redis_conn)?;
 
-    if result != "OK" {
+    if !result {
         return Err(ServiceError::NotFound);
     }
 
@@ -62,9 +62,9 @@ pub fn delete_data_str(
 ) -> ServiceResult<()> {
     let result = redis::cmd("DEL")
         .arg(format!("{}/{}", storage, key))
-        .query::<String>(redis_conn)?;
+        .query::<bool>(redis_conn)?;
 
-    if result != "OK" {
+    if !result {
         return Err(ServiceError::NotFound);
     }
 
