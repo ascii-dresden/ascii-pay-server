@@ -30,9 +30,9 @@ pub fn register(
 ) -> ServiceResult<()> {
     use crate::model::schema::authentication_nfc::dsl;
 
-    if !account.allow_nfc_registration {
-        return Err(ServiceError::Unauthorized);
-    }
+    // if !account.allow_nfc_registration {
+    //     return Err(ServiceError::Unauthorized);
+    // }
 
     let a = AuthenticationNfc {
         account_id: account.id,

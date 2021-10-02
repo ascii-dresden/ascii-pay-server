@@ -171,8 +171,8 @@ impl IdentityInfo {
         database_conn: &DatabaseConnection,
         redis_conn: &mut RedisConnection,
     ) -> ServiceResult<Self> {
-        let is_cert_present =
-            if let Some(auth_header) = request.headers().get(API_ACCESS_KEY_HEADER) {
+        let is_cert_present = env::API_ACCESS_KEY.is_empty()
+            || if let Some(auth_header) = request.headers().get(API_ACCESS_KEY_HEADER) {
                 auth_header.to_str().unwrap_or("") == env::API_ACCESS_KEY.as_str()
             } else {
                 false
@@ -264,7 +264,7 @@ impl IdentityInfo {
                 .secure(*SECURE_COOKIE)
                 .finish())
         } else {
-            Err(ServiceError::Unauthorized)
+            Err(ServiceError::Unauthorized("session is not present"))
         }
     }
 }
@@ -282,17 +282,7 @@ pub trait IdentityRequire {
                 Err(ServiceError::InsufficientPrivileges)
             }
         } else {
-            Err(ServiceError::Unauthorized)
-        }
-    }
-
-    fn require_account_with_redirect(&self, permission: Permission) -> ServiceResult<Account> {
-        match self.require_account(permission) {
-            Ok(account) => Ok(account),
-            Err(e) => match e {
-                ServiceError::Unauthorized => Err(ServiceError::Redirect("/login".to_owned())),
-                _ => Err(e),
-            },
+            Err(ServiceError::Unauthorized("login required"))
         }
     }
 
@@ -300,7 +290,7 @@ pub trait IdentityRequire {
         if self.is_cert_present()? {
             Ok(())
         } else {
-            Err(ServiceError::Unauthorized)
+            Err(ServiceError::Unauthorized("client cert required"))
         }
     }
 
@@ -308,7 +298,7 @@ pub trait IdentityRequire {
         if let Some(auth_token) = self.get_auth_token()? {
             Ok(auth_token)
         } else {
-            Err(ServiceError::Unauthorized)
+            Err(ServiceError::Unauthorized("cannot get auth token"))
         }
     }
 
@@ -324,17 +314,7 @@ pub trait IdentityRequire {
                 Err(ServiceError::InsufficientPrivileges)
             }
         } else {
-            Err(ServiceError::Unauthorized)
-        }
-    }
-
-    fn require_account_or_cert_with_redirect(&self, permission: Permission) -> ServiceResult<()> {
-        match self.require_account_or_cert(permission) {
-            Ok(_) => Ok(()),
-            Err(e) => match e {
-                ServiceError::Unauthorized => Err(ServiceError::Redirect("/login".to_owned())),
-                _ => Err(e),
-            },
+            Err(ServiceError::Unauthorized("login or client cert required"))
         }
     }
 }
@@ -410,11 +390,12 @@ impl IdentityRequire for Identity {
 
 impl From<grpc::Metadata> for Identity {
     fn from(metadata: grpc::Metadata) -> Self {
-        let is_cert_present = if let Some(auth_header) = metadata.get(API_ACCESS_KEY_HEADER) {
-            from_utf8(auth_header).unwrap_or("") == env::API_ACCESS_KEY.as_str()
-        } else {
-            false
-        };
+        let is_cert_present = env::API_ACCESS_KEY.is_empty()
+            || if let Some(auth_header) = metadata.get(API_ACCESS_KEY_HEADER) {
+                from_utf8(auth_header).unwrap_or("") == env::API_ACCESS_KEY.as_str()
+            } else {
+                false
+            };
 
         Self {
             session: Arc::new(Mutex::new(None)),
@@ -456,7 +437,7 @@ impl IdentityMut {
 
             Ok(())
         } else {
-            Err(ServiceError::Unauthorized)
+            Err(ServiceError::Unauthorized("identify info not present"))
         }
     }
 
@@ -471,7 +452,7 @@ impl IdentityMut {
 
             Ok(())
         } else {
-            Err(ServiceError::Unauthorized)
+            Err(ServiceError::Unauthorized("identify info not present"))
         }
     }
 }
@@ -481,7 +462,7 @@ impl IdentityRequire for IdentityMut {
         if let Some(info) = self.request.extensions().get::<IdentityInfo>() {
             Ok(info.session.as_ref().map(|(_, a)| a.clone()))
         } else {
-            Err(ServiceError::Unauthorized)
+            Err(ServiceError::Unauthorized("identify info not present"))
         }
     }
 
@@ -489,7 +470,7 @@ impl IdentityRequire for IdentityMut {
         if let Some(info) = self.request.extensions().get::<IdentityInfo>() {
             Ok(info.is_cert_present)
         } else {
-            Err(ServiceError::Unauthorized)
+            Err(ServiceError::Unauthorized("identify info not present"))
         }
     }
 
@@ -501,7 +482,7 @@ impl IdentityRequire for IdentityMut {
                 Ok(None)
             }
         } else {
-            Err(ServiceError::Unauthorized)
+            Err(ServiceError::Unauthorized("identify info not present"))
         }
     }
 }

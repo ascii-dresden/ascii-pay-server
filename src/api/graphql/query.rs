@@ -1,13 +1,16 @@
+use std::ops::DerefMut;
+
 use async_graphql::{Context, Object};
 use chrono::NaiveDate;
 use uuid::Uuid;
 
+use crate::model::session::Session;
 use crate::repo::{
     self, AccountOutput, CategoryOutput, ProductOutput, SearchElement, TransactionOutput,
 };
 use crate::{identity_service::Identity, utils::ServiceResult};
 
-use super::get_database_conn_from_ctx;
+use super::{get_database_conn_from_ctx, get_redis_conn_from_ctx};
 
 pub struct Query;
 
@@ -32,6 +35,13 @@ impl Query {
         let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
         repo::get_account(database_conn, identity, id)
+    }
+
+    async fn get_account_by_access_token(&self, ctx: &Context<'_>, account_access_token: Session) -> ServiceResult<AccountOutput> {
+        let database_conn = &get_database_conn_from_ctx(ctx)?;
+        let mut redis_conn = get_redis_conn_from_ctx(ctx)?;
+        let identity = ctx.data::<Identity>()?;
+        repo::get_account_by_access_token(database_conn, redis_conn.deref_mut(), identity, account_access_token)
     }
 
     #[graphql(entity)]

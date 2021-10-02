@@ -2,7 +2,7 @@ use actix_web::http::header::ToStrError;
 use actix_web::{error::ResponseError, Error as ActixError, HttpResponse};
 use derive_more::Display;
 use lettre::smtp::error::Error as LettreError;
-use log::warn;
+use log::{error, warn};
 
 /// Represent errors in the application
 ///
@@ -18,8 +18,8 @@ pub enum ServiceError {
     #[display(fmt = "Not Found")]
     NotFound,
 
-    #[display(fmt = "Unauthorized")]
-    Unauthorized,
+    #[display(fmt = "Unauthorized: '{}'", _0)]
+    Unauthorized(&'static str),
 
     #[display(fmt = "You have insufficient privileges to view this site")]
     InsufficientPrivileges,
@@ -231,7 +231,7 @@ impl ResponseError for ServiceError {
             ServiceError::NoneError => HttpResponse::InternalServerError().json(json!({
                 "message": "None type error"
             })),
-            ServiceError::Unauthorized => HttpResponse::Unauthorized().json(json!({
+            ServiceError::Unauthorized(_) => HttpResponse::Unauthorized().json(json!({
                 "message": "Unauthorized"
             })),
             ServiceError::InsufficientPrivileges => HttpResponse::Forbidden().json(json!({
@@ -248,4 +248,14 @@ impl ResponseError for ServiceError {
                 .finish(),
         }
     }
+}
+
+pub fn log_result<R, E>(result: Result<R, E>) -> Result<R, E>
+where
+    E: std::fmt::Debug,
+{
+    if let Err(e) = &result {
+        error!("{:?}", e);
+    }
+    result
 }

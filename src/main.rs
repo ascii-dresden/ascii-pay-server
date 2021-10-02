@@ -27,11 +27,11 @@ use r2d2_redis::RedisConnectionManager;
 // Internal services
 mod demo_data;
 mod grpc;
+mod grpc_server;
 mod http_server;
 mod identity_service;
 mod model;
 mod repo;
-mod tcp_server;
 mod utils;
 
 // endpoints
@@ -40,8 +40,8 @@ mod api;
 use crate::demo_data::load_demo_data;
 use crate::model::{authentication_password, Account, Permission};
 use crate::utils::{env, DatabaseConnection, DatabasePool, ServiceResult};
+use grpc_server::start_tcp_server;
 use http_server::start_http_server;
-use tcp_server::start_tcp_server;
 
 embed_migrations!();
 

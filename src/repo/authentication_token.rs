@@ -94,7 +94,7 @@ pub fn authenticate_nfc_generic(
 
     let nfc_entry = authentication_nfc::get_by_card_id(database_conn, id)?;
     if nfc_entry.card_type != CARD_TYPE_GENERIC {
-        return Err(ServiceError::Unauthorized);
+        return Err(ServiceError::Unauthorized("nfc card type does not match!"));
     }
 
     let account = Account::get(database_conn, nfc_entry.account_id)?;
@@ -121,7 +121,7 @@ pub fn authenticate_nfc_mifare_desfire_phase1(
 
     let nfc_entry = authentication_nfc::get_by_card_id(database_conn, id)?;
     if nfc_entry.card_type != CARD_TYPE_MIFARE_DESFIRE {
-        return Err(ServiceError::Unauthorized);
+        return Err(ServiceError::Unauthorized("nfc card type does not match!"));
     }
 
     let key = str_to_bytes(&nfc_entry.data);
@@ -166,7 +166,7 @@ pub fn authenticate_nfc_mifare_desfire_phase2(
 
     let nfc_entry = authentication_nfc::get_by_card_id(database_conn, id)?;
     if nfc_entry.card_type != CARD_TYPE_MIFARE_DESFIRE {
-        return Err(ServiceError::Unauthorized);
+        return Err(ServiceError::Unauthorized("nfc card type does not match!"));
     }
 
     let key = str_to_bytes(&nfc_entry.data);
@@ -184,7 +184,9 @@ pub fn authenticate_nfc_mifare_desfire_phase2(
 
     let dk_rndA_rndBshifted_ref = mifare_utils::tdes_encrypt(&key, &rndA_rndBshifted)?;
     if dk_rndA_rndBshifted != bytes_to_string(&dk_rndA_rndBshifted_ref) {
-        return Err(ServiceError::Unauthorized);
+        return Err(ServiceError::Unauthorized(
+            "response does not match challenge!",
+        ));
     }
 
     let ek_rndAshifted_card = str_to_bytes(ek_rndAshifted_card);
@@ -195,7 +197,7 @@ pub fn authenticate_nfc_mifare_desfire_phase2(
     rndAshifted.push(rndA[0]);
 
     if rndAshifted != rndAshifted_card {
-        return Err(ServiceError::Unauthorized);
+        return Err(ServiceError::Unauthorized("challenge response failed!"));
     }
 
     let mut session_key: Vec<u8> = Vec::with_capacity(16);

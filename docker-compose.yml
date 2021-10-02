@@ -19,10 +19,13 @@ services:
       - CRON_SECRET=12345678
       - IMAGE_PATH=./img
       - BASE_URL=https://ascii.pixix4.com/
+      - API_ACCESS_KEY=
     expose:
       - "8080"
+      - "50051"
     ports:
       - "8080:8080"
+      - "50051:50051"
     volumes:
       - ./dist/img:/opt/ascii-pay-server/img
       - ./certificates:/opt/ascii-pay-server/certificates

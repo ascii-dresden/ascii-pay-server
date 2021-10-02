@@ -47,7 +47,7 @@ pub fn login(
                     token,
                 })
             }
-            Err(_) => Err(ServiceError::Unauthorized),
+            Err(_) => Err(ServiceError::Unauthorized("invalid onetime session")),
         };
     }
 
@@ -65,7 +65,7 @@ pub fn login(
                 token,
             })
         }
-        Err(_) => Err(ServiceError::Unauthorized),
+        Err(_) => Err(ServiceError::Unauthorized("invalid username/password")),
     }
 }
 
@@ -88,7 +88,7 @@ pub fn login_mut(
                     token,
                 })
             }
-            Err(_) => Err(ServiceError::Unauthorized),
+            Err(_) => Err(ServiceError::Unauthorized("invalid onetime session")),
         };
     }
 
@@ -106,7 +106,7 @@ pub fn login_mut(
                 token,
             })
         }
-        Err(_) => Err(ServiceError::Unauthorized),
+        Err(_) => Err(ServiceError::Unauthorized("invalid username/password")),
     }
 }
 

@@ -1,6 +1,7 @@
 use crate::identity_service::{Identity, IdentityRequire};
+use crate::model::session::{Session, get_onetime_session};
 use crate::model::{Account, Permission};
-use crate::utils::{fuzzy_vec_match, DatabaseConnection, Money, ServiceError, ServiceResult};
+use crate::utils::{DatabaseConnection, Money, RedisConnection, ServiceError, ServiceResult, fuzzy_vec_match};
 use log::warn;
 use uuid::Uuid;
 
@@ -121,6 +122,18 @@ pub fn get_account(
     identity.require_account_or_cert(Permission::Member)?;
 
     let entity = Account::get(database_conn, id)?;
+    Ok(entity.into())
+}
+
+pub fn get_account_by_access_token(
+    database_conn: &DatabaseConnection,
+    redis_conn: &mut RedisConnection,
+    identity: &Identity,
+    account_access_token: Session,
+) -> ServiceResult<AccountOutput> {
+    identity.require_cert()?;
+
+    let entity = get_onetime_session(database_conn, redis_conn, &account_access_token)?;
     Ok(entity.into())
 }
 

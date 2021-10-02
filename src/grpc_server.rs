@@ -9,6 +9,7 @@ use crate::grpc::authentication_grpc::AsciiPayAuthentication;
 use crate::grpc::authentication_grpc::AsciiPayAuthenticationServer;
 use crate::identity_service::Identity;
 use crate::repo::authentication_token as t;
+use crate::utils::log_result;
 use crate::utils::RedisPool;
 use crate::utils::{DatabasePool, ServiceError};
 
@@ -57,12 +58,12 @@ impl AsciiPayAuthentication for AuthenticationImpl {
         let mut redis_conn = self.redis_pool.get().map_err(ServiceError::from)?;
         let identity = Identity::from(req.metadata);
 
-        let (token_type, token) = t::authenticate_barcode(
+        let (token_type, token) = log_result(t::authenticate_barcode(
             database_conn,
             redis_conn.deref_mut(),
             &identity,
             req.message.get_code(),
-        )?;
+        ))?;
 
         let mut response = AuthenticateBarcodeResponse::new();
         response.set_tokenType(token_type.into());
@@ -82,8 +83,11 @@ impl AsciiPayAuthentication for AuthenticationImpl {
         let database_conn = &self.database_pool.get().map_err(ServiceError::from)?;
         let identity = Identity::from(req.metadata);
 
-        let nfc_card_type =
-            t::authenticate_nfc_type(database_conn, &identity, req.message.get_card_id())?;
+        let nfc_card_type = log_result(t::authenticate_nfc_type(
+            database_conn,
+            &identity,
+            req.message.get_card_id(),
+        ))?;
 
         let mut response = AuthenticateNfcTypeResponse::new();
         response.set_card_id(req.message.get_card_id().to_owned());
@@ -104,12 +108,12 @@ impl AsciiPayAuthentication for AuthenticationImpl {
         let mut redis_conn = self.redis_pool.get().map_err(ServiceError::from)?;
         let identity = Identity::from(req.metadata);
 
-        let (token_type, token) = t::authenticate_nfc_generic(
+        let (token_type, token) = log_result(t::authenticate_nfc_generic(
             database_conn,
             redis_conn.deref_mut(),
             &identity,
             req.message.get_card_id(),
-        )?;
+        ))?;
 
         let mut response = AuthenticateNfcGenericResponse::new();
         response.set_card_id(req.message.get_card_id().to_owned());
@@ -133,13 +137,13 @@ impl AsciiPayAuthentication for AuthenticationImpl {
         let mut redis_conn = self.redis_pool.get().map_err(ServiceError::from)?;
         let identity = Identity::from(req.metadata);
 
-        let challenge = t::authenticate_nfc_mifare_desfire_phase1(
+        let challenge = log_result(t::authenticate_nfc_mifare_desfire_phase1(
             database_conn,
             redis_conn.deref_mut(),
             &identity,
             req.message.get_card_id(),
             req.message.get_ek_rndB(),
-        )?;
+        ))?;
 
         let mut response = AuthenticateNfcMifareDesfirePhase1Response::new();
         response.set_card_id(req.message.get_card_id().to_owned());
@@ -162,14 +166,15 @@ impl AsciiPayAuthentication for AuthenticationImpl {
         let mut redis_conn = self.redis_pool.get().map_err(ServiceError::from)?;
         let identity = Identity::from(req.metadata);
 
-        let (session, (token_type, token)) = t::authenticate_nfc_mifare_desfire_phase2(
-            database_conn,
-            redis_conn.deref_mut(),
-            &identity,
-            req.message.get_card_id(),
-            req.message.get_dk_rndA_rndBshifted(),
-            req.message.get_ek_rndAshifted_card(),
-        )?;
+        let (session, (token_type, token)) =
+            log_result(t::authenticate_nfc_mifare_desfire_phase2(
+                database_conn,
+                redis_conn.deref_mut(),
+                &identity,
+                req.message.get_card_id(),
+                req.message.get_dk_rndA_rndBshifted(),
+                req.message.get_ek_rndAshifted_card(),
+            ))?;
 
         let mut response = AuthenticateNfcMifareDesfirePhase2Response::new();
         response.set_card_id(req.message.get_card_id().to_owned());
@@ -193,12 +198,12 @@ impl AsciiPayAuthentication for AuthenticationImpl {
         let database_conn = &self.database_pool.get().map_err(ServiceError::from)?;
         let identity = Identity::from(req.metadata);
 
-        t::authenticate_nfc_generic_init_card(
+        log_result(t::authenticate_nfc_generic_init_card(
             database_conn,
             &identity,
             req.message.get_card_id(),
             Uuid::parse_str(req.message.get_account_id()).map_err(ServiceError::from)?,
-        )?;
+        ))?;
 
         let mut response = AuthenticateNfcGenericInitCardResponse::new();
         response.set_card_id(req.message.get_card_id().to_owned());
@@ -219,12 +224,12 @@ impl AsciiPayAuthentication for AuthenticationImpl {
         let database_conn = &self.database_pool.get().map_err(ServiceError::from)?;
         let identity = Identity::from(req.metadata);
 
-        let key = t::authenticate_nfc_mifare_desfire_init_card(
+        let key = log_result(t::authenticate_nfc_mifare_desfire_init_card(
             database_conn,
             &identity,
             req.message.get_card_id(),
             Uuid::parse_str(req.message.get_account_id()).map_err(ServiceError::from)?,
-        )?;
+        ))?;
 
         let mut response = AuthenticateNfcMifareDesfireInitCardResponse::new();
         response.set_card_id(req.message.get_card_id().to_owned());
