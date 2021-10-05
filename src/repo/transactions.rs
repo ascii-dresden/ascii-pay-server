@@ -120,7 +120,7 @@ pub fn get_transactions_by_account(
     transaction_filer_from: Option<NaiveDateTime>,
     transaction_filer_to: Option<NaiveDateTime>,
 ) -> ServiceResult<Vec<TransactionOutput>> {
-    identity.require_account_or_cert(Permission::Member)?;
+    identity.require_account(Permission::Member)?;
 
     let account = Account::get(database_conn, account_id)?;
     let entities = transactions::get_by_account(
@@ -146,9 +146,45 @@ pub fn get_transaction_by_account(
     account_id: Uuid,
     transaction_id: Uuid,
 ) -> ServiceResult<TransactionOutput> {
-    identity.require_account_or_cert(Permission::Member)?;
+    identity.require_account(Permission::Member)?;
 
     let account = Account::get(database_conn, account_id)?;
+    let entity =
+        transactions::get_by_account_and_id(database_conn, &account, transaction_id)?.into();
+
+    Ok(entity)
+}
+
+pub fn get_transactions_self(
+    database_conn: &DatabaseConnection,
+    identity: &Identity,
+    transaction_filer_from: Option<NaiveDateTime>,
+    transaction_filer_to: Option<NaiveDateTime>,
+) -> ServiceResult<Vec<TransactionOutput>> {
+    let account = identity.require_account(Permission::Default)?;
+    let entities = transactions::get_by_account(
+        database_conn,
+        &account,
+        transaction_filer_from,
+        transaction_filer_to,
+    )?
+    .into_iter()
+    .map(|t| {
+        let p = t.get_products(database_conn).unwrap_or_default();
+        (t, p)
+    })
+    .map(TransactionOutput::from)
+    .collect();
+
+    Ok(entities)
+}
+
+pub fn get_transaction_self(
+    database_conn: &DatabaseConnection,
+    identity: &Identity,
+    transaction_id: Uuid,
+) -> ServiceResult<TransactionOutput> {
+    let account = identity.require_account(Permission::Default)?;
     let entity =
         transactions::get_by_account_and_id(database_conn, &account, transaction_id)?.into();
 

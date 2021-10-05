@@ -60,11 +60,9 @@ fn search_category(entity: Category, search: &str) -> Option<SearchElement<Categ
 
 pub fn get_categories(
     database_conn: &DatabaseConnection,
-    identity: &Identity,
+    _identity: &Identity,
     search: Option<&str>,
 ) -> ServiceResult<Vec<SearchElement<CategoryOutput>>> {
-    identity.require_account_or_cert(Permission::Member)?;
-
     let search = match search {
         Some(s) => s.to_owned(),
         None => "".to_owned(),
@@ -81,11 +79,9 @@ pub fn get_categories(
 
 pub fn get_category(
     database_conn: &DatabaseConnection,
-    identity: &Identity,
+    _identity: &Identity,
     id: Uuid,
 ) -> ServiceResult<CategoryOutput> {
-    identity.require_account_or_cert(Permission::Member)?;
-
     let entity = Category::get(database_conn, id)?;
     Ok(entity.into())
 }
@@ -95,7 +91,7 @@ pub fn create_category(
     identity: &Identity,
     input: CategoryInput,
 ) -> ServiceResult<CategoryOutput> {
-    identity.require_account_or_cert(Permission::Member)?;
+    identity.require_account(Permission::Admin)?;
 
     let mut entity = Category::create(database_conn, &input.name)?;
     entity.update_prices(
@@ -116,7 +112,7 @@ pub fn update_category(
     id: Uuid,
     input: CategoryInput,
 ) -> ServiceResult<CategoryOutput> {
-    identity.require_account_or_cert(Permission::Member)?;
+    identity.require_account(Permission::Admin)?;
 
     let mut entity = Category::get(database_conn, id)?;
     entity.name = input.name.clone();
@@ -139,7 +135,7 @@ pub fn delete_category(
     identity: &Identity,
     _id: Uuid,
 ) -> ServiceResult<()> {
-    identity.require_account_or_cert(Permission::Member)?;
+    identity.require_account(Permission::Admin)?;
 
     warn!("Delete is not supported!");
 

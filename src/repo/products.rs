@@ -86,11 +86,9 @@ fn serach_product(entity: Product, search: &str) -> Option<SearchElement<Product
 
 pub fn get_products(
     database_conn: &DatabaseConnection,
-    identity: &Identity,
+    _identity: &Identity,
     search: Option<&str>,
 ) -> ServiceResult<Vec<SearchElement<ProductOutput>>> {
-    identity.require_account_or_cert(Permission::Member)?;
-
     let search = match search {
         Some(s) => s.to_owned(),
         None => "".to_owned(),
@@ -107,22 +105,18 @@ pub fn get_products(
 
 pub fn get_product(
     database_conn: &DatabaseConnection,
-    identity: &Identity,
+    _identity: &Identity,
     id: Uuid,
 ) -> ServiceResult<ProductOutput> {
-    identity.require_account_or_cert(Permission::Member)?;
-
     let entity = Product::get(database_conn, id)?;
     Ok(entity.into())
 }
 
 pub fn get_product_image(
     database_conn: &DatabaseConnection,
-    identity: &Identity,
+    _identity: &Identity,
     id: Uuid,
 ) -> ServiceResult<String> {
-    identity.require_account_or_cert(Permission::Member)?;
-
     let entity = Product::get(database_conn, id)?;
     entity.get_image()
 }
@@ -132,7 +126,7 @@ pub fn create_product(
     identity: &Identity,
     input: ProductInput,
 ) -> ServiceResult<ProductOutput> {
-    identity.require_account_or_cert(Permission::Member)?;
+    identity.require_account(Permission::Member)?;
 
     let category = if let Some(category) = input.category {
         Some(Category::get(database_conn, category)?)
@@ -163,7 +157,7 @@ pub fn update_product(
     id: Uuid,
     input: ProductInput,
 ) -> ServiceResult<ProductOutput> {
-    identity.require_account_or_cert(Permission::Member)?;
+    identity.require_account(Permission::Member)?;
 
     let mut entity = Product::get(database_conn, id)?;
 
@@ -196,7 +190,7 @@ pub fn remove_product_image(
     identity: &Identity,
     id: Uuid,
 ) -> ServiceResult<()> {
-    identity.require_account_or_cert(Permission::Member)?;
+    identity.require_account(Permission::Member)?;
 
     let mut entity = Product::get(database_conn, id)?;
     entity.remove_image(database_conn)?;
@@ -212,7 +206,7 @@ pub fn set_product_image(
     content_type: Option<&str>,
     content: &mut File,
 ) -> ServiceResult<()> {
-    identity.require_account_or_cert(Permission::Member)?;
+    identity.require_account(Permission::Member)?;
 
     let mut entity = Product::get(database_conn, id)?;
 
@@ -260,7 +254,7 @@ pub fn delete_product(
     identity: &Identity,
     _id: Uuid,
 ) -> ServiceResult<()> {
-    identity.require_account_or_cert(Permission::Member)?;
+    identity.require_account(Permission::Member)?;
 
     warn!("Delete is not supported!");
 
