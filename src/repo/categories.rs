@@ -1,24 +1,28 @@
 use crate::identity_service::{Identity, IdentityRequire};
-use crate::model::{Category, Permission, Price};
+use crate::model::{Category, Permission, StampType};
 use crate::utils::{fuzzy_vec_match, DatabaseConnection, Money, ServiceError, ServiceResult};
 use log::warn;
 use uuid::Uuid;
 
-use super::prices::{PriceInput, PriceOutput};
 use super::SearchElement;
 
 #[derive(Debug, Deserialize, InputObject)]
 pub struct CategoryInput {
     pub name: String,
-    pub prices: Vec<PriceInput>,
+    pub price: Money,
+    pub pay_with_stamps: StampType,
+    pub give_stamps: StampType,
+    pub ordering: Option<i32>,
 }
 
 #[derive(Debug, Serialize, SimpleObject)]
 pub struct CategoryOutput {
     pub id: Uuid,
     pub name: String,
-    pub prices: Vec<PriceOutput>,
-    pub current_price: Option<Money>,
+    pub price: Money,
+    pub pay_with_stamps: StampType,
+    pub give_stamps: StampType,
+    pub ordering: Option<i32>,
 }
 
 impl From<Category> for CategoryOutput {
@@ -26,8 +30,10 @@ impl From<Category> for CategoryOutput {
         Self {
             id: entity.id,
             name: entity.name,
-            prices: entity.prices.into_iter().map(PriceOutput::from).collect(),
-            current_price: entity.current_price,
+            price: entity.price,
+            pay_with_stamps: entity.pay_with_stamps,
+            give_stamps: entity.give_stamps,
+            ordering: entity.ordering,
         }
     }
 }
@@ -35,10 +41,7 @@ impl From<Category> for CategoryOutput {
 fn search_category(entity: Category, search: &str) -> Option<SearchElement<CategoryOutput>> {
     let values = vec![
         entity.name.clone(),
-        entity
-            .current_price
-            .map(|v| format!("{:.2}€", (v as f32) / 100.0))
-            .unwrap_or_else(|| "".to_owned()),
+        format!("{:.2}€", (entity.price as f32) / 100.0),
     ];
 
     let mut result = if search.is_empty() {
@@ -93,15 +96,11 @@ pub fn create_category(
 ) -> ServiceResult<CategoryOutput> {
     identity.require_account(Permission::Admin)?;
 
-    let mut entity = Category::create(database_conn, &input.name)?;
-    entity.update_prices(
-        database_conn,
-        &input
-            .prices
-            .into_iter()
-            .map(Price::from)
-            .collect::<Vec<_>>(),
-    )?;
+    let mut entity = Category::create(database_conn, &input.name, input.price)?;
+    entity.pay_with_stamps = input.pay_with_stamps;
+    entity.give_stamps = input.give_stamps;
+    entity.ordering = input.ordering;
+    entity.update(database_conn)?;
 
     Ok(entity.into())
 }
@@ -116,16 +115,11 @@ pub fn update_category(
 
     let mut entity = Category::get(database_conn, id)?;
     entity.name = input.name.clone();
+    entity.price = input.price;
+    entity.pay_with_stamps = input.pay_with_stamps;
+    entity.give_stamps = input.give_stamps;
+    entity.ordering = input.ordering;
     entity.update(database_conn)?;
-
-    entity.update_prices(
-        database_conn,
-        &input
-            .prices
-            .into_iter()
-            .map(Price::from)
-            .collect::<Vec<_>>(),
-    )?;
 
     Ok(entity.into())
 }

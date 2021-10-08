@@ -1,13 +1,10 @@
-use diesel::backend::Backend;
-use diesel::deserialize::{self, FromSql};
 use diesel::prelude::*;
-use diesel::serialize::{self, Output, ToSql};
-use diesel::sql_types::*;
-use std::io;
 use uuid::Uuid;
 
 use crate::model::schema::account;
 use crate::utils::{generate_uuid, DatabaseConnection, Money, ServiceError, ServiceResult};
+
+use super::enums::Permission;
 
 /// Represent a account
 #[derive(
@@ -34,93 +31,10 @@ pub struct Account {
     pub username: Option<String>,
     pub account_number: Option<String>,
     pub permission: Permission,
+    pub use_digital_stamps: bool,
+    pub coffee_stamps: i32,
+    pub bottle_stamps: i32,
     pub receives_monthly_report: bool,
-    pub allow_nfc_registration: bool,
-}
-
-/// Represents the permission level of an account
-#[derive(
-    Debug, Copy, Clone, FromSqlRow, AsExpression, Hash, PartialEq, Eq, Serialize, Deserialize, Enum,
-)]
-#[sql_type = "SmallInt"]
-pub enum Permission {
-    /// default user without the ability to edit anything
-    Default,
-    /// ascii member who can perform transactions
-    Member,
-    /// ascii executive or admin who can do everything
-    Admin,
-}
-
-impl PartialOrd for Permission {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Permission {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.level().cmp(&other.level())
-    }
-}
-
-impl Permission {
-    /// Check if the permission level is `Permission::DEFAULT`
-    pub fn is_default(self) -> bool {
-        Permission::Default == self
-    }
-
-    /// Check if the permission level is `Permission::MEMBER`
-    pub fn is_member(self) -> bool {
-        Permission::Member == self
-    }
-
-    /// Check if the permission level is `Permission::ADMIN`
-    pub fn is_admin(self) -> bool {
-        Permission::Admin == self
-    }
-
-    pub fn level(self) -> u32 {
-        match self {
-            Permission::Default => 0,
-            Permission::Member => 1,
-            Permission::Admin => 2,
-        }
-    }
-}
-
-/// For manuel database convertion
-impl<DB: Backend> ToSql<SmallInt, DB> for Permission
-where
-    i16: ToSql<SmallInt, DB>,
-{
-    fn to_sql<W>(&self, out: &mut Output<W, DB>) -> serialize::Result
-    where
-        W: io::Write,
-    {
-        let v = match *self {
-            Permission::Default => 0,
-            Permission::Member => 1,
-            Permission::Admin => 2,
-        };
-        v.to_sql(out)
-    }
-}
-
-/// For manuel database convertion
-impl<DB: Backend> FromSql<SmallInt, DB> for Permission
-where
-    i16: FromSql<SmallInt, DB>,
-{
-    fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {
-        let v = i16::from_sql(bytes)?;
-        Ok(match v {
-            0 => Permission::Default,
-            1 => Permission::Member,
-            2 => Permission::Admin,
-            _ => panic!("'{}' is not a valid permission!", &v),
-        })
-    }
 }
 
 impl Account {
@@ -142,7 +56,9 @@ impl Account {
             account_number: None,
             permission,
             receives_monthly_report: false,
-            allow_nfc_registration: false,
+            use_digital_stamps: true,
+            coffee_stamps: 0,
+            bottle_stamps: 0,
         };
 
         if !a.exist_conficting_account(database_conn)? {

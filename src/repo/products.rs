@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 
 use crate::identity_service::{Identity, IdentityRequire};
-use crate::model::{Category, Permission, Price, Product};
+use crate::model::{Category, Permission, Product, StampType};
 use crate::utils::{
     fuzzy_vec_match, uuid_to_str, DatabaseConnection, Money, ServiceError, ServiceResult,
 };
@@ -10,59 +10,66 @@ use log::warn;
 use uuid::Uuid;
 
 use super::categories::CategoryOutput;
-use super::prices::{PriceInput, PriceOutput};
 use super::SearchElement;
 
 #[derive(Debug, Deserialize, InputObject)]
 pub struct ProductInput {
     pub name: String,
-    pub category: Option<Uuid>,
-    pub prices: Vec<PriceInput>,
+    pub price: Option<Money>,
+    pub pay_with_stamps: Option<StampType>,
+    pub give_stamps: Option<StampType>,
+    pub category_id: Uuid,
     pub barcode: Option<String>,
+    pub ordering: Option<i32>,
 }
 
 #[derive(Debug, Serialize, SimpleObject)]
 pub struct ProductOutput {
     pub id: Uuid,
     pub name: String,
-    pub category: Option<CategoryOutput>,
+    pub price: Option<Money>,
+    pub pay_with_stamps: Option<StampType>,
+    pub give_stamps: Option<StampType>,
+    pub category: CategoryOutput,
     pub image: Option<String>,
-    pub prices: Vec<PriceOutput>,
-    pub current_price: Option<Money>,
     pub barcode: Option<String>,
+    pub ordering: Option<i32>,
 }
 
-impl From<Product> for ProductOutput {
-    fn from(entity: Product) -> Self {
+impl From<(Product, Category)> for ProductOutput {
+    fn from(entity: (Product, Category)) -> Self {
         let image = entity
+            .0
             .image
             .as_ref()
-            .map(|_| format!("/api/v1/product/{}/image", uuid_to_str(entity.id)));
+            .map(|_| format!("/api/v1/product/{}/image", uuid_to_str(entity.0.id)));
         Self {
-            id: entity.id,
-            name: entity.name,
-            category: entity.category.map(CategoryOutput::from),
+            id: entity.0.id,
+            name: entity.0.name,
+            price: entity.0.price,
+            pay_with_stamps: entity.0.pay_with_stamps,
+            give_stamps: entity.0.give_stamps,
+            category: entity.1.into(),
             image,
-            prices: entity.prices.into_iter().map(PriceOutput::from).collect(),
-            current_price: entity.current_price,
-            barcode: entity.barcode,
+            barcode: entity.0.barcode,
+            ordering: entity.0.ordering,
         }
     }
 }
 
-fn serach_product(entity: Product, search: &str) -> Option<SearchElement<ProductOutput>> {
+fn serach_product(
+    entity: (Product, Category),
+    search: &str,
+) -> Option<SearchElement<ProductOutput>> {
     let values = vec![
-        entity.name.clone(),
+        entity.0.name.clone(),
+        entity.1.name.clone(),
         entity
-            .category
-            .clone()
-            .map(|v| v.name)
-            .unwrap_or_else(|| "".to_owned()),
-        entity
-            .current_price
+            .0
+            .price
             .map(|v| format!("{:.2}€", (v as f32) / 100.0))
             .unwrap_or_else(|| "".to_owned()),
-        entity.barcode.clone().unwrap_or_else(String::new),
+        entity.0.barcode.clone().unwrap_or_else(String::new),
     ];
 
     let mut result = if search.is_empty() {
@@ -77,7 +84,7 @@ fn serach_product(entity: Product, search: &str) -> Option<SearchElement<Product
     let mut search_element = SearchElement::new(entity.into());
 
     search_element.add_highlight("barcode", result.pop().expect(""));
-    search_element.add_highlight("current_price", result.pop().expect(""));
+    search_element.add_highlight("price", result.pop().expect(""));
     search_element.add_highlight("category", result.pop().expect(""));
     search_element.add_highlight("name", result.pop().expect(""));
 
@@ -118,7 +125,7 @@ pub fn get_product_image(
     id: Uuid,
 ) -> ServiceResult<String> {
     let entity = Product::get(database_conn, id)?;
-    entity.get_image()
+    entity.0.get_image()
 }
 
 pub fn create_product(
@@ -128,27 +135,18 @@ pub fn create_product(
 ) -> ServiceResult<ProductOutput> {
     identity.require_account(Permission::Member)?;
 
-    let category = if let Some(category) = input.category {
-        Some(Category::get(database_conn, category)?)
-    } else {
-        None
-    };
+    let category = Category::get(database_conn, input.category_id)?;
+    let mut entity = Product::create(database_conn, &input.name, &category)?;
 
-    let mut entity = Product::create(database_conn, &input.name, category)?;
+    entity.price = input.price;
+    entity.pay_with_stamps = input.pay_with_stamps;
+    entity.give_stamps = input.give_stamps;
+    entity.ordering = input.ordering;
+    entity.barcode = input.barcode;
 
-    entity.barcode = input.barcode.clone();
     entity.update(database_conn)?;
 
-    entity.update_prices(
-        database_conn,
-        &input
-            .prices
-            .into_iter()
-            .map(Price::from)
-            .collect::<Vec<_>>(),
-    )?;
-
-    Ok(entity.into())
+    Ok((entity, category).into())
 }
 
 pub fn update_product(
@@ -159,30 +157,20 @@ pub fn update_product(
 ) -> ServiceResult<ProductOutput> {
     identity.require_account(Permission::Member)?;
 
-    let mut entity = Product::get(database_conn, id)?;
-
-    let category = if let Some(category) = input.category {
-        Some(Category::get(database_conn, category)?)
-    } else {
-        None
-    };
+    let category = Category::get(database_conn, input.category_id)?;
+    let (mut entity, _) = Product::get(database_conn, id)?;
 
     entity.name = input.name;
+    entity.category_id = category.id;
+    entity.price = input.price;
+    entity.pay_with_stamps = input.pay_with_stamps;
+    entity.give_stamps = input.give_stamps;
+    entity.ordering = input.ordering;
     entity.barcode = input.barcode;
-    entity.category = category;
 
     entity.update(database_conn)?;
 
-    entity.update_prices(
-        database_conn,
-        &input
-            .prices
-            .into_iter()
-            .map(Price::from)
-            .collect::<Vec<_>>(),
-    )?;
-
-    Ok(entity.into())
+    Ok((entity, category).into())
 }
 
 pub fn remove_product_image(
@@ -193,7 +181,7 @@ pub fn remove_product_image(
     identity.require_account(Permission::Member)?;
 
     let mut entity = Product::get(database_conn, id)?;
-    entity.remove_image(database_conn)?;
+    entity.0.remove_image(database_conn)?;
 
     Ok(())
 }
@@ -208,7 +196,7 @@ pub fn set_product_image(
 ) -> ServiceResult<()> {
     identity.require_account(Permission::Member)?;
 
-    let mut entity = Product::get(database_conn, id)?;
+    let (mut entity, _) = Product::get(database_conn, id)?;
 
     let mut file_extension = "png";
 

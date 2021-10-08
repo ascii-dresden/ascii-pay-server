@@ -1,10 +1,11 @@
 use crate::{
     identity_service::{Identity, IdentityRequire},
     model::{
-        session::{get_onetime_session, Session},
-        transactions, Account, Permission, Product, Transaction,
+        session::{create_onetime_session, get_onetime_session, Session},
+        transactions::{self, TransactionItem, TransactionItemInput},
+        Account, Category, Permission, Product, StampType, Transaction,
     },
-    utils::{DatabaseConnection, Money, RedisConnection, ServiceResult},
+    utils::{DatabaseConnection, Money, RedisConnection, ServiceError, ServiceResult},
 };
 
 use chrono::NaiveDateTime;
@@ -13,77 +14,137 @@ use uuid::Uuid;
 use super::{accounts::AccountOutput, ProductOutput};
 
 #[derive(Debug, Deserialize, InputObject)]
-pub struct PaymentInput {
-    pub account_access_token: Session,
-    pub amount: i32,
-    pub products: Vec<PaymentProductInput>,
+pub struct PaymentItemInput {
+    pub price: Money,
+    pub pay_with_stamps: StampType,
+    pub give_stamps: StampType,
+    pub product_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize, InputObject)]
-pub struct PaymentProductInput {
-    pub id: Uuid,
-    pub amount: i32,
+pub struct PaymentInput {
+    pub account_access_token: Session,
+    pub stop_if_stamp_payment_is_possible: bool,
+    pub transaction_items: Vec<PaymentItemInput>,
 }
 
 #[derive(Debug, Serialize, SimpleObject)]
 pub struct PaymentOutput {
     pub account: AccountOutput,
-    pub transaction: TransactionOutput,
+    pub transaction: Option<TransactionOutput>,
+    pub account_access_token: Option<Session>,
+    pub error: Option<PaymentOutputError>,
+}
+
+#[derive(Debug, Serialize, SimpleObject)]
+pub struct PaymentOutputError {
+    pub message: String,
 }
 
 #[derive(Debug, Serialize, SimpleObject)]
 pub struct TransactionOutput {
     pub id: Uuid,
     pub account_id: Uuid,
-    pub cashier_id: Option<Uuid>,
     pub total: Money,
     pub before_credit: Money,
     pub after_credit: Money,
+    pub coffee_stamps: i32,
+    pub before_coffee_stamps: i32,
+    pub after_coffee_stamps: i32,
+    pub bottle_stamps: i32,
+    pub before_bottle_stamps: i32,
+    pub after_bottle_stamps: i32,
     pub date: NaiveDateTime,
-    pub products: Vec<TransactionProductOutput>,
+    pub items: Vec<TransactionItemOutput>,
 }
 
 #[derive(Debug, Serialize, SimpleObject)]
-pub struct TransactionProductOutput {
-    pub product: ProductOutput,
-    pub amount: i32,
+pub struct TransactionItemOutput {
+    pub transaction_id: Uuid,
+    pub index: i32,
+    pub price: Money,
+    pub pay_with_stamps: StampType,
+    pub give_stamps: StampType,
+    pub product: Option<ProductOutput>,
 }
 
-impl From<Transaction> for TransactionOutput {
-    fn from(entity: Transaction) -> Self {
-        Self {
-            id: entity.id,
-            account_id: entity.account_id,
-            cashier_id: entity.cashier_id,
-            total: entity.total,
-            before_credit: entity.before_credit,
-            after_credit: entity.after_credit,
-            date: entity.date,
-            products: Vec::new(),
-        }
-    }
-}
+type TransactionWrapper = (
+    Transaction,
+    Vec<(TransactionItem, Option<(Product, Category)>)>,
+);
 
-impl From<(Transaction, Vec<(Product, i32)>)> for TransactionOutput {
-    fn from(entity: (Transaction, Vec<(Product, i32)>)) -> Self {
+impl From<TransactionWrapper> for TransactionOutput {
+    fn from(entity: TransactionWrapper) -> Self {
+        let (transaction, items) = entity;
+
         Self {
-            id: entity.0.id,
-            account_id: entity.0.account_id,
-            cashier_id: entity.0.cashier_id,
-            total: entity.0.total,
-            before_credit: entity.0.before_credit,
-            after_credit: entity.0.after_credit,
-            date: entity.0.date,
-            products: entity
-                .1
+            id: transaction.id,
+            account_id: transaction.account_id,
+            total: transaction.total,
+            before_credit: transaction.before_credit,
+            after_credit: transaction.after_credit,
+            coffee_stamps: transaction.coffee_stamps,
+            before_coffee_stamps: transaction.before_coffee_stamps,
+            after_coffee_stamps: transaction.after_coffee_stamps,
+            bottle_stamps: transaction.bottle_stamps,
+            before_bottle_stamps: transaction.before_bottle_stamps,
+            after_bottle_stamps: transaction.after_bottle_stamps,
+            date: transaction.date,
+            items: items
                 .into_iter()
-                .map(|(product, amount)| TransactionProductOutput {
-                    product: product.into(),
-                    amount,
+                .map(|(i, o)| TransactionItemOutput {
+                    transaction_id: i.transaction_id,
+                    index: i.index,
+                    price: i.price,
+                    pay_with_stamps: i.pay_with_stamps,
+                    give_stamps: i.give_stamps,
+                    product: o.map(|o| o.into()),
                 })
                 .collect(),
         }
     }
+}
+
+pub fn map_with_result<A, B, F>(vec: Vec<A>, transform: F) -> ServiceResult<Vec<B>>
+where
+    F: Fn(A) -> ServiceResult<B>,
+{
+    let mut result = Vec::<B>::with_capacity(vec.len());
+
+    for element in vec.into_iter() {
+        result.push(transform(element)?);
+    }
+
+    Ok(result)
+}
+
+pub fn zip_with_result<A, B, F>(vec: Vec<A>, transform: F) -> ServiceResult<Vec<(A, B)>>
+where
+    F: Fn(&A) -> ServiceResult<B>,
+{
+    let mut result = Vec::<(A, B)>::with_capacity(vec.len());
+
+    for element in vec.into_iter() {
+        let item = transform(&element)?;
+
+        result.push((element, item));
+    }
+
+    Ok(result)
+}
+
+pub fn map_transaction_output(
+    database_conn: &DatabaseConnection,
+    transaction: Transaction,
+) -> ServiceResult<TransactionOutput> {
+    let items = zip_with_result(transaction.get_items(database_conn)?, |item| {
+        match item.product_id {
+            Some(id) => Some(Product::get(database_conn, id)).transpose(),
+            None => Ok(None),
+        }
+    })?;
+
+    Ok((transaction, items).into())
 }
 
 pub fn transaction_payment(
@@ -95,22 +156,46 @@ pub fn transaction_payment(
     identity.require_cert()?;
 
     let mut account = get_onetime_session(database_conn, redis_conn, &input.account_access_token)?;
-    let transaction = transactions::execute(database_conn, &mut account, None, input.amount)?;
+    let result = transactions::execute(
+        database_conn,
+        &mut account,
+        input
+            .transaction_items
+            .iter()
+            .map(|item| TransactionItemInput {
+                price: item.price,
+                pay_with_stamps: item.pay_with_stamps,
+                give_stamps: item.give_stamps,
+                product_id: item.product_id,
+            })
+            .collect(),
+        input.stop_if_stamp_payment_is_possible,
+    );
 
-    let mut products: Vec<(Product, i32)> = Vec::new();
-
-    for payment_product in &input.products {
-        if let Ok(product) = Product::get(database_conn, payment_product.id) {
-            products.push((product, payment_product.amount));
+    let error = match result {
+        Ok(transaction) => {
+            return Ok(PaymentOutput {
+                account: account.into(),
+                transaction: Some(map_transaction_output(database_conn, transaction)?),
+                account_access_token: None,
+                error: None,
+            });
         }
+        Err(e) => e,
+    };
+
+    if let ServiceError::TransactionCanceled(message) = error {
+        let account_access_token = create_onetime_session(redis_conn, &account)?;
+
+        return Ok(PaymentOutput {
+            account: account.into(),
+            transaction: None,
+            account_access_token: Some(account_access_token),
+            error: Some(PaymentOutputError { message }),
+        });
     }
 
-    transaction.add_products(database_conn, products)?;
-
-    Ok(PaymentOutput {
-        account: account.into(),
-        transaction: transaction.into(),
-    })
+    Err(error)
 }
 
 pub fn get_transactions_by_account(
@@ -128,16 +213,9 @@ pub fn get_transactions_by_account(
         &account,
         transaction_filer_from,
         transaction_filer_to,
-    )?
-    .into_iter()
-    .map(|t| {
-        let p = t.get_products(database_conn).unwrap_or_default();
-        (t, p)
-    })
-    .map(TransactionOutput::from)
-    .collect();
+    )?;
 
-    Ok(entities)
+    map_with_result(entities, |t| map_transaction_output(database_conn, t))
 }
 
 pub fn get_transaction_by_account(
@@ -149,10 +227,9 @@ pub fn get_transaction_by_account(
     identity.require_account(Permission::Member)?;
 
     let account = Account::get(database_conn, account_id)?;
-    let entity =
-        transactions::get_by_account_and_id(database_conn, &account, transaction_id)?.into();
+    let transaction = transactions::get_by_account_and_id(database_conn, &account, transaction_id)?;
 
-    Ok(entity)
+    map_transaction_output(database_conn, transaction)
 }
 
 pub fn get_transactions_self(
@@ -167,16 +244,9 @@ pub fn get_transactions_self(
         &account,
         transaction_filer_from,
         transaction_filer_to,
-    )?
-    .into_iter()
-    .map(|t| {
-        let p = t.get_products(database_conn).unwrap_or_default();
-        (t, p)
-    })
-    .map(TransactionOutput::from)
-    .collect();
+    )?;
 
-    Ok(entities)
+    map_with_result(entities, |t| map_transaction_output(database_conn, t))
 }
 
 pub fn get_transaction_self(
@@ -185,8 +255,7 @@ pub fn get_transaction_self(
     transaction_id: Uuid,
 ) -> ServiceResult<TransactionOutput> {
     let account = identity.require_account(Permission::Default)?;
-    let entity =
-        transactions::get_by_account_and_id(database_conn, &account, transaction_id)?.into();
+    let transaction = transactions::get_by_account_and_id(database_conn, &account, transaction_id)?;
 
-    Ok(entity)
+    map_transaction_output(database_conn, transaction)
 }

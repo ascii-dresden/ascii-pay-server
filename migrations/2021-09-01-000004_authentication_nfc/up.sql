@@ -6,6 +6,3 @@ CREATE TABLE "authentication_nfc" (
   "data" VARCHAR NOT NULL,
   PRIMARY KEY ("account_id", "card_id")
 );
-
-ALTER TABLE "account"
-ADD COLUMN "allow_nfc_registration" BOOLEAN DEFAULT 'f' NOT NULL;

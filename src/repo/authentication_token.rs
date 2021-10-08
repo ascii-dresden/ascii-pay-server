@@ -52,7 +52,7 @@ pub fn authenticate_barcode(
     identity.require_cert()?;
 
     if let Ok(product) = Product::get_by_barcode(database_conn, code) {
-        return Ok((TokenType::ProductId, uuid_to_str(product.id)));
+        return Ok((TokenType::ProductId, uuid_to_str(product.0.id)));
     }
 
     if let Ok(account_id) = wallet::get_by_qr_code(database_conn, code) {

@@ -1,64 +1,39 @@
-use chrono::{Local, NaiveDateTime};
 use diesel::prelude::*;
 use log::info;
 use std::fs::{self, File};
 use std::path::Path;
 use uuid::Uuid;
 
-use crate::utils::{
-    env, generate_uuid, DatabaseConnection, Money, ServiceError, ServiceResult, DB,
-};
-
-use super::{Category, Price};
+use super::{Category, StampType};
+use crate::model::schema::product;
+use crate::utils::{env, generate_uuid, DatabaseConnection, Money, ServiceError, ServiceResult};
 
 /// Represent a product
-#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone)]
+#[derive(
+    Debug,
+    Queryable,
+    Insertable,
+    Identifiable,
+    AsChangeset,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    Clone,
+)]
+#[changeset_options(treat_none_as_null = "true")]
+#[table_name = "product"]
 pub struct Product {
     pub id: Uuid,
     pub name: String,
-    pub category: Option<Category>,
+    pub price: Option<Money>,
+    pub pay_with_stamps: Option<StampType>,
+    pub give_stamps: Option<StampType>,
+    pub category_id: Uuid,
     pub image: Option<String>,
-    #[serde(default = "std::vec::Vec::new")]
-    pub prices: Vec<Price>,
-    pub current_price: Option<Money>,
     pub barcode: Option<String>,
-}
-
-/// Custom db loader for `Product`
-///
-/// Ignore price vec
-impl
-    diesel::Queryable<
-        (
-            diesel::sql_types::Uuid,
-            diesel::sql_types::Text,
-            diesel::sql_types::Nullable<diesel::sql_types::Uuid>,
-            diesel::sql_types::Nullable<diesel::sql_types::Text>,
-            diesel::sql_types::Nullable<diesel::sql_types::Text>,
-        ),
-        DB,
-    > for Product
-{
-    type Row = (Uuid, String, Option<Uuid>, Option<String>, Option<String>);
-
-    fn build(row: Self::Row) -> Self {
-        let category = row.2.map(|id| Category {
-            id,
-            name: String::new(),
-            prices: vec![],
-            current_price: None,
-        });
-
-        Product {
-            id: row.0,
-            name: row.1,
-            category,
-            image: row.3,
-            prices: vec![],
-            current_price: None,
-            barcode: row.4,
-        }
-    }
+    pub ordering: Option<i32>,
 }
 
 impl Product {
@@ -66,28 +41,24 @@ impl Product {
     pub fn create(
         database_conn: &DatabaseConnection,
         name: &str,
-        category: Option<Category>,
+        category: &Category,
     ) -> ServiceResult<Product> {
         use crate::model::schema::product::dsl;
-
-        let category_id = category.as_ref().map(|category| category.id.to_owned());
 
         let p = Product {
             id: generate_uuid(),
             name: name.to_owned(),
-            category,
+            category_id: category.id,
+            price: None,
+            pay_with_stamps: None,
+            give_stamps: None,
             image: None,
-            prices: vec![],
-            current_price: None,
             barcode: None,
+            ordering: None,
         };
 
         diesel::insert_into(dsl::product)
-            .values((
-                dsl::id.eq(&p.id),
-                dsl::name.eq(&p.name),
-                dsl::category.eq(&category_id),
-            ))
+            .values(&p)
             .execute(database_conn)?;
 
         Ok(p)
@@ -99,159 +70,15 @@ impl Product {
     pub fn update(&self, database_conn: &DatabaseConnection) -> ServiceResult<()> {
         use crate::model::schema::product::dsl;
 
-        let category = self
-            .category
-            .as_ref()
-            .map(|category| category.id.to_owned());
-
         diesel::update(dsl::product.find(&self.id))
-            .set((
-                dsl::name.eq(&self.name),
-                dsl::category.eq(&category),
-                dsl::barcode.eq(&self.barcode),
-            ))
+            .set(self)
             .execute(database_conn)?;
 
         Ok(())
     }
 
-    /// Add and save a new price to the product
-    ///
-    /// This updates the `prices` vec and the `current_price`
-    pub fn add_price(
-        &mut self,
-        database_conn: &DatabaseConnection,
-        validity_start: NaiveDateTime,
-        value: Money,
-    ) -> ServiceResult<()> {
-        use crate::model::schema::product_price::dsl;
-
-        let p = Price {
-            validity_start,
-            value,
-        };
-
-        diesel::insert_into(dsl::product_price)
-            .values((
-                dsl::product_id.eq(&self.id),
-                dsl::validity_start.eq(&p.validity_start),
-                dsl::value.eq(&p.value),
-            ))
-            .execute(database_conn)?;
-
-        self.prices.push(p);
-
-        self.calc_current_price();
-
-        Ok(())
-    }
-
-    /// Remove and save a price from the product by its `validity_start`
-    ///
-    /// This updates the `prices` vec and the `current_price`
-    pub fn remove_price(
-        &mut self,
-        database_conn: &DatabaseConnection,
-        validity_start: NaiveDateTime,
-    ) -> ServiceResult<()> {
-        use crate::model::schema::product_price::dsl;
-
-        let mut index = 0;
-        for price in self.prices.iter() {
-            if price.validity_start == validity_start {
-                break;
-            }
-            index += 1;
-        }
-
-        diesel::delete(
-            dsl::product_price.filter(
-                dsl::product_id
-                    .eq(&self.id)
-                    .and(dsl::validity_start.eq(validity_start)),
-            ),
-        )
-        .execute(database_conn)?;
-
-        self.prices.remove(index);
-
-        self.calc_current_price();
-
-        Ok(())
-    }
-
-    pub fn update_prices(
-        &mut self,
-        database_conn: &DatabaseConnection,
-        new_prices: &[Price],
-    ) -> ServiceResult<()> {
-        use crate::model::schema::product_price::dsl;
-
-        diesel::delete(dsl::product_price.filter(dsl::product_id.eq(&self.id)))
-            .execute(database_conn)?;
-        self.prices.clear();
-
-        for p in new_prices {
-            diesel::insert_into(dsl::product_price)
-                .values((
-                    dsl::product_id.eq(&self.id),
-                    dsl::validity_start.eq(&p.validity_start),
-                    dsl::value.eq(&p.value),
-                ))
-                .execute(database_conn)?;
-
-            self.prices.push(p.clone());
-        }
-
-        self.calc_current_price();
-        Ok(())
-    }
-
-    fn load_category(&mut self, database_conn: &DatabaseConnection) -> ServiceResult<()> {
-        self.category = match &self.category {
-            Some(category) => Some(Category::get(database_conn, category.id)?),
-            None => None,
-        };
-
-        Ok(())
-    }
-
-    /// Load the prices for this product
-    ///
-    /// This updates the `prices` vec and the `current_price`
-    fn load_prices(&mut self, database_conn: &DatabaseConnection) -> ServiceResult<()> {
-        use crate::model::schema::product_price::dsl;
-
-        let results = dsl::product_price
-            .filter(dsl::product_id.eq(&self.id))
-            .load::<Price>(database_conn)?;
-
-        self.prices = results;
-
-        self.calc_current_price();
-
-        Ok(())
-    }
-
-    /// Calculate the `current_price` based on the `prices` vec
-    fn calc_current_price(&mut self) {
-        self.current_price = self.get_price_at(&Local::now().naive_local());
-    }
-
-    pub fn get_price_at(&self, datetime: &NaiveDateTime) -> Option<Money> {
-        let current = self
-            .prices
-            .iter()
-            .filter(|p| p.validity_start <= *datetime)
-            .max_by(|p1, p2| p1.validity_start.cmp(&p2.validity_start));
-
-        match current {
-            Some(price) => Some(price.value),
-            None => match &self.category {
-                Some(category) => category.get_price_at(datetime),
-                None => None,
-            },
-        }
+    fn get_category(&self, database_conn: &DatabaseConnection) -> ServiceResult<Category> {
+        Category::get(database_conn, self.category_id)
     }
 
     pub fn get_image(&self) -> ServiceResult<String> {
@@ -312,52 +139,44 @@ impl Product {
     }
 
     /// List all products
-    pub fn all(database_conn: &DatabaseConnection) -> ServiceResult<Vec<Product>> {
+    pub fn all(database_conn: &DatabaseConnection) -> ServiceResult<Vec<(Product, Category)>> {
+        use crate::model::schema::category::dsl as dsl2;
         use crate::model::schema::product::dsl;
 
-        let mut results = dsl::product
-            .order(dsl::name.asc())
-            .load::<Product>(database_conn)?;
-
-        for p in &mut results {
-            p.load_category(database_conn)?;
-            p.load_prices(database_conn)?;
-        }
+        let results = dsl::product
+            .order((dsl::ordering.asc(), dsl::name.asc()))
+            .inner_join(dsl2::category)
+            .load::<(Product, Category)>(database_conn)?;
 
         Ok(results)
     }
 
     /// Get a product by the `id`
-    pub fn get(database_conn: &DatabaseConnection, id: Uuid) -> ServiceResult<Product> {
+    pub fn get(database_conn: &DatabaseConnection, id: Uuid) -> ServiceResult<(Product, Category)> {
+        use crate::model::schema::category::dsl as dsl2;
         use crate::model::schema::product::dsl;
 
-        let mut results = dsl::product
+        let result = dsl::product
             .filter(dsl::id.eq(id))
-            .load::<Product>(database_conn)?;
+            .inner_join(dsl2::category)
+            .first::<(Product, Category)>(database_conn)?;
 
-        let mut p = results.pop().ok_or(ServiceError::NotFound)?;
-
-        p.load_category(database_conn)?;
-        p.load_prices(database_conn)?;
-
-        Ok(p)
+        Ok(result)
     }
-    /// Get a product by the `id`
+
+    /// Get a product by the `barcode`
     pub fn get_by_barcode(
         database_conn: &DatabaseConnection,
         barcode: &str,
-    ) -> ServiceResult<Product> {
+    ) -> ServiceResult<(Product, Category)> {
+        use crate::model::schema::category::dsl as dsl2;
         use crate::model::schema::product::dsl;
 
-        let mut results = dsl::product
+        let result = dsl::product
             .filter(dsl::barcode.eq(barcode))
-            .load::<Product>(database_conn)?;
+            .inner_join(dsl2::category)
+            .first::<(Product, Category)>(database_conn)?;
 
-        let mut p = results.pop().ok_or(ServiceError::NotFound)?;
-
-        p.load_category(database_conn)?;
-        p.load_prices(database_conn)?;
-
-        Ok(p)
+        Ok(result)
     }
 }

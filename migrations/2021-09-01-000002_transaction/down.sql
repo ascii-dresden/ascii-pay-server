@@ -1,2 +1,2 @@
+DROP TABLE "transaction_item";
 DROP TABLE "transaction";
-DROP TABLE "transaction_product";

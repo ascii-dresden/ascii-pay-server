@@ -1,7 +1,5 @@
-use actix_web::http::header::ToStrError;
 use actix_web::{error::ResponseError, Error as ActixError, HttpResponse};
 use derive_more::Display;
-use lettre::smtp::error::Error as LettreError;
 use log::{error, warn};
 
 /// Represent errors in the application
@@ -14,6 +12,12 @@ pub enum ServiceError {
 
     #[display(fmt = "Internal Server Error: '{}'\n{}", _0, _1)]
     InternalServerError(&'static str, String),
+
+    #[display(fmt = "Transaction canceled: {}", _0)]
+    TransactionCanceled(String),
+
+    #[display(fmt = "Transaction error: {}", _0)]
+    TransactionError(String),
 
     #[display(fmt = "Not Found")]
     NotFound,
@@ -29,9 +33,6 @@ pub enum ServiceError {
 
     #[display(fmt = "Cannot access none reference")]
     NoneError,
-
-    #[display(fmt = "Request should be redirected to: {}". _0)]
-    Redirect(String),
 }
 
 impl ServiceError {
@@ -45,6 +46,9 @@ pub type ServiceResult<T> = Result<T, ServiceError>;
 
 impl From<diesel::result::Error> for ServiceError {
     fn from(error: diesel::result::Error) -> Self {
+        if diesel::result::Error::NotFound == error {
+            return ServiceError::NotFound;
+        }
         warn!("Database error: {}", error);
         ServiceError::InternalServerError("Database error", format!("{}", error))
     }
@@ -123,14 +127,14 @@ impl From<block_modes::BlockModeError> for ServiceError {
     }
 }
 
-impl From<LettreError> for ServiceError {
-    fn from(error: LettreError) -> Self {
+impl From<lettre::smtp::error::Error> for ServiceError {
+    fn from(error: lettre::smtp::error::Error) -> Self {
         ServiceError::MailError(error.to_string())
     }
 }
 
-impl From<ToStrError> for ServiceError {
-    fn from(error: ToStrError) -> Self {
+impl From<actix_web::http::header::ToStrError> for ServiceError {
+    fn from(error: actix_web::http::header::ToStrError) -> Self {
         ServiceError::BadRequest(
             "Request contained invalid CRON_SECRET header value",
             format!("{}", error),
@@ -218,6 +222,16 @@ impl ResponseError for ServiceError {
                     "cause": cause
                 }))
             }
+            ServiceError::TransactionCanceled(ref message) => {
+                HttpResponse::Conflict().json(json!({
+                    "message": "Payment canceled",
+                    "cause": message
+                }))
+            }
+            ServiceError::TransactionError(ref message) => HttpResponse::Conflict().json(json!({
+                "message": "Payment error",
+                "cause": message
+            })),
             ServiceError::BadRequest(ref source, ref cause) => {
                 HttpResponse::BadRequest().json(json!({
                     "message": "Internal Server Error, Please try again later",
@@ -243,9 +257,6 @@ impl ResponseError for ServiceError {
                     "cause": mail_err.to_string()
                 }))
             }
-            ServiceError::Redirect(ref url) => HttpResponse::Found()
-                .set_header(actix_web::http::header::LOCATION, url.as_str())
-                .finish(),
         }
     }
 }

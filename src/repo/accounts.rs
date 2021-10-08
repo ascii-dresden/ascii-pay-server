@@ -1,7 +1,9 @@
 use crate::identity_service::{Identity, IdentityRequire};
-use crate::model::session::{Session, get_onetime_session};
+use crate::model::session::{get_onetime_session, Session};
 use crate::model::{Account, Permission};
-use crate::utils::{DatabaseConnection, Money, RedisConnection, ServiceError, ServiceResult, fuzzy_vec_match};
+use crate::utils::{
+    fuzzy_vec_match, DatabaseConnection, Money, RedisConnection, ServiceError, ServiceResult,
+};
 use log::warn;
 use uuid::Uuid;
 
@@ -15,8 +17,8 @@ pub struct AccountInput {
     pub username: Option<String>,
     pub account_number: Option<String>,
     pub permission: Permission,
+    pub use_digital_stamps: bool,
     pub receives_monthly_report: bool,
-    pub allow_nfc_registration: bool,
 }
 
 #[derive(Debug, Serialize, SimpleObject)]
@@ -29,8 +31,10 @@ pub struct AccountOutput {
     pub username: Option<String>,
     pub account_number: Option<String>,
     pub permission: Permission,
+    pub use_digital_stamps: bool,
+    pub coffee_stamps: i32,
+    pub bottle_stamps: i32,
     pub receives_monthly_report: bool,
-    pub allow_nfc_registration: bool,
 }
 
 impl From<Account> for AccountOutput {
@@ -44,8 +48,10 @@ impl From<Account> for AccountOutput {
             username: entity.username,
             account_number: entity.account_number,
             permission: entity.permission,
+            use_digital_stamps: entity.use_digital_stamps,
+            coffee_stamps: entity.coffee_stamps,
+            bottle_stamps: entity.bottle_stamps,
             receives_monthly_report: entity.receives_monthly_report,
-            allow_nfc_registration: entity.allow_nfc_registration,
         }
     }
 }
@@ -150,8 +156,8 @@ pub fn create_account(
     entity.mail = input.mail.clone();
     entity.username = input.username.clone();
     entity.account_number = input.account_number.clone();
+    entity.use_digital_stamps = input.use_digital_stamps;
     entity.receives_monthly_report = input.receives_monthly_report;
-    entity.allow_nfc_registration = input.allow_nfc_registration;
 
     entity.update(database_conn)?;
 
@@ -174,8 +180,8 @@ pub fn update_account(
     entity.username = input.username.clone();
     entity.account_number = input.account_number.clone();
     entity.permission = input.permission;
+    entity.use_digital_stamps = input.use_digital_stamps;
     entity.receives_monthly_report = input.receives_monthly_report;
-    entity.allow_nfc_registration = input.allow_nfc_registration;
 
     entity.update(database_conn)?;
 

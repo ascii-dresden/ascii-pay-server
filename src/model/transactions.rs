@@ -1,11 +1,12 @@
 use chrono::{Local, NaiveDateTime};
 use diesel::prelude::*;
-use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::model::schema::transaction;
+use crate::model::schema::{transaction, transaction_item};
 use crate::model::{Account, Product};
 use crate::utils::{generate_uuid, DatabaseConnection, Money, ServiceError, ServiceResult};
+
+use super::enums::StampType;
 
 /// Represent a transaction
 #[derive(
@@ -15,11 +16,37 @@ use crate::utils::{generate_uuid, DatabaseConnection, Money, ServiceError, Servi
 pub struct Transaction {
     pub id: Uuid,
     pub account_id: Uuid,
-    pub cashier_id: Option<Uuid>,
     pub total: Money,
     pub before_credit: Money,
     pub after_credit: Money,
+    pub coffee_stamps: i32,
+    pub before_coffee_stamps: i32,
+    pub after_coffee_stamps: i32,
+    pub bottle_stamps: i32,
+    pub before_bottle_stamps: i32,
+    pub after_bottle_stamps: i32,
     pub date: NaiveDateTime,
+}
+
+/// Represent a transaction
+#[derive(Debug, Queryable, Insertable, AsChangeset, Serialize, Deserialize, Clone)]
+#[changeset_options(treat_none_as_null = "true")]
+#[table_name = "transaction_item"]
+pub struct TransactionItem {
+    pub transaction_id: Uuid,
+    pub index: i32,
+    pub price: Money,
+    pub pay_with_stamps: StampType,
+    pub give_stamps: StampType,
+    pub product_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TransactionItemInput {
+    pub price: Money,
+    pub pay_with_stamps: StampType,
+    pub give_stamps: StampType,
+    pub product_id: Option<Uuid>,
 }
 
 /// Execute a transaction on the given `account` with the given `total`
@@ -29,57 +56,171 @@ pub struct Transaction {
 /// * 2 Requery the account credit
 /// * 3 Calculate the new credit
 /// * 4 Check if the account minimum_credit allows the new credit
-/// * 5 Create and save the transaction (with optional cashier refernece)
+/// * 5 Create and save the transaction
 /// * 6 Save the new credit to the account
 pub fn execute_at(
     database_conn: &DatabaseConnection,
     account: &mut Account,
-    cashier: Option<&Account>,
-    total: Money,
+    transaction_items: Vec<TransactionItemInput>,
+    stop_if_stamp_payment_is_possible: bool,
     date: NaiveDateTime,
 ) -> ServiceResult<Transaction> {
     use crate::model::schema::transaction::dsl;
-
-    let before_credit = account.credit;
-    let mut after_credit = account.credit;
+    use crate::model::schema::transaction_item::dsl as dsl_item;
 
     let result = database_conn.build_transaction().serializable().run(|| {
         let mut account = Account::get(database_conn, account.id)?;
-        after_credit = account.credit + total;
+
+        let before_credit = account.credit;
+        let mut after_credit = account.credit;
+
+        let before_coffee_stamps = account.coffee_stamps;
+        let mut after_coffee_stamps = account.coffee_stamps;
+
+        let before_bottle_stamps = account.bottle_stamps;
+        let mut after_bottle_stamps = account.bottle_stamps;
+
+        // Update credit and stamp values
+        for item in transaction_items.iter() {
+            // Update credit if item is not paid with stemps
+            if item.pay_with_stamps.is_none() || !account.use_digital_stamps {
+                after_credit += item.price;
+            }
+
+            // An transaction item cannot give stemps and be paid with stamps at the same time
+            if !item.pay_with_stamps.is_none() && !item.give_stamps.is_none() {
+                return Err(ServiceError::TransactionError(
+                    "An item cannot give stemps and be paid with stamps at the same time!"
+                        .to_owned(),
+                ));
+            }
+
+            if account.use_digital_stamps {
+                // Remove 10 stemps if paid with stemps
+                match item.pay_with_stamps {
+                    StampType::Coffee => {
+                        after_coffee_stamps -= 10;
+                    }
+                    StampType::Bottle => {
+                        after_bottle_stamps -= 10;
+                    }
+                    _ => {}
+                }
+
+                // Add 1 stemp if item gives stemp
+                match item.give_stamps {
+                    StampType::Coffee => {
+                        after_coffee_stamps += 1;
+                    }
+                    StampType::Bottle => {
+                        after_bottle_stamps += 1;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Return error if an item could be paid with stemps
+        if stop_if_stamp_payment_is_possible && account.use_digital_stamps {
+            for item in transaction_items.iter() {
+                if let Some(product_id) = item.product_id {
+                    let (product, category) = Product::get(database_conn, product_id)?;
+
+                    match product.pay_with_stamps.unwrap_or(category.pay_with_stamps) {
+                        StampType::Coffee => {
+                            if after_coffee_stamps >= 10 {
+                                return Err(ServiceError::TransactionCanceled(
+                                    "Payment with coffee stamps is possible!".to_owned(),
+                                ));
+                            }
+                        }
+                        StampType::Bottle => {
+                            if after_bottle_stamps >= 10 {
+                                return Err(ServiceError::TransactionCanceled(
+                                    "Payment with bottle stamps is possible!".to_owned(),
+                                ));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
 
         if after_credit < account.minimum_credit && after_credit < account.credit {
-            return Err(ServiceError::InternalServerError(
-                "Transaction error",
-                "The transaction can not be performed. Check the account credit and minimum_credit"
-                    .to_owned(),
+            return Err(ServiceError::TransactionError(
+                "Insufficient credit!".to_owned(),
             ));
         }
 
-        let a = Transaction {
+        if account.use_digital_stamps
+            && after_coffee_stamps < 0
+            && after_coffee_stamps < account.coffee_stamps
+        {
+            return Err(ServiceError::TransactionError(
+                "Insufficient coffee stamps!".to_owned(),
+            ));
+        }
+
+        if account.use_digital_stamps
+            && after_bottle_stamps < 0
+            && after_bottle_stamps < account.bottle_stamps
+        {
+            return Err(ServiceError::TransactionError(
+                "Insufficient bottle stamps!".to_owned(),
+            ));
+        }
+
+        let t = Transaction {
             id: generate_uuid(),
             account_id: account.id,
-            cashier_id: cashier.map(|c| c.id),
-            total,
+            total: after_credit - before_credit,
             before_credit,
             after_credit,
+            coffee_stamps: after_coffee_stamps - before_coffee_stamps,
+            before_coffee_stamps,
+            after_coffee_stamps,
+            bottle_stamps: after_bottle_stamps - before_bottle_stamps,
+            before_bottle_stamps,
+            after_bottle_stamps,
             date,
         };
         account.credit = after_credit;
-
-        diesel::insert_into(dsl::transaction)
-            .values(&a)
-            .execute(database_conn)?;
+        account.coffee_stamps = after_coffee_stamps;
+        account.bottle_stamps = after_bottle_stamps;
 
         account.update(database_conn)?;
+        diesel::insert_into(dsl::transaction)
+            .values(&t)
+            .execute(database_conn)?;
 
-        Ok(a)
+        for (i, item) in transaction_items.iter().enumerate() {
+            let ti = TransactionItem {
+                transaction_id: t.id,
+                index: i as i32,
+                price: item.price,
+                pay_with_stamps: item.pay_with_stamps,
+                give_stamps: item.give_stamps,
+                product_id: item.product_id,
+            };
+
+            diesel::insert_into(dsl_item::transaction_item)
+                .values(&ti)
+                .execute(database_conn)?;
+        }
+
+        Ok((t, account))
     });
 
-    if result.is_ok() {
-        account.credit = after_credit;
+    match result {
+        Ok((t, a)) => {
+            account.credit = a.credit;
+            account.coffee_stamps = a.coffee_stamps;
+            account.bottle_stamps = a.bottle_stamps;
+            Ok(t)
+        }
+        Err(e) => Err(e),
     }
-
-    result
 }
 
 /// Execute a transaction on the given `account` with the given `total`
@@ -94,21 +235,18 @@ pub fn execute_at(
 pub fn execute(
     database_conn: &DatabaseConnection,
     account: &mut Account,
-    cashier: Option<&Account>,
-    total: Money,
+    transaction_items: Vec<TransactionItemInput>,
+    stop_if_stamp_payment_is_possible: bool,
 ) -> ServiceResult<Transaction> {
-    let transaction = execute_at(
+    execute_at(
         database_conn,
         account,
-        cashier,
-        total,
+        transaction_items,
+        stop_if_stamp_payment_is_possible,
         Local::now().naive_local(),
-    )?;
-
-    Ok(transaction)
+    )
 }
 
-// Pagination reference: https://github.com/diesel-rs/diesel/blob/v1.3.0/examples/postgres/advanced-blog-cli/src/pagination.rs
 /// List all transactions of a account between the given datetimes
 pub fn get_by_account(
     database_conn: &DatabaseConnection,
@@ -162,199 +300,16 @@ pub fn get_by_account_and_id(
     results.pop().ok_or(ServiceError::NotFound)
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(tag = "status")]
-pub enum ValidationResult {
-    Ok,
-    InvalidTransactionBefore {
-        expected_credit: Money,
-        transaction_credit: Money,
-        transaction: Transaction,
-    },
-    InvalidTransactionAfter {
-        expected_credit: Money,
-        transaction_credit: Money,
-        transaction: Transaction,
-    },
-    InvalidSum {
-        expected: Money,
-        actual: Money,
-    },
-    NoData,
-    Error,
-}
-
-/// Check if the credit of an account is valid to its transactions
-fn validate_account(
-    database_conn: &DatabaseConnection,
-    account: &Account,
-) -> ServiceResult<ValidationResult> {
-    use crate::model::schema::transaction::dsl;
-
-    database_conn.build_transaction().serializable().run(|| {
-        let account = Account::get(database_conn, account.id)?;
-
-        let results = dsl::transaction
-            .filter(dsl::account_id.eq(&account.id))
-            .order(dsl::date.asc())
-            .load::<Transaction>(database_conn)?;
-
-        let mut last_credit = 0;
-
-        for transaction in results {
-            if last_credit != transaction.before_credit {
-                return Ok(ValidationResult::InvalidTransactionBefore {
-                    expected_credit: last_credit,
-                    transaction_credit: transaction.before_credit,
-                    transaction,
-                });
-            }
-            if transaction.before_credit + transaction.total != transaction.after_credit {
-                return Ok(ValidationResult::InvalidTransactionAfter {
-                    expected_credit: last_credit + transaction.total,
-                    transaction_credit: transaction.after_credit,
-                    transaction,
-                });
-            }
-            last_credit += transaction.total;
-        }
-
-        if last_credit != account.credit {
-            Ok(ValidationResult::InvalidSum {
-                expected: last_credit,
-                actual: account.credit,
-            })
-        } else {
-            Ok(ValidationResult::Ok)
-        }
-    })
-}
-
-/// List all accounts with validation erros of their credit to their transactions
-pub fn validate_all(
-    database_conn: &DatabaseConnection,
-) -> ServiceResult<HashMap<Uuid, ValidationResult>> {
-    let accounts = Account::all(database_conn)?;
-
-    let map = accounts
-        .into_iter()
-        .map(|a| {
-            let r = validate_account(database_conn, &a).unwrap_or(ValidationResult::Error);
-            (a.id, r)
-        })
-        .collect::<HashMap<_, _>>();
-
-    Ok(map)
-}
-
 impl Transaction {
-    /// Assign products with amounts to this transaction
-    pub fn add_products(
-        &self,
-        database_conn: &DatabaseConnection,
-        products: Vec<(Product, i32)>,
-    ) -> ServiceResult<()> {
-        use crate::model::schema::transaction_product::dsl;
-
-        let current_products = self
-            .get_products(database_conn)?
-            .into_iter()
-            .collect::<HashMap<Product, i32>>();
-
-        for (product, amount) in products {
-            match current_products.get(&product) {
-                Some(current_amount) => {
-                    diesel::update(
-                        dsl::transaction_product.filter(
-                            dsl::transaction
-                                .eq(&self.id)
-                                .and(dsl::product_id.eq(&product.id)),
-                        ),
-                    )
-                    .set(dsl::amount.eq(current_amount + amount))
-                    .execute(database_conn)?;
-                }
-                None => {
-                    diesel::insert_into(dsl::transaction_product)
-                        .values((
-                            dsl::transaction.eq(&self.id),
-                            dsl::product_id.eq(&product.id),
-                            dsl::amount.eq(amount),
-                        ))
-                        .execute(database_conn)?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Remove products with amounts from this transaction
-    pub fn remove_products(
-        &self,
-        database_conn: &DatabaseConnection,
-        products: Vec<(Product, i32)>,
-    ) -> ServiceResult<()> {
-        use crate::model::schema::transaction_product::dsl;
-
-        let current_products = self
-            .get_products(database_conn)?
-            .into_iter()
-            .collect::<HashMap<Product, i32>>();
-
-        for (product, amount) in products {
-            if let Some(current_amount) = current_products.get(&product) {
-                if *current_amount <= amount {
-                    diesel::delete(
-                        dsl::transaction_product.filter(
-                            dsl::transaction
-                                .eq(&self.id)
-                                .and(dsl::product_id.eq(&product.id)),
-                        ),
-                    )
-                    .execute(database_conn)?;
-                } else {
-                    diesel::update(
-                        dsl::transaction_product.filter(
-                            dsl::transaction
-                                .eq(&self.id)
-                                .and(dsl::product_id.eq(&product.id)),
-                        ),
-                    )
-                    .set(dsl::amount.eq(current_amount - amount))
-                    .execute(database_conn)?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     /// List assigned products with amounts of this transaction
-    pub fn get_products(
+    pub fn get_items(
         &self,
         database_conn: &DatabaseConnection,
-    ) -> ServiceResult<Vec<(Product, i32)>> {
-        use crate::model::schema::transaction_product::dsl;
+    ) -> ServiceResult<Vec<TransactionItem>> {
+        use crate::model::schema::transaction_item::dsl;
 
-        Ok(dsl::transaction_product
-            .filter(dsl::transaction.eq(&self.id))
-            .load::<(Uuid, Uuid, i32)>(database_conn)?
-            .into_iter()
-            .filter_map(|(_, p, a)| match Product::get(database_conn, p) {
-                Ok(p) => Some((p, a)),
-                _ => None,
-            })
-            .collect())
-    }
-
-    pub fn all(database_conn: &DatabaseConnection) -> ServiceResult<Vec<Transaction>> {
-        use crate::model::schema::transaction::dsl;
-
-        let results = dsl::transaction
-            .order(dsl::date.desc())
-            .load::<Transaction>(database_conn)?;
-
-        Ok(results)
+        Ok(dsl::transaction_item
+            .filter(dsl::transaction_id.eq(&self.id))
+            .load::<TransactionItem>(database_conn)?)
     }
 }

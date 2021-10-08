@@ -8,8 +8,10 @@ table! {
         username -> Nullable<Varchar>,
         account_number -> Nullable<Varchar>,
         permission -> Int2,
+        use_digital_stamps -> Bool,
+        coffee_stamps -> Int4,
+        bottle_stamps -> Int4,
         receives_monthly_report -> Bool,
-        allow_nfc_registration -> Bool,
     }
 }
 
@@ -61,14 +63,10 @@ table! {
     category (id) {
         id -> Uuid,
         name -> Varchar,
-    }
-}
-
-table! {
-    category_price (category_id, validity_start) {
-        category_id -> Uuid,
-        validity_start -> Timestamp,
-        value -> Int4,
+        price -> Int4,
+        pay_with_stamps -> Int2,
+        give_stamps -> Int2,
+        ordering -> Nullable<Int4>,
     }
 }
 
@@ -76,17 +74,13 @@ table! {
     product (id) {
         id -> Uuid,
         name -> Varchar,
-        category -> Nullable<Uuid>,
+        price -> Nullable<Int4>,
+        pay_with_stamps -> Nullable<Int2>,
+        give_stamps -> Nullable<Int2>,
+        category_id -> Uuid,
         image -> Nullable<Varchar>,
         barcode -> Nullable<Varchar>,
-    }
-}
-
-table! {
-    product_price (product_id, validity_start) {
-        product_id -> Uuid,
-        validity_start -> Timestamp,
-        value -> Int4,
+        ordering -> Nullable<Int4>,
     }
 }
 
@@ -94,21 +88,32 @@ table! {
     transaction (id) {
         id -> Uuid,
         account_id -> Uuid,
-        cashier_id -> Nullable<Uuid>,
         total -> Int4,
         before_credit -> Int4,
         after_credit -> Int4,
+        coffee_stamps -> Int4,
+        before_coffee_stamps -> Int4,
+        after_coffee_stamps -> Int4,
+        bottle_stamps -> Int4,
+        before_bottle_stamps -> Int4,
+        after_bottle_stamps -> Int4,
         date -> Timestamp,
     }
 }
 
 table! {
-    transaction_product (transaction, product_id) {
-        transaction -> Uuid,
-        product_id -> Uuid,
-        amount -> Int4,
+    transaction_item (transaction_id, index) {
+        transaction_id -> Uuid,
+        index -> Int4,
+        price -> Int4,
+        pay_with_stamps -> Int2,
+        give_stamps -> Int2,
+        product_id -> Nullable<Uuid>,
     }
 }
+
+joinable!(product -> category (category_id));
+joinable!(transaction_item -> transaction (transaction_id));
 
 allow_tables_to_appear_in_same_query!(
     account,
@@ -118,9 +123,7 @@ allow_tables_to_appear_in_same_query!(
     authentication_password,
     authentication_password_invitation,
     category,
-    category_price,
     product,
-    product_price,
     transaction,
-    transaction_product,
+    transaction_item,
 );

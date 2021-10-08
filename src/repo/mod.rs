@@ -1,17 +1,14 @@
+use async_graphql::OutputType;
 use std::collections::HashMap;
 
 mod accounts;
 pub use accounts::*;
 
 pub mod auth;
-use async_graphql::OutputType;
 pub use auth::*;
 
 pub mod categories;
 pub use categories::*;
-
-pub mod prices;
-pub use prices::*;
 
 pub mod products;
 pub use products::*;
