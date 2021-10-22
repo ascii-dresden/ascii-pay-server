@@ -45,6 +45,7 @@ pub struct TransactionItem {
 pub struct TransactionItemInput {
     pub price: Money,
     pub pay_with_stamps: StampType,
+    pub could_be_paid_with_stamps: StampType,
     pub give_stamps: StampType,
     pub product_id: Option<Uuid>,
 }
@@ -129,20 +130,38 @@ pub fn execute_at(
                     match product.pay_with_stamps.unwrap_or(category.pay_with_stamps) {
                         StampType::Coffee => {
                             if after_coffee_stamps >= 10 {
-                                return Err(ServiceError::TransactionCanceled(
+                                return Err(ServiceError::TransactionCancelled(
                                     "Payment with coffee stamps is possible!".to_owned(),
                                 ));
                             }
                         }
                         StampType::Bottle => {
                             if after_bottle_stamps >= 10 {
-                                return Err(ServiceError::TransactionCanceled(
+                                return Err(ServiceError::TransactionCancelled(
                                     "Payment with bottle stamps is possible!".to_owned(),
                                 ));
                             }
                         }
                         _ => {}
                     }
+                }
+
+                match item.could_be_paid_with_stamps {
+                    StampType::Coffee => {
+                        if after_coffee_stamps >= 10 {
+                            return Err(ServiceError::TransactionCancelled(
+                                "Payment with coffee stamps is possible!".to_owned(),
+                            ));
+                        }
+                    }
+                    StampType::Bottle => {
+                        if after_bottle_stamps >= 10 {
+                            return Err(ServiceError::TransactionCancelled(
+                                "Payment with bottle stamps is possible!".to_owned(),
+                            ));
+                        }
+                    }
+                    _ => {}
                 }
             }
         }

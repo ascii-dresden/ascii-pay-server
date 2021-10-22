@@ -17,6 +17,7 @@ use super::{accounts::AccountOutput, ProductOutput};
 pub struct PaymentItemInput {
     pub price: Money,
     pub pay_with_stamps: StampType,
+    pub could_be_paid_with_stamps: StampType,
     pub give_stamps: StampType,
     pub product_id: Option<Uuid>,
 }
@@ -165,6 +166,7 @@ pub fn transaction_payment(
             .map(|item| TransactionItemInput {
                 price: item.price,
                 pay_with_stamps: item.pay_with_stamps,
+                could_be_paid_with_stamps: item.could_be_paid_with_stamps,
                 give_stamps: item.give_stamps,
                 product_id: item.product_id,
             })
@@ -184,7 +186,7 @@ pub fn transaction_payment(
         Err(e) => e,
     };
 
-    if let ServiceError::TransactionCanceled(message) = error {
+    if let ServiceError::TransactionCancelled(message) = error {
         let account_access_token = create_onetime_session(redis_conn, &account)?;
 
         return Ok(PaymentOutput {

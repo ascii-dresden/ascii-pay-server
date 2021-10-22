@@ -14,7 +14,7 @@ pub enum ServiceError {
     InternalServerError(&'static str, String),
 
     #[display(fmt = "Transaction canceled: {}", _0)]
-    TransactionCanceled(String),
+    TransactionCancelled(String),
 
     #[display(fmt = "Transaction error: {}", _0)]
     TransactionError(String),
@@ -222,7 +222,7 @@ impl ResponseError for ServiceError {
                     "cause": cause
                 }))
             }
-            ServiceError::TransactionCanceled(ref message) => {
+            ServiceError::TransactionCancelled(ref message) => {
                 HttpResponse::Conflict().json(json!({
                     "message": "Payment canceled",
                     "cause": message

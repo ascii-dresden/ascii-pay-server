@@ -3,7 +3,7 @@ use rand::prelude::SliceRandom;
 
 use crate::model::transactions::{execute_at, TransactionItemInput};
 use crate::model::{authentication_password, Account, Category, Permission, Product, StampType};
-use crate::utils::{DatabaseConnection, DatabasePool, Money, ServiceResult};
+use crate::utils::{DatabaseConnection, DatabasePool, Money, ServiceError, ServiceResult};
 
 fn add_account(
     database_conn: &DatabaseConnection,
@@ -94,6 +94,7 @@ fn generate_transactions(
                 transaction_items.push(TransactionItemInput {
                     price: -pr,
                     pay_with_stamps: StampType::None,
+                    could_be_paid_with_stamps: StampType::None,
                     give_stamps: give_stamps,
                     product_id: Some(p.id),
                 });
@@ -106,6 +107,7 @@ fn generate_transactions(
                     vec![TransactionItemInput {
                         price: avg_up,
                         pay_with_stamps: StampType::None,
+                        could_be_paid_with_stamps: StampType::None,
                         give_stamps: StampType::None,
                         product_id: None,
                     }],
@@ -115,13 +117,23 @@ fn generate_transactions(
                 seconds += 60;
             }
 
-            execute_at(
+            let result = execute_at(
                 database_conn,
                 account,
                 transaction_items,
                 false,
                 date_time + Duration::seconds(seconds),
-            )?;
+            );
+
+            match result {
+                Ok(_) => {}
+                Err(ServiceError::TransactionCancelled(_)) => {
+                    // TODO
+                }
+                Err(e) => {
+                    Err(e)?;
+                }
+            }
         }
     }
 
