@@ -1,7 +1,7 @@
 use crate::{
     identity_service::{Identity, IdentityRequire},
     model::{
-        session::{create_onetime_session, get_onetime_session, Session},
+        session::{create_onetime_session_ttl, get_onetime_session, Session},
         transactions::{self, TransactionItem, TransactionItemInput},
         Account, Category, Permission, Product, StampType, Transaction,
     },
@@ -187,7 +187,7 @@ pub fn transaction_payment(
     };
 
     if let ServiceError::TransactionCancelled(message) = error {
-        let account_access_token = create_onetime_session(redis_conn, &account)?;
+        let account_access_token = create_onetime_session_ttl(redis_conn, &account, 30)?;
 
         return Ok(PaymentOutput {
             account: account.into(),

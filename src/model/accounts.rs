@@ -61,9 +61,9 @@ impl Account {
             bottle_stamps: 0,
         };
 
-        if !a.exist_conficting_account(database_conn)? {
+        if !a.exist_conflicting_account(database_conn)? {
             return Err(ServiceError::InternalServerError(
-                "Conficting account settings",
+                "Conflicting account settings",
                 "The given account settings conflict with the other existing accounts".to_owned(),
             ));
         }
@@ -79,9 +79,9 @@ impl Account {
     pub fn update(&self, database_conn: &DatabaseConnection) -> ServiceResult<()> {
         use crate::model::schema::account::dsl;
 
-        if !self.exist_conficting_account(database_conn)? {
+        if !self.exist_conflicting_account(database_conn)? {
             return Err(ServiceError::InternalServerError(
-                "Conficting account settings",
+                "Conflicting account settings",
                 "The given account settings conflict with the other existing accounts".to_owned(),
             ));
         }
@@ -143,7 +143,7 @@ impl Account {
         results.pop().ok_or(ServiceError::NotFound)
     }
 
-    fn exist_conficting_account(&self, database_conn: &DatabaseConnection) -> ServiceResult<bool> {
+    fn exist_conflicting_account(&self, database_conn: &DatabaseConnection) -> ServiceResult<bool> {
         use crate::model::schema::account::dsl;
 
         if !self.mail.is_empty() {
@@ -155,7 +155,7 @@ impl Account {
             }
         }
 
-        if self.username.is_empty() {
+        if !self.username.is_empty() {
             let results = dsl::account
                 .filter(dsl::id.ne(self.id).and(dsl::username.eq(&self.username)))
                 .load::<Account>(database_conn)?;
@@ -164,7 +164,7 @@ impl Account {
             }
         }
 
-        if self.account_number.is_empty() {
+        if !self.account_number.is_empty() {
             let results = dsl::account
                 .filter(
                     dsl::id

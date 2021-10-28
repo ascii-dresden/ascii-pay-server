@@ -85,6 +85,14 @@ pub fn create_onetime_session(
     redis_conn: &mut RedisConnection,
     account: &Account,
 ) -> ServiceResult<Session> {
+    create_onetime_session_ttl(redis_conn, account, 10)
+}
+
+pub fn create_onetime_session_ttl(
+    redis_conn: &mut RedisConnection,
+    account: &Account,
+    ttl: i32,
+) -> ServiceResult<Session> {
     let (session_key, session) = Session::new()?;
 
     redis::create_data::<OnetimeSession>(
@@ -93,7 +101,7 @@ pub fn create_onetime_session(
         &OnetimeSession {
             account_id: account.id,
         },
-        10,
+        ttl,
     )?;
 
     Ok(session)
