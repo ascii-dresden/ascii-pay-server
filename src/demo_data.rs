@@ -24,12 +24,14 @@ fn add_category(
     price: Money,
     pay_with_stamps: StampType,
     give_stamps: StampType,
+    ordering: i32,
 ) -> ServiceResult<Category> {
-    let mut catagory = Category::create(database_conn, name, price)?;
-    catagory.pay_with_stamps = pay_with_stamps;
-    catagory.give_stamps = give_stamps;
-    catagory.update(database_conn)?;
-    Ok(catagory)
+    let mut category = Category::create(database_conn, name, price)?;
+    category.pay_with_stamps = pay_with_stamps;
+    category.give_stamps = give_stamps;
+    category.ordering = Some(ordering);
+    category.update(database_conn)?;
+    Ok(category)
 }
 
 fn add_product(
@@ -158,13 +160,13 @@ pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
         Permission::Default,
     )?;
 
-    let other = add_category(database_conn, "Other", 0, StampType::None, StampType::None)?;
     let kaltgetraenke_0_5 = add_category(
         database_conn,
         "Kaltgetränke 0,5l",
         150,
         StampType::Bottle,
         StampType::None,
+        2,
     )?;
     let kaltgetraenke_0_33 = add_category(
         database_conn,
@@ -172,6 +174,7 @@ pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
         110,
         StampType::Bottle,
         StampType::None,
+        3,
     )?;
     let kaltgetraenke_0_33_bio = add_category(
         database_conn,
@@ -179,6 +182,7 @@ pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
         150,
         StampType::Bottle,
         StampType::None,
+        4,
     )?;
     let snacks = add_category(
         database_conn,
@@ -186,6 +190,7 @@ pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
         100,
         StampType::None,
         StampType::None,
+        5,
     )?;
     let heisgetraenke = add_category(
         database_conn,
@@ -193,17 +198,9 @@ pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
         100,
         StampType::Coffee,
         StampType::Coffee,
+        1,
     )?;
 
-    add_product(
-        database_conn,
-        "Flaschenpfand Stempel",
-        None,
-        &other,
-        Some(0),
-        None,
-        Some(StampType::Bottle),
-    )?;
     add_product(
         database_conn,
         "Kolle Mate",
@@ -305,7 +302,7 @@ pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
     )?;
     add_product(
         database_conn,
-        "Wostok Estragon-Ingwer",
+        "Wostok Estragon Ingwer",
         Some("4260189210058"),
         &kaltgetraenke_0_33,
         None,
@@ -323,7 +320,7 @@ pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
     )?;
     add_product(
         database_conn,
-        "Biozisch Matcha",
+        "BioZisch Matcha",
         Some("4015533025419"),
         &kaltgetraenke_0_33_bio,
         None,
@@ -332,7 +329,7 @@ pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
     )?;
     add_product(
         database_conn,
-        "Biozisch Ginger Life",
+        "BioZisch Ginger Life",
         Some("4015533019586"),
         &kaltgetraenke_0_33_bio,
         None,
@@ -431,15 +428,6 @@ pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
         None,
     )?;
 
-    add_product(
-        database_conn,
-        "Kaffee Stempel",
-        None,
-        &other,
-        Some(0),
-        None,
-        Some(StampType::Coffee),
-    )?;
     add_product(
         database_conn,
         "Kaffee (C)",
@@ -550,7 +538,7 @@ pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
     )?;
     add_product(
         database_conn,
-        "Großer Latte Macciato (Rubinious)",
+        "Latte Macciato - groß (Rubinious)",
         None,
         &heisgetraenke,
         Some(120),
