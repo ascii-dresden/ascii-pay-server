@@ -13,7 +13,18 @@ use super::categories::CategoryOutput;
 use super::SearchElement;
 
 #[derive(Debug, Deserialize, InputObject)]
-pub struct ProductInput {
+pub struct ProductCreateInput {
+    pub name: String,
+    pub price: Option<Money>,
+    pub pay_with_stamps: Option<StampType>,
+    pub give_stamps: Option<StampType>,
+    pub category_id: Uuid,
+    pub barcode: Option<String>,
+    pub ordering: Option<i32>,
+}
+
+#[derive(Debug, Deserialize, InputObject)]
+pub struct ProductUpdateInput {
     pub name: String,
     pub price: Option<Money>,
     pub pay_with_stamps: Option<StampType>,
@@ -131,7 +142,7 @@ pub fn get_product_image(
 pub fn create_product(
     database_conn: &DatabaseConnection,
     identity: &Identity,
-    input: ProductInput,
+    input: ProductCreateInput,
 ) -> ServiceResult<ProductOutput> {
     identity.require_account(Permission::Member)?;
 
@@ -153,7 +164,7 @@ pub fn update_product(
     database_conn: &DatabaseConnection,
     identity: &Identity,
     id: Uuid,
-    input: ProductInput,
+    input: ProductUpdateInput,
 ) -> ServiceResult<ProductOutput> {
     identity.require_account(Permission::Member)?;
 

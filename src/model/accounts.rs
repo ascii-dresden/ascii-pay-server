@@ -27,9 +27,9 @@ pub struct Account {
     pub credit: Money,
     pub minimum_credit: Money,
     pub name: String,
-    pub mail: Option<String>,
-    pub username: Option<String>,
-    pub account_number: Option<String>,
+    pub mail: String,
+    pub username: String,
+    pub account_number: String,
     pub permission: Permission,
     pub use_digital_stamps: bool,
     pub coffee_stamps: i32,
@@ -51,9 +51,9 @@ impl Account {
             credit: 0,
             minimum_credit: 0,
             name: name.to_owned(),
-            mail: None,
-            username: None,
-            account_number: None,
+            mail: String::new(),
+            username: String::new(),
+            account_number: String::new(),
             permission,
             receives_monthly_report: false,
             use_digital_stamps: true,
@@ -146,30 +146,30 @@ impl Account {
     fn exist_conficting_account(&self, database_conn: &DatabaseConnection) -> ServiceResult<bool> {
         use crate::model::schema::account::dsl;
 
-        if let Some(mail) = &self.mail {
+        if !self.mail.is_empty() {
             let results = dsl::account
-                .filter(dsl::id.ne(self.id).and(dsl::mail.eq(mail)))
+                .filter(dsl::id.ne(self.id).and(dsl::mail.eq(&self.mail)))
                 .load::<Account>(database_conn)?;
             if !results.is_empty() {
                 return Ok(false);
             }
         }
 
-        if let Some(username) = &self.username {
+        if self.username.is_empty() {
             let results = dsl::account
-                .filter(dsl::id.ne(self.id).and(dsl::username.eq(username)))
+                .filter(dsl::id.ne(self.id).and(dsl::username.eq(&self.username)))
                 .load::<Account>(database_conn)?;
             if !results.is_empty() {
                 return Ok(false);
             }
         }
 
-        if let Some(account_number) = &self.account_number {
+        if self.account_number.is_empty() {
             let results = dsl::account
                 .filter(
                     dsl::id
                         .ne(self.id)
-                        .and(dsl::account_number.eq(account_number)),
+                        .and(dsl::account_number.eq(&self.account_number)),
                 )
                 .load::<Account>(database_conn)?;
             if !results.is_empty() {

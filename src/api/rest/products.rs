@@ -1,5 +1,5 @@
 use crate::identity_service::Identity;
-use crate::repo::{self, ProductInput};
+use crate::repo::{self, ProductCreateInput, ProductUpdateInput};
 use crate::utils::{DatabasePool, ServiceResult};
 use actix_files::NamedFile;
 use actix_web::{web, HttpRequest, HttpResponse};
@@ -22,7 +22,7 @@ pub async fn get_products(
 pub async fn put_products(
     identity: Identity,
     database_pool: web::Data<DatabasePool>,
-    input: web::Json<ProductInput>,
+    input: web::Json<ProductCreateInput>,
 ) -> ServiceResult<HttpResponse> {
     let database_conn = &database_pool.get()?;
     let result = repo::create_product(database_conn, &identity, input.into_inner())?;
@@ -58,7 +58,7 @@ pub async fn post_product(
     database_pool: web::Data<DatabasePool>,
     identity: Identity,
     id: web::Path<Uuid>,
-    input: web::Json<ProductInput>,
+    input: web::Json<ProductUpdateInput>,
 ) -> ServiceResult<HttpResponse> {
     let database_conn = &database_pool.get()?;
     let result = repo::update_product(

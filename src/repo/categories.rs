@@ -7,11 +7,20 @@ use uuid::Uuid;
 use super::SearchElement;
 
 #[derive(Debug, Deserialize, InputObject)]
-pub struct CategoryInput {
+pub struct CategoryCreateInput {
     pub name: String,
     pub price: Money,
-    pub pay_with_stamps: StampType,
-    pub give_stamps: StampType,
+    pub pay_with_stamps: Option<StampType>,
+    pub give_stamps: Option<StampType>,
+    pub ordering: Option<i32>,
+}
+
+#[derive(Debug, Deserialize, InputObject)]
+pub struct CategoryUpdateInput {
+    pub name: Option<String>,
+    pub price: Option<Money>,
+    pub pay_with_stamps: Option<StampType>,
+    pub give_stamps: Option<StampType>,
     pub ordering: Option<i32>,
 }
 
@@ -92,13 +101,17 @@ pub fn get_category(
 pub fn create_category(
     database_conn: &DatabaseConnection,
     identity: &Identity,
-    input: CategoryInput,
+    input: CategoryCreateInput,
 ) -> ServiceResult<CategoryOutput> {
     identity.require_account(Permission::Admin)?;
 
     let mut entity = Category::create(database_conn, &input.name, input.price)?;
-    entity.pay_with_stamps = input.pay_with_stamps;
-    entity.give_stamps = input.give_stamps;
+    if let Some(value) = input.pay_with_stamps {
+        entity.pay_with_stamps = value;
+    }
+    if let Some(value) = input.give_stamps {
+        entity.give_stamps = value;
+    }
     entity.ordering = input.ordering;
     entity.update(database_conn)?;
 
@@ -109,15 +122,23 @@ pub fn update_category(
     database_conn: &DatabaseConnection,
     identity: &Identity,
     id: Uuid,
-    input: CategoryInput,
+    input: CategoryUpdateInput,
 ) -> ServiceResult<CategoryOutput> {
     identity.require_account(Permission::Admin)?;
 
     let mut entity = Category::get(database_conn, id)?;
-    entity.name = input.name.clone();
-    entity.price = input.price;
-    entity.pay_with_stamps = input.pay_with_stamps;
-    entity.give_stamps = input.give_stamps;
+    if let Some(value) = input.name {
+        entity.name = value;
+    }
+    if let Some(value) = input.price {
+        entity.price = value;
+    }
+    if let Some(value) = input.pay_with_stamps {
+        entity.pay_with_stamps = value;
+    }
+    if let Some(value) = input.give_stamps {
+        entity.give_stamps = value;
+    }
     entity.ordering = input.ordering;
     entity.update(database_conn)?;
 

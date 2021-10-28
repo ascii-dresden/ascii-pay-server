@@ -146,7 +146,7 @@ fn create_admin_user(database_pool: &DatabasePool) -> ServiceResult<()> {
     let password = read_value("Password: ", true);
 
     let mut account = Account::create(database_conn, &fullname, Permission::Admin)?;
-    account.username = Some(username.clone());
+    account.username = username.clone();
     account.update(database_conn)?;
     authentication_password::register(database_conn, &account, &password)?;
 

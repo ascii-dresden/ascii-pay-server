@@ -253,14 +253,14 @@ pub fn create_pass(
     field.label("account_name");
     store_card.add_secondary_field(field);
 
-    if let Some(account_number) = &account.account_number {
-        let mut field = template::Field::new_string("account_number", account_number);
+    if !account.account_number.is_empty() {
+        let mut field = template::Field::new_string("account_number", &account.account_number);
         field.label("account_number");
         store_card.add_secondary_field(field);
 
         let mut field = template::Field::new_string(
             "account_login",
-            &format!("https://pay.ascii.coffee?code={}", &account_number),
+            &format!("https://pay.ascii.coffee?code={}", &account.account_number),
         );
         field.label("account_login");
         store_card.add_back_field(field);

@@ -12,7 +12,7 @@ fn add_account(
     permission: Permission,
 ) -> ServiceResult<Account> {
     let mut account = Account::create(database_conn, name, permission)?;
-    account.username = Some(username.to_owned());
+    account.username = username.to_owned();
     account.update(database_conn)?;
     authentication_password::register(database_conn, &account, "password")?;
     Ok(account)
@@ -95,7 +95,7 @@ fn generate_transactions(
                     price: -pr,
                     pay_with_stamps: StampType::None,
                     could_be_paid_with_stamps: StampType::None,
-                    give_stamps: give_stamps,
+                    give_stamps,
                     product_id: Some(p.id),
                 });
             }
@@ -131,7 +131,7 @@ fn generate_transactions(
                     // TODO
                 }
                 Err(e) => {
-                    Err(e)?;
+                    return Err(e);
                 }
             }
         }

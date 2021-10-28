@@ -1,7 +1,7 @@
 use std::ops::DerefMut;
 
 use crate::identity_service::Identity;
-use crate::repo::{self, AccountInput};
+use crate::repo::{self, AccountCreateInput, AccountUpdateInput};
 use crate::utils::{DatabasePool, RedisPool, ServiceResult};
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
@@ -23,7 +23,7 @@ pub async fn get_accounts(
 pub async fn put_accounts(
     database_pool: web::Data<DatabasePool>,
     identity: Identity,
-    input: web::Json<AccountInput>,
+    input: web::Json<AccountCreateInput>,
 ) -> ServiceResult<HttpResponse> {
     let conn = &database_pool.get()?;
     let result = repo::create_account(conn, &identity, input.into_inner())?;
@@ -46,7 +46,7 @@ pub async fn post_account(
     database_pool: web::Data<DatabasePool>,
     identity: Identity,
     id: web::Path<Uuid>,
-    input: web::Json<AccountInput>,
+    input: web::Json<AccountUpdateInput>,
 ) -> ServiceResult<HttpResponse> {
     let conn = &database_pool.get()?;
     let result = repo::update_account(conn, &identity, id.into_inner(), input.into_inner())?;

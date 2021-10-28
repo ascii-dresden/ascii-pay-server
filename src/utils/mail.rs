@@ -7,9 +7,7 @@ use lettre_email::EmailBuilder;
 use log::trace;
 
 fn send_standard_mail(account: &Account, subj: &str, message: String) -> ServiceResult<()> {
-    let mail_address = if let Some(m) = account.mail.as_ref() {
-        m
-    } else {
+    if account.mail.is_empty() {
         return Err(ServiceError::InternalServerError(
             "No Mail address provided",
             String::from("A mail sending context was called, but no mail address was provided."),
@@ -18,7 +16,7 @@ fn send_standard_mail(account: &Account, subj: &str, message: String) -> Service
 
     let email = EmailBuilder::new()
         // Addresses can be specified by the tuple (email, alias)
-        .to((mail_address, &account.name))
+        .to((&account.mail, &account.name))
         .from((env::MAIL_SENDER.as_str(), env::MAIL_SENDER_NAME.as_str()))
         .subject(subj)
         .text(message)

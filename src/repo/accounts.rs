@@ -10,15 +10,27 @@ use uuid::Uuid;
 use super::SearchElement;
 
 #[derive(Debug, Deserialize, InputObject)]
-pub struct AccountInput {
-    pub minimum_credit: Money,
+pub struct AccountCreateInput {
     pub name: String,
+    pub permission: Permission,
+    pub username: Option<String>,
+    pub mail: Option<String>,
+    pub account_number: Option<String>,
+    pub minimum_credit: Option<Money>,
+    pub use_digital_stamps: Option<bool>,
+    pub receives_monthly_report: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, InputObject)]
+pub struct AccountUpdateInput {
+    pub minimum_credit: Option<Money>,
+    pub name: Option<String>,
     pub mail: Option<String>,
     pub username: Option<String>,
     pub account_number: Option<String>,
-    pub permission: Permission,
-    pub use_digital_stamps: bool,
-    pub receives_monthly_report: bool,
+    pub permission: Option<Permission>,
+    pub use_digital_stamps: Option<bool>,
+    pub receives_monthly_report: Option<bool>,
 }
 
 #[derive(Debug, Serialize, SimpleObject)]
@@ -27,9 +39,9 @@ pub struct AccountOutput {
     pub credit: Money,
     pub minimum_credit: Money,
     pub name: String,
-    pub mail: Option<String>,
-    pub username: Option<String>,
-    pub account_number: Option<String>,
+    pub mail: String,
+    pub username: String,
+    pub account_number: String,
     pub permission: Permission,
     pub use_digital_stamps: bool,
     pub coffee_stamps: i32,
@@ -64,12 +76,9 @@ fn search_account(entity: Account, search: &str) -> Option<SearchElement<Account
             .encode_upper(&mut Uuid::encode_buffer())
             .to_owned(),
         entity.name.clone(),
-        entity.mail.clone().unwrap_or_else(|| "".to_owned()),
-        entity.username.clone().unwrap_or_else(|| "".to_owned()),
-        entity
-            .account_number
-            .clone()
-            .unwrap_or_else(|| "".to_owned()),
+        entity.mail.clone(),
+        entity.username.clone(),
+        entity.account_number.clone(),
         match entity.permission {
             Permission::Default => "",
             Permission::Member => "member",
@@ -146,18 +155,34 @@ pub fn get_account_by_access_token(
 pub fn create_account(
     database_conn: &DatabaseConnection,
     identity: &Identity,
-    input: AccountInput,
+    input: AccountCreateInput,
 ) -> ServiceResult<AccountOutput> {
-    identity.require_account_or_cert(Permission::Member)?;
+    if let Permission::Admin = input.permission {
+        identity.require_account(Permission::Admin)?;
+    } else {
+        identity.require_account_or_cert(Permission::Member)?;
+    }
 
     let mut entity = Account::create(database_conn, &input.name, input.permission)?;
 
-    entity.minimum_credit = input.minimum_credit;
-    entity.mail = input.mail.clone();
-    entity.username = input.username.clone();
-    entity.account_number = input.account_number.clone();
-    entity.use_digital_stamps = input.use_digital_stamps;
-    entity.receives_monthly_report = input.receives_monthly_report;
+    if let Some(value) = input.minimum_credit {
+        entity.minimum_credit = value;
+    }
+    if let Some(value) = input.mail {
+        entity.mail = value;
+    }
+    if let Some(value) = input.username {
+        entity.username = value;
+    }
+    if let Some(value) = input.account_number {
+        entity.account_number = value;
+    }
+    if let Some(value) = input.use_digital_stamps {
+        entity.use_digital_stamps = value;
+    }
+    if let Some(value) = input.receives_monthly_report {
+        entity.receives_monthly_report = value;
+    }
 
     entity.update(database_conn)?;
 
@@ -168,20 +193,44 @@ pub fn update_account(
     database_conn: &DatabaseConnection,
     identity: &Identity,
     id: Uuid,
-    input: AccountInput,
+    input: AccountUpdateInput,
 ) -> ServiceResult<AccountOutput> {
     identity.require_account_or_cert(Permission::Member)?;
 
     let mut entity = Account::get(database_conn, id)?;
 
-    entity.minimum_credit = input.minimum_credit;
-    entity.name = input.name.clone();
-    entity.mail = input.mail.clone();
-    entity.username = input.username.clone();
-    entity.account_number = input.account_number.clone();
-    entity.permission = input.permission;
-    entity.use_digital_stamps = input.use_digital_stamps;
-    entity.receives_monthly_report = input.receives_monthly_report;
+    if let Permission::Admin = entity.permission {
+        identity.require_account(Permission::Admin)?;
+    }
+
+    if let Some(value) = input.minimum_credit {
+        entity.minimum_credit = value;
+    }
+    if let Some(value) = input.name {
+        entity.name = value;
+    }
+    if let Some(value) = input.mail {
+        entity.mail = value;
+    }
+    if let Some(value) = input.username {
+        entity.username = value;
+    }
+    if let Some(value) = input.account_number {
+        entity.account_number = value;
+    }
+    if let Some(value) = input.permission {
+        if let Permission::Admin = value {
+            identity.require_account(Permission::Admin)?;
+        }
+
+        entity.permission = value;
+    }
+    if let Some(value) = input.use_digital_stamps {
+        entity.use_digital_stamps = value;
+    }
+    if let Some(value) = input.receives_monthly_report {
+        entity.receives_monthly_report = value;
+    }
 
     entity.update(database_conn)?;
 

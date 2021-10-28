@@ -57,7 +57,7 @@ pub fn create_invitation_link(
         .execute(database_conn)?;
 
     // send invite link if account has an associated mail address
-    if account.mail.is_some() {
+    if !account.mail.is_empty() {
         mail::send_invitation_link(account, &a)?;
     }
 

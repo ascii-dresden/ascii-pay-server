@@ -1,5 +1,5 @@
 use crate::identity_service::Identity;
-use crate::repo::{self, CategoryInput};
+use crate::repo::{self, CategoryCreateInput, CategoryUpdateInput};
 use crate::utils::{DatabasePool, ServiceResult};
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
@@ -21,7 +21,7 @@ pub async fn get_categories(
 pub async fn put_categories(
     database_pool: web::Data<DatabasePool>,
     identity: Identity,
-    input: web::Json<CategoryInput>,
+    input: web::Json<CategoryCreateInput>,
 ) -> ServiceResult<HttpResponse> {
     let database_conn = &database_pool.get()?;
     let result = repo::create_category(database_conn, &identity, input.into_inner())?;
@@ -44,7 +44,7 @@ pub async fn post_category(
     database_pool: web::Data<DatabasePool>,
     identity: Identity,
     id: web::Path<Uuid>,
-    input: web::Json<CategoryInput>,
+    input: web::Json<CategoryUpdateInput>,
 ) -> ServiceResult<HttpResponse> {
     let database_conn = &database_pool.get()?;
     let result = repo::update_category(

@@ -6,8 +6,9 @@ use uuid::Uuid;
 use crate::identity_service::Identity;
 use crate::model::session::Session;
 use crate::repo::{
-    self, AccountAccessTokenOutput, AccountInput, AccountOutput, CategoryInput, CategoryOutput,
-    LoginInput, LoginOutput, PaymentInput, PaymentOutput, ProductInput, ProductOutput,
+    self, AccountAccessTokenOutput, AccountCreateInput, AccountOutput, AccountUpdateInput,
+    CategoryCreateInput, CategoryOutput, CategoryUpdateInput, LoginInput, LoginOutput,
+    PaymentInput, PaymentOutput, ProductCreateInput, ProductOutput, ProductUpdateInput,
 };
 use crate::utils::ServiceResult;
 
@@ -49,7 +50,7 @@ impl Mutation {
     async fn create_account(
         &self,
         ctx: &Context<'_>,
-        input: AccountInput,
+        input: AccountCreateInput,
     ) -> ServiceResult<AccountOutput> {
         let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
@@ -60,7 +61,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         id: Uuid,
-        input: AccountInput,
+        input: AccountUpdateInput,
     ) -> ServiceResult<AccountOutput> {
         let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
@@ -95,7 +96,7 @@ impl Mutation {
     async fn create_category(
         &self,
         ctx: &Context<'_>,
-        input: CategoryInput,
+        input: CategoryCreateInput,
     ) -> ServiceResult<CategoryOutput> {
         let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
@@ -106,7 +107,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         id: Uuid,
-        input: CategoryInput,
+        input: CategoryUpdateInput,
     ) -> ServiceResult<CategoryOutput> {
         let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
@@ -123,7 +124,7 @@ impl Mutation {
     async fn create_product(
         &self,
         ctx: &Context<'_>,
-        input: ProductInput,
+        input: ProductCreateInput,
     ) -> ServiceResult<ProductOutput> {
         let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
@@ -134,7 +135,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         id: Uuid,
-        input: ProductInput,
+        input: ProductUpdateInput,
     ) -> ServiceResult<ProductOutput> {
         let database_conn = &get_database_conn_from_ctx(ctx)?;
         let identity = ctx.data::<Identity>()?;
