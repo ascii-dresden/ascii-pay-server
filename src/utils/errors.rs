@@ -196,6 +196,12 @@ impl From<http::Error> for ServiceError {
     }
 }
 
+impl From<argon2rs::verifier::DecodeError> for ServiceError {
+    fn from(error: argon2rs::verifier::DecodeError) -> Self {
+        ServiceError::InternalServerError("Hash error", format!("{:?}", error))
+    }
+}
+
 impl From<ServiceError> for grpc::Error {
     fn from(error: ServiceError) -> Self {
         grpc::Error::Panic(format!("{:?}", error))

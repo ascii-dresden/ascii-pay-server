@@ -35,7 +35,7 @@ lazy_static::lazy_static! {
     /// Salt for password hashing.
     ///
     /// Field name: `PASSWORD_SALT`
-    pub static ref PASSWORD_SALT: String = std::env::var("PASSWORD_SALT").unwrap_or_else(|_| "0123".repeat(8));
+    pub static ref PASSWORD_SALT: String = std::env::var("PASSWORD_SALT").unwrap_or_else(|_| "0123012301230123".repeat(8));
 
     /// Encryption key for authentication cookies.
     ///

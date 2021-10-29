@@ -1,4 +1,4 @@
-use argonautica::{Hasher, Verifier};
+use argon2rs::verifier::Encoded;
 use chrono::{Duration, Local, NaiveDateTime};
 use diesel::prelude::*;
 use std::fmt;
@@ -205,25 +205,18 @@ fn hash_password(password: &str) -> ServiceResult<String> {
             "Password should not be empty".to_owned(),
         ));
     }
-    Hasher::default()
-        .with_password(password)
-        .with_secret_key(env::PASSWORD_SALT.as_str())
-        .hash()
-        .map_err(|err| {
-            dbg!(&err);
-            ServiceError::InternalServerError("Hash password", format!("{}", err))
-        })
+
+    let bytes =
+        Encoded::default2i(password.as_bytes(), env::PASSWORD_SALT.as_bytes(), b"", b"").to_u8();
+    Ok(String::from_utf8(bytes)?)
 }
 
 /// Verify a password to its hash version
-fn verify(hash: &str, password: &str) -> ServiceResult<bool> {
+pub fn verify(hash: &str, password: &str) -> ServiceResult<bool> {
     if password.is_empty() {
         return Ok(false);
     }
-    Verifier::default()
-        .with_hash(hash)
-        .with_password(password)
-        .with_secret_key(env::PASSWORD_SALT.as_str())
-        .verify()
-        .map_err(|err| ServiceError::InternalServerError("Hash password", format!("{}", err)))
+
+    let enc = Encoded::from_u8(hash.as_bytes())?;
+    Ok(enc.verify(password.as_bytes()))
 }

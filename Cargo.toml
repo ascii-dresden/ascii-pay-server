@@ -21,7 +21,7 @@ uuid = {version = "0.8", features = ["serde", "v4"]}
 
 # security
 openssl = "0.10"
-argonautica = "0.2"
+argon2rs = "0.2"
 rand_core = "0.6"
 rand = "0.8"
 aes = "0.7"
