@@ -7,9 +7,6 @@ pub use accounts::*;
 pub mod auth;
 pub use auth::*;
 
-pub mod categories;
-pub use categories::*;
-
 pub mod products;
 pub use products::*;
 
@@ -58,36 +55,6 @@ pub struct SearchElementAccount {
 }
 impl From<SearchElement<AccountOutput>> for SearchElementAccount {
     fn from(s: SearchElement<AccountOutput>) -> Self {
-        Self {
-            element: s.element,
-            highlight: s.highlight,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, SimpleObject)]
-pub struct SearchElementCategory {
-    #[serde(flatten)]
-    pub element: CategoryOutput,
-    pub highlight: HashMap<String, String>,
-}
-impl From<SearchElement<CategoryOutput>> for SearchElementCategory {
-    fn from(s: SearchElement<CategoryOutput>) -> Self {
-        Self {
-            element: s.element,
-            highlight: s.highlight,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, SimpleObject)]
-pub struct SearchElementProduct {
-    #[serde(flatten)]
-    pub element: ProductOutput,
-    pub highlight: HashMap<String, String>,
-}
-impl From<SearchElement<ProductOutput>> for SearchElementProduct {
-    fn from(s: SearchElement<ProductOutput>) -> Self {
         Self {
             element: s.element,
             highlight: s.highlight,

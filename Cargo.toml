@@ -3,7 +3,7 @@ name = "ascii-pay-server"
 version = "0.1.0"
 authors = ["Lars Westermann <lars-westermann@live.de>", "Felix Wittwer <dev@felixwittwer.de>"]
 description = "[WIP] A prepaid system."
-edition = "2018"
+edition = "2021"
 build = "build.rs"
 
 [dependencies]

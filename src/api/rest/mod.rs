@@ -1,6 +1,5 @@
 pub mod accounts;
 pub mod auth;
-pub mod categories;
 pub mod products;
 pub mod transactions;
 
@@ -53,31 +52,13 @@ pub fn init(config: &mut web::ServiceConfig) {
                 .route(web::post().to(transactions::post_transaction_payment)),
         )
         // Setup product mangement related routes
-        .service(
-            web::resource("/products")
-                .route(web::get().to(products::get_products))
-                .route(web::put().to(products::put_products)),
-        )
+        .service(web::resource("/products/update").route(web::get().to(products::update_products)))
+        .service(web::resource("/products").route(web::get().to(products::get_products)))
         .service(
             web::resource("/product/{product_id}/image")
                 .route(web::get().to(products::get_product_image)),
         )
         .service(
-            web::resource("/product/{product_id}")
-                .route(web::get().to(products::get_product))
-                .route(web::post().to(products::post_product))
-                .route(web::delete().to(products::delete_product)),
-        )
-        // Setup categories mangement related routes
-        .service(
-            web::resource("/categories")
-                .route(web::get().to(categories::get_categories))
-                .route(web::put().to(categories::put_categories)),
-        )
-        .service(
-            web::resource("/category/{category_id}")
-                .route(web::get().to(categories::get_category))
-                .route(web::post().to(categories::post_category))
-                .route(web::delete().to(categories::delete_category)),
+            web::resource("/product/{product_id}").route(web::get().to(products::get_product)),
         );
 }

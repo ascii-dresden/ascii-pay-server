@@ -1,14 +1,13 @@
 use std::ops::DerefMut;
 
-use async_graphql::{Context, Upload};
+use async_graphql::Context;
 use uuid::Uuid;
 
 use crate::identity_service::Identity;
 use crate::model::session::Session;
 use crate::repo::{
     self, AccountAccessTokenOutput, AccountCreateInput, AccountOutput, AccountUpdateInput,
-    CategoryCreateInput, CategoryOutput, CategoryUpdateInput, LoginInput, LoginOutput,
-    PaymentInput, PaymentOutput, ProductCreateInput, ProductOutput, ProductUpdateInput,
+    LoginInput, LoginOutput, PaymentInput, PaymentOutput,
 };
 use crate::utils::ServiceResult;
 
@@ -93,62 +92,6 @@ impl Mutation {
         repo::authenticate_account(conn, redis_conn.deref_mut(), identity, id)
     }
 
-    async fn create_category(
-        &self,
-        ctx: &Context<'_>,
-        input: CategoryCreateInput,
-    ) -> ServiceResult<CategoryOutput> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
-        let identity = ctx.data::<Identity>()?;
-        repo::create_category(database_conn, identity, input)
-    }
-
-    async fn update_category(
-        &self,
-        ctx: &Context<'_>,
-        id: Uuid,
-        input: CategoryUpdateInput,
-    ) -> ServiceResult<CategoryOutput> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
-        let identity = ctx.data::<Identity>()?;
-        repo::update_category(database_conn, identity, id, input)
-    }
-
-    async fn delete_category(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<String> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
-        let identity = ctx.data::<Identity>()?;
-        repo::delete_category(database_conn, identity, id)?;
-        Ok("ok".to_string())
-    }
-
-    async fn create_product(
-        &self,
-        ctx: &Context<'_>,
-        input: ProductCreateInput,
-    ) -> ServiceResult<ProductOutput> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
-        let identity = ctx.data::<Identity>()?;
-        repo::create_product(database_conn, identity, input)
-    }
-
-    async fn update_product(
-        &self,
-        ctx: &Context<'_>,
-        id: Uuid,
-        input: ProductUpdateInput,
-    ) -> ServiceResult<ProductOutput> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
-        let identity = ctx.data::<Identity>()?;
-        repo::update_product(database_conn, identity, id, input)
-    }
-
-    async fn delete_product(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<String> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
-        let identity = ctx.data::<Identity>()?;
-        repo::delete_product(database_conn, identity, id)?;
-        Ok("ok".to_string())
-    }
-
     async fn transaction(
         &self,
         ctx: &Context<'_>,
@@ -160,32 +103,9 @@ impl Mutation {
         repo::transaction_payment(database_conn, redis_conn.deref_mut(), identity, input)
     }
 
-    async fn remove_product_image(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<String> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
+    async fn update_products(&self, ctx: &Context<'_>) -> ServiceResult<String> {
         let identity = ctx.data::<Identity>()?;
-
-        repo::remove_product_image(database_conn, identity, id)?;
-        Ok("ok".to_string())
-    }
-
-    async fn set_product_image(
-        &self,
-        ctx: &Context<'_>,
-        id: Uuid,
-        image: Upload,
-    ) -> ServiceResult<String> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
-        let identity = ctx.data::<Identity>()?;
-
-        let mut upload_data = image.value(ctx).unwrap();
-        repo::set_product_image(
-            database_conn,
-            identity,
-            id,
-            &upload_data.filename,
-            upload_data.content_type.as_deref(),
-            &mut upload_data.content,
-        )?;
+        repo::update_products(identity)?;
         Ok("ok".to_string())
     }
 }

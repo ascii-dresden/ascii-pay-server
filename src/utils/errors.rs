@@ -202,6 +202,18 @@ impl From<argon2rs::verifier::DecodeError> for ServiceError {
     }
 }
 
+impl<T> From<std::sync::PoisonError<std::sync::RwLockWriteGuard<'_, T>>> for ServiceError {
+    fn from(error: std::sync::PoisonError<std::sync::RwLockWriteGuard<'_, T>>) -> Self {
+        ServiceError::InternalServerError("Lock poison error", format!("{:?}", error))
+    }
+}
+
+impl<T> From<std::sync::PoisonError<std::sync::RwLockReadGuard<'_, T>>> for ServiceError {
+    fn from(error: std::sync::PoisonError<std::sync::RwLockReadGuard<'_, T>>) -> Self {
+        ServiceError::InternalServerError("Lock poison error", format!("{:?}", error))
+    }
+}
+
 impl From<ServiceError> for grpc::Error {
     fn from(error: ServiceError) -> Self {
         grpc::Error::Panic(format!("{:?}", error))

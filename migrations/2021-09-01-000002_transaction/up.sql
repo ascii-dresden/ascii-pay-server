@@ -19,7 +19,7 @@ CREATE TABLE "transaction_item" (
   "price" INT NOT NULL,
   "pay_with_stamps" SMALLINT NOT NULL,
   "give_stamps" SMALLINT NOT NULL,
-  "product_id" UUID,
+  "product_id" VARCHAR NOT NULL,
   PRIMARY KEY ("transaction_id", "index"),
    CONSTRAINT fk_transaction
       FOREIGN KEY(transaction_id)

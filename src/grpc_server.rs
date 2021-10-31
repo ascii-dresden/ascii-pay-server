@@ -9,6 +9,7 @@ use crate::grpc::authentication_grpc::AsciiPayAuthentication;
 use crate::grpc::authentication_grpc::AsciiPayAuthenticationServer;
 use crate::identity_service::Identity;
 use crate::repo::authentication_token as t;
+use crate::utils::env;
 use crate::utils::log_result;
 use crate::utils::RedisPool;
 use crate::utils::{DatabasePool, ServiceError};
@@ -241,10 +242,8 @@ impl AsciiPayAuthentication for AuthenticationImpl {
 
 pub fn start_tcp_server(database_pool: DatabasePool, redis_pool: RedisPool) {
     thread::spawn(move || {
-        let port = 50051;
-
         let mut server_builder = grpc::ServerBuilder::new_plain();
-        server_builder.http.set_port(port);
+        server_builder.http.set_port(*env::GRPC_PORT);
         server_builder.add_service(AsciiPayAuthenticationServer::new_service_def(
             AuthenticationImpl::new(database_pool, redis_pool),
         ));

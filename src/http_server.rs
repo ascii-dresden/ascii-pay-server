@@ -11,7 +11,7 @@ use crate::utils::{env, DatabasePool, RedisPool, ServiceResult};
 async fn start_server(database_pool: DatabasePool, redis_pool: RedisPool) -> ServiceResult<()> {
     // Read config params from env
 
-    let address = format!("{}:{}", env::HOST.as_str(), *env::PORT);
+    let address = format!("{}:{}", env::HOST.as_str(), *env::HTTP_PORT);
     let schema = graphql::create_schema_with_context(database_pool.clone(), redis_pool.clone());
 
     info!("Start http server at {}", address);

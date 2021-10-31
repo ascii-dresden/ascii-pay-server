@@ -7,10 +7,18 @@ lazy_static::lazy_static! {
     /// The application port.
     ///
     /// Field name: `PORT`
-    pub static ref PORT: u16 = std::env::var("PORT")
+    pub static ref HTTP_PORT: u16 = std::env::var("HTTP_PORT")
         .unwrap_or_else(|_| "".to_string())
         .parse::<u16>()
         .unwrap_or(8080);
+
+    /// The application port.
+    ///
+    /// Field name: `PORT`
+    pub static ref GRPC_PORT: u16 = std::env::var("GRPC_PORT")
+        .unwrap_or_else(|_| "".to_string())
+        .parse::<u16>()
+        .unwrap_or(8081);
 
     /// Domain string for cookies. Cookies will be valid for this domain name.
     ///
@@ -24,13 +32,18 @@ lazy_static::lazy_static! {
 
     /// Database connection string.
     ///
-    /// Field name: `DATABASE_URL`
-    pub static ref DATABASE_URL: String = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    /// Field name: `DATABASE_URI`
+    pub static ref DATABASE_URI: String = std::env::var("DATABASE_URI").expect("DATABASE_URI must be set");
 
     /// Redis connection string.
     ///
-    /// Field name: `REDIS_URL`
-    pub static ref REDIS_URL: String = std::env::var("REDIS_URL").expect("REDIS_URL must be set");
+    /// Field name: `REDIS_URI`
+    pub static ref REDIS_URI: String = std::env::var("REDIS_URI").expect("REDIS_URI must be set");
+
+    /// Product storage path.
+    ///
+    /// Field name: `PRODUCT_STORAGE`
+    pub static ref PRODUCT_STORAGE: String = std::env::var("PRODUCT_STORAGE").expect("PRODUCT_STORAGE must be set");
 
     /// Salt for password hashing.
     ///
@@ -46,11 +59,6 @@ lazy_static::lazy_static! {
     ///
     /// Field name: `API_ACCESS_KEY`
     pub static ref API_ACCESS_KEY: String = std::env::var("API_ACCESS_KEY").unwrap_or_else(|_| "true".to_owned());
-
-    /// Server path to store uploaded images.
-    ///
-    /// Field name: `IMAGE_PATH`
-    pub static ref IMAGE_PATH: String = std::env::var("IMAGE_PATH").unwrap_or_else(|_| "img/".to_owned());
 
     /// Header secret to access cron urls.
     ///

@@ -1,182 +1,139 @@
-use diesel::prelude::*;
-use log::info;
-use std::fs::{self, File};
-use std::path::Path;
-use uuid::Uuid;
+use std::{collections::HashMap, fs::File, hash::Hash, path::Path, sync::RwLock};
 
-use super::{Category, StampType};
-use crate::model::schema::product;
-use crate::utils::{env, generate_uuid, DatabaseConnection, Money, ServiceError, ServiceResult};
+use log::error;
+
+use super::StampType;
+use crate::utils::{env, Money, ServiceError, ServiceResult};
+
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone, SimpleObject)]
+pub struct Category {
+    pub name: String,
+}
+
+impl Default for Category {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+        }
+    }
+}
 
 /// Represent a product
-#[derive(
-    Debug,
-    Queryable,
-    Insertable,
-    Identifiable,
-    AsChangeset,
-    PartialEq,
-    Eq,
-    Hash,
-    Serialize,
-    Deserialize,
-    Clone,
-)]
-#[changeset_options(treat_none_as_null = "true")]
-#[table_name = "product"]
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone, SimpleObject)]
 pub struct Product {
-    pub id: Uuid,
+    pub id: String,
     pub name: String,
-    pub price: Option<Money>,
-    pub pay_with_stamps: Option<StampType>,
-    pub give_stamps: Option<StampType>,
-    pub category_id: Uuid,
+    pub price: Money,
+    #[serde(default)]
+    pub pay_with_stamps: StampType,
+    #[serde(default)]
+    pub give_stamps: StampType,
+    pub nickname: Option<String>,
     pub image: Option<String>,
     pub barcode: Option<String>,
-    pub ordering: Option<i32>,
+    #[serde(default)]
+    pub flags: Vec<String>,
+    #[serde(default)]
+    pub category: Category,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone)]
+pub struct CategoryFile {
+    #[serde(flatten)]
+    pub category: Category,
+    pub products: Vec<Product>,
+}
+
+lazy_static::lazy_static! {
+    static ref PRODUCT_DATASET: RwLock<HashMap<String, Product>> = RwLock::new(HashMap::new());
 }
 
 impl Product {
-    /// Create a new product with the given name and category
-    pub fn create(
-        database_conn: &DatabaseConnection,
-        name: &str,
-        category: &Category,
-    ) -> ServiceResult<Product> {
-        use crate::model::schema::product::dsl;
+    pub fn load_dataset() -> ServiceResult<()> {
+        let mut map = HashMap::new();
+        if Path::new(env::PRODUCT_STORAGE.as_str()).exists() {
+            let mut file = File::open(env::PRODUCT_STORAGE.as_str())?;
+            let dataset: Vec<CategoryFile> = serde_json::from_reader(&mut file)?;
 
-        let p = Product {
-            id: generate_uuid(),
-            name: name.to_owned(),
-            category_id: category.id,
-            price: None,
-            pay_with_stamps: None,
-            give_stamps: None,
-            image: None,
-            barcode: None,
-            ordering: None,
-        };
+            for category in dataset {
+                for mut product in category.products {
+                    product.category = category.category.clone();
 
-        diesel::insert_into(dsl::product)
-            .values(&p)
-            .execute(database_conn)?;
-
-        Ok(p)
-    }
-
-    /// Save the current product data to the database
-    ///
-    /// This ignores all changes to the `prices` vec
-    pub fn update(&self, database_conn: &DatabaseConnection) -> ServiceResult<()> {
-        use crate::model::schema::product::dsl;
-
-        diesel::update(dsl::product.find(&self.id))
-            .set(self)
-            .execute(database_conn)?;
+                    map.insert(product.id.clone(), product);
+                }
+            }
+        } else {
+            error!("Product storage does not exists!");
+        }
+        let mut w = PRODUCT_DATASET.write()?;
+        *w = map;
 
         Ok(())
     }
 
-    fn get_category(&self, database_conn: &DatabaseConnection) -> ServiceResult<Category> {
-        Category::get(database_conn, self.category_id)
+    pub fn clone_for_output(&self) -> Self {
+        let mut p = self.clone();
+
+        if p.image.is_some() {
+            p.image = Some(format!("/api/v1/product/{}/image", p.id));
+        }
+
+        p
     }
 
-    pub fn get_image(&self) -> ServiceResult<String> {
-        if let Some(name) = self.image.clone() {
-            let p = format!("{}/{}", env::IMAGE_PATH.as_str(), name);
+    pub fn get_image(id: &str) -> ServiceResult<String> {
+        let filename = if let Some(p) = PRODUCT_DATASET.read()?.get(id) {
+            p.image.clone()
+        } else {
+            return Err(ServiceError::NotFound);
+        };
 
-            if Path::new(&p).exists() {
-                return Ok(p);
+        if let Some(filename) = filename.as_deref() {
+            let file = Path::new(env::PRODUCT_STORAGE.as_str())
+                .parent()
+                .unwrap_or_else(|| Path::new(env::PRODUCT_STORAGE.as_str()));
+            let path_buf = file.join(filename);
+            if Path::new(&path_buf).exists() {
+                if let Some(p) = path_buf.to_str() {
+                    return Ok(p.to_owned());
+                }
             }
         }
 
         Err(ServiceError::NotFound)
     }
 
-    pub fn set_image(
-        &mut self,
-        database_conn: &DatabaseConnection,
-        file_extension: &str,
-    ) -> ServiceResult<File> {
-        use crate::model::schema::product::dsl;
-
-        self.remove_image(database_conn)?;
-
-        let name = format!("{}.{}", generate_uuid(), file_extension);
-        self.image = Some(name.clone());
-
-        fs::create_dir_all(env::IMAGE_PATH.as_str())?;
-        let file = File::create(format!("{}/{}", env::IMAGE_PATH.as_str(), name))?;
-        info!(
-            "Save image '{}'",
-            format!("{}/{}", env::IMAGE_PATH.as_str(), name)
-        );
-
-        diesel::update(dsl::product.find(&self.id))
-            .set(dsl::image.eq(&self.image))
-            .execute(database_conn)?;
-
-        Ok(file)
-    }
-
-    pub fn remove_image(&mut self, database_conn: &DatabaseConnection) -> ServiceResult<()> {
-        use crate::model::schema::product::dsl;
-
-        if let Some(name) = self.image.clone() {
-            let p = format!("{}/{}", env::IMAGE_PATH.as_str(), name);
-
-            if Path::new(&p).exists() {
-                fs::remove_file(p)?;
-            }
-
-            self.image = None;
-            diesel::update(dsl::product.find(&self.id))
-                .set(dsl::image.eq(&self.image))
-                .execute(database_conn)?;
-        }
-
-        Ok(())
-    }
-
     /// List all products
-    pub fn all(database_conn: &DatabaseConnection) -> ServiceResult<Vec<(Product, Category)>> {
-        use crate::model::schema::category::dsl as dsl2;
-        use crate::model::schema::product::dsl;
-
-        let results = dsl::product
-            .order((dsl::ordering.asc(), dsl::name.asc()))
-            .inner_join(dsl2::category)
-            .load::<(Product, Category)>(database_conn)?;
-
+    pub fn all() -> ServiceResult<Vec<Product>> {
+        let results = PRODUCT_DATASET
+            .read()?
+            .iter()
+            .map(|(_, p)| p.clone_for_output())
+            .collect();
         Ok(results)
     }
 
     /// Get a product by the `id`
-    pub fn get(database_conn: &DatabaseConnection, id: Uuid) -> ServiceResult<(Product, Category)> {
-        use crate::model::schema::category::dsl as dsl2;
-        use crate::model::schema::product::dsl;
+    pub fn get(id: &str) -> ServiceResult<Product> {
+        if let Some(p) = PRODUCT_DATASET.read()?.get(id) {
+            return Ok(p.clone_for_output());
+        }
 
-        let result = dsl::product
-            .filter(dsl::id.eq(id))
-            .inner_join(dsl2::category)
-            .first::<(Product, Category)>(database_conn)?;
-
-        Ok(result)
+        Err(ServiceError::NotFound)
     }
 
     /// Get a product by the `barcode`
-    pub fn get_by_barcode(
-        database_conn: &DatabaseConnection,
-        barcode: &str,
-    ) -> ServiceResult<(Product, Category)> {
-        use crate::model::schema::category::dsl as dsl2;
-        use crate::model::schema::product::dsl;
+    pub fn get_by_barcode(barcode: &str) -> ServiceResult<Product> {
+        let dataset = PRODUCT_DATASET.read()?;
 
-        let result = dsl::product
-            .filter(dsl::barcode.eq(barcode))
-            .inner_join(dsl2::category)
-            .first::<(Product, Category)>(database_conn)?;
+        for (_, p) in dataset.iter() {
+            if let Some(b) = p.barcode.as_deref() {
+                if b == barcode {
+                    return Ok(p.clone_for_output());
+                }
+            }
+        }
 
-        Ok(result)
+        Err(ServiceError::NotFound)
     }
 }

@@ -38,7 +38,7 @@ pub struct TransactionItem {
     pub price: Money,
     pub pay_with_stamps: StampType,
     pub give_stamps: StampType,
-    pub product_id: Option<Uuid>,
+    pub product_id: String,
 }
 
 #[derive(Debug, Clone)]
@@ -47,7 +47,7 @@ pub struct TransactionItemInput {
     pub pay_with_stamps: StampType,
     pub could_be_paid_with_stamps: StampType,
     pub give_stamps: StampType,
-    pub product_id: Option<Uuid>,
+    pub product_id: String,
 }
 
 /// Execute a transaction on the given `account` with the given `total`
@@ -124,10 +124,10 @@ pub fn execute_at(
         // Return error if an item could be paid with stemps
         if stop_if_stamp_payment_is_possible && account.use_digital_stamps {
             for item in transaction_items.iter() {
-                if let Some(product_id) = item.product_id {
-                    let (product, category) = Product::get(database_conn, product_id)?;
+                if !item.product_id.is_empty() {
+                    let product = Product::get(&item.product_id)?;
 
-                    match product.pay_with_stamps.unwrap_or(category.pay_with_stamps) {
+                    match product.pay_with_stamps {
                         StampType::Coffee => {
                             if after_coffee_stamps >= 10 {
                                 return Err(ServiceError::TransactionCancelled(
@@ -220,7 +220,7 @@ pub fn execute_at(
                 price: item.price,
                 pay_with_stamps: item.pay_with_stamps,
                 give_stamps: item.give_stamps,
-                product_id: item.product_id,
+                product_id: item.product_id.clone(),
             };
 
             diesel::insert_into(dsl_item::transaction_item)

@@ -1,8 +1,8 @@
-FROM rust:1.53-buster as builder
+FROM rust:1.56-buster as builder
 
 WORKDIR /usr/src/ascii-pay-server
 ENV CARGO_TERM_COLOR always
-RUN apt-get update && apt-get install -y libpq-dev libssl-dev build-essential clang llvm-dev libclang-dev protobuf-compiler libprotobuf-dev
+RUN apt-get update && apt-get install -y libpq-dev libssl-dev build-essential protobuf-compiler libprotobuf-dev
 
 RUN mkdir src/
 RUN echo "fn main() {println!(\"if you see this, the build broke\")}" > src/main.rs

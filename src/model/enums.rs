@@ -115,6 +115,12 @@ impl StampType {
     }
 }
 
+impl Default for StampType {
+    fn default() -> Self {
+        StampType::None
+    }
+}
+
 /// For manuel database convertion
 impl<DB: Backend> ToSql<SmallInt, DB> for StampType
 where

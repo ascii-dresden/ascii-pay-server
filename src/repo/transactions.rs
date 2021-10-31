@@ -3,7 +3,7 @@ use crate::{
     model::{
         session::{create_onetime_session_ttl, get_onetime_session, Session},
         transactions::{self, TransactionItem, TransactionItemInput},
-        Account, Category, Permission, Product, StampType, Transaction,
+        Account, Permission, Product, StampType, Transaction,
     },
     utils::{DatabaseConnection, Money, RedisConnection, ServiceError, ServiceResult},
 };
@@ -11,7 +11,7 @@ use crate::{
 use chrono::NaiveDateTime;
 use uuid::Uuid;
 
-use super::{accounts::AccountOutput, ProductOutput};
+use super::accounts::AccountOutput;
 
 #[derive(Debug, Deserialize, InputObject)]
 pub struct PaymentItemInput {
@@ -19,7 +19,7 @@ pub struct PaymentItemInput {
     pub pay_with_stamps: StampType,
     pub could_be_paid_with_stamps: StampType,
     pub give_stamps: StampType,
-    pub product_id: Option<Uuid>,
+    pub product_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize, InputObject)]
@@ -66,13 +66,10 @@ pub struct TransactionItemOutput {
     pub price: Money,
     pub pay_with_stamps: StampType,
     pub give_stamps: StampType,
-    pub product: Option<ProductOutput>,
+    pub product: Option<Product>,
 }
 
-type TransactionWrapper = (
-    Transaction,
-    Vec<(TransactionItem, Option<(Product, Category)>)>,
-);
+type TransactionWrapper = (Transaction, Vec<(TransactionItem, Option<Product>)>);
 
 impl From<TransactionWrapper> for TransactionOutput {
     fn from(entity: TransactionWrapper) -> Self {
@@ -99,7 +96,7 @@ impl From<TransactionWrapper> for TransactionOutput {
                     price: i.price,
                     pay_with_stamps: i.pay_with_stamps,
                     give_stamps: i.give_stamps,
-                    product: o.map(|o| o.into()),
+                    product: o,
                 })
                 .collect(),
         }
@@ -139,9 +136,10 @@ pub fn map_transaction_output(
     transaction: Transaction,
 ) -> ServiceResult<TransactionOutput> {
     let items = zip_with_result(transaction.get_items(database_conn)?, |item| {
-        match item.product_id {
-            Some(id) => Some(Product::get(database_conn, id)).transpose(),
-            None => Ok(None),
+        if item.product_id.is_empty() {
+            Ok(None)
+        } else {
+            Some(Product::get(&item.product_id)).transpose()
         }
     })?;
 
@@ -168,7 +166,7 @@ pub fn transaction_payment(
                 pay_with_stamps: item.pay_with_stamps,
                 could_be_paid_with_stamps: item.could_be_paid_with_stamps,
                 give_stamps: item.give_stamps,
-                product_id: item.product_id,
+                product_id: item.product_id.clone().unwrap_or_default(),
             })
             .collect(),
         input.stop_if_stamp_payment_is_possible,

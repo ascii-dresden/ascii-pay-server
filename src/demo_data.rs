@@ -2,7 +2,7 @@ use chrono::{Duration, Local, NaiveDateTime, NaiveTime};
 use rand::prelude::SliceRandom;
 
 use crate::model::transactions::{execute_at, TransactionItemInput};
-use crate::model::{authentication_password, Account, Category, Permission, Product, StampType};
+use crate::model::{authentication_password, Account, Permission, Product, StampType};
 use crate::utils::{DatabaseConnection, DatabasePool, Money, ServiceError, ServiceResult};
 
 fn add_account(
@@ -18,40 +18,6 @@ fn add_account(
     Ok(account)
 }
 
-fn add_category(
-    database_conn: &DatabaseConnection,
-    name: &str,
-    price: Money,
-    pay_with_stamps: StampType,
-    give_stamps: StampType,
-    ordering: i32,
-) -> ServiceResult<Category> {
-    let mut category = Category::create(database_conn, name, price)?;
-    category.pay_with_stamps = pay_with_stamps;
-    category.give_stamps = give_stamps;
-    category.ordering = Some(ordering);
-    category.update(database_conn)?;
-    Ok(category)
-}
-
-fn add_product(
-    database_conn: &DatabaseConnection,
-    name: &str,
-    barcode: Option<&str>,
-    category: &Category,
-    price: Option<Money>,
-    pay_with_stamps: Option<StampType>,
-    give_stamps: Option<StampType>,
-) -> ServiceResult<Product> {
-    let mut product = Product::create(database_conn, name, category)?;
-    product.barcode = barcode.map(|b| b.to_owned());
-    product.price = price;
-    product.pay_with_stamps = pay_with_stamps;
-    product.give_stamps = give_stamps;
-    product.update(database_conn)?;
-    Ok(product)
-}
-
 fn generate_transactions(
     database_conn: &DatabaseConnection,
     account: &mut Account,
@@ -64,7 +30,7 @@ fn generate_transactions(
     let days = (to - from).num_days();
     let start_date = from.date();
 
-    let products = Product::all(database_conn)?;
+    let products = Product::all()?;
     let mut rng = rand::thread_rng();
 
     for day_offset in 0..days {
@@ -86,19 +52,19 @@ fn generate_transactions(
             let mut price = 0;
             let mut transaction_items: Vec<TransactionItemInput> = Vec::new();
             while price < avg_down.abs() {
-                let (p, c) = products.choose(&mut rng).unwrap();
+                let p = products.choose(&mut rng).unwrap();
 
-                let pr = p.price.unwrap_or(c.price);
+                let pr = p.price;
                 price += pr;
 
-                let give_stamps = p.give_stamps.unwrap_or(c.give_stamps);
+                let give_stamps = p.give_stamps;
 
                 transaction_items.push(TransactionItemInput {
                     price: -pr,
                     pay_with_stamps: StampType::None,
                     could_be_paid_with_stamps: StampType::None,
                     give_stamps,
-                    product_id: Some(p.id),
+                    product_id: p.id.clone(),
                 });
             }
 
@@ -111,7 +77,7 @@ fn generate_transactions(
                         pay_with_stamps: StampType::None,
                         could_be_paid_with_stamps: StampType::None,
                         give_stamps: StampType::None,
-                        product_id: None,
+                        product_id: String::new(),
                     }],
                     false,
                     date_time + Duration::seconds(seconds),
@@ -158,446 +124,6 @@ pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
         "default",
         "Demo Default User",
         Permission::Default,
-    )?;
-
-    let kaltgetraenke_0_5 = add_category(
-        database_conn,
-        "Kaltgetränke 0,5l",
-        150,
-        StampType::Bottle,
-        StampType::None,
-        2,
-    )?;
-    let kaltgetraenke_0_33 = add_category(
-        database_conn,
-        "Kaltgetränke 0,33l",
-        110,
-        StampType::Bottle,
-        StampType::None,
-        3,
-    )?;
-    let kaltgetraenke_0_33_bio = add_category(
-        database_conn,
-        "Kaltgetränke 0,33l BIO",
-        150,
-        StampType::Bottle,
-        StampType::None,
-        4,
-    )?;
-    let snacks = add_category(
-        database_conn,
-        "Snacks",
-        100,
-        StampType::None,
-        StampType::None,
-        5,
-    )?;
-    let heisgetraenke = add_category(
-        database_conn,
-        "Heißgetränke",
-        100,
-        StampType::Coffee,
-        StampType::Coffee,
-        1,
-    )?;
-
-    add_product(
-        database_conn,
-        "Kolle Mate",
-        Some("4280001274044"),
-        &kaltgetraenke_0_5,
-        None,
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Zotrine",
-        Some("4280001274006"),
-        &kaltgetraenke_0_5,
-        None,
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Flora Mate",
-        Some("4260031874056"),
-        &kaltgetraenke_0_5,
-        None,
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Premium Cola",
-        None,
-        &kaltgetraenke_0_5,
-        None,
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Club Mate",
-        Some("4029764001807"),
-        &kaltgetraenke_0_5,
-        None,
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Club Mate Eistee",
-        Some("4029764001814"),
-        &kaltgetraenke_0_5,
-        None,
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Club Mate Granat",
-        Some("4029764001401"),
-        &kaltgetraenke_0_5,
-        None,
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Fritz Limo Orange",
-        Some("4260107222989"),
-        &kaltgetraenke_0_5,
-        None,
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Fritz-Spritz Apfelschorle",
-        Some("4260107222576"),
-        &kaltgetraenke_0_5,
-        None,
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Wostok Aprikose Mandel",
-        Some("4260189210096"),
-        &kaltgetraenke_0_33,
-        None,
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Wostok Dattel Granatapfel",
-        Some("4260189210034"),
-        &kaltgetraenke_0_33,
-        None,
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Wostok Estragon Ingwer",
-        Some("4260189210058"),
-        &kaltgetraenke_0_33,
-        None,
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Wostok Tannenwald",
-        Some("4260189210010"),
-        &kaltgetraenke_0_33,
-        None,
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "BioZisch Matcha",
-        Some("4015533025419"),
-        &kaltgetraenke_0_33_bio,
-        None,
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "BioZisch Ginger Life",
-        Some("4015533019586"),
-        &kaltgetraenke_0_33_bio,
-        None,
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "BioZisch Gurke",
-        Some("4015533028236"),
-        &kaltgetraenke_0_33_bio,
-        None,
-        None,
-        None,
-    )?;
-
-    add_product(
-        database_conn,
-        "Mr. Tom",
-        Some("4021700800000"),
-        &snacks,
-        Some(40),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Die Gute Bio Schokolade",
-        Some("7610815028774"),
-        &snacks,
-        Some(140),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Kinder Riegel",
-        Some("40084077"),
-        &snacks,
-        Some(30),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Kinder Bueno",
-        Some("4008400935225"),
-        &snacks,
-        Some(80),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Snickers",
-        Some("5000159461122"),
-        &snacks,
-        Some(80),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Twix",
-        Some("5000159459228"),
-        &snacks,
-        Some(80),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Knoppers",
-        Some("40358802"),
-        &snacks,
-        Some(60),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Hanuta",
-        Some("7120873518730"),
-        &snacks,
-        Some(60),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Pickup",
-        Some("4017100213045"),
-        &snacks,
-        Some(40),
-        None,
-        None,
-    )?;
-
-    add_product(
-        database_conn,
-        "Kaffee (C)",
-        None,
-        &heisgetraenke,
-        Some(80),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Kaffee Creme (C++)",
-        None,
-        &heisgetraenke,
-        Some(80),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Cafe americano (Rust)",
-        None,
-        &heisgetraenke,
-        Some(80),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Kaffee (C--)",
-        None,
-        &heisgetraenke,
-        Some(80),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Espresso (Lua)",
-        None,
-        &heisgetraenke,
-        Some(80),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Espresso Doppio (Julia)",
-        None,
-        &heisgetraenke,
-        Some(100),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Ristretto (Schema)",
-        None,
-        &heisgetraenke,
-        Some(80),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Espresso Macchiato (Erlang)",
-        None,
-        &heisgetraenke,
-        Some(80),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Melange (Go)",
-        None,
-        &heisgetraenke,
-        Some(100),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Milchkaffee (Java)",
-        None,
-        &heisgetraenke,
-        Some(100),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Cappuccino (Python)",
-        None,
-        &heisgetraenke,
-        Some(100),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Latte Macciato (Ruby)",
-        None,
-        &heisgetraenke,
-        Some(100),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Latte Macciato - groß (Rubinious)",
-        None,
-        &heisgetraenke,
-        Some(120),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Chocolate (bash)",
-        None,
-        &heisgetraenke,
-        Some(100),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "White Chocolate (Javascript)",
-        None,
-        &heisgetraenke,
-        Some(100),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Chocolate Espresso (ObjectiveC)",
-        None,
-        &heisgetraenke,
-        Some(100),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "White Chocolate Espresso (Swift)",
-        None,
-        &heisgetraenke,
-        Some(100),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Chococcino (Perl)",
-        None,
-        &heisgetraenke,
-        Some(100),
-        None,
-        None,
-    )?;
-    add_product(
-        database_conn,
-        "Frotty Bash (fish)",
-        None,
-        &heisgetraenke,
-        Some(100),
-        None,
-        None,
     )?;
 
     let now = Local::now().naive_local();

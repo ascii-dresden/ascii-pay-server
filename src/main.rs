@@ -38,7 +38,7 @@ mod utils;
 mod api;
 
 use crate::demo_data::load_demo_data;
-use crate::model::{authentication_password, Account, Permission};
+use crate::model::{authentication_password, Account, Permission, Product};
 use crate::utils::{env, DatabaseConnection, DatabasePool, ServiceResult};
 use grpc_server::start_tcp_server;
 use http_server::start_http_server;
@@ -69,11 +69,13 @@ async fn main() {
 
 async fn init() -> ServiceResult<()> {
     // Setup database connection
-    let database_manager = ConnectionManager::<DatabaseConnection>::new(env::DATABASE_URL.as_str());
+    let database_manager = ConnectionManager::<DatabaseConnection>::new(env::DATABASE_URI.as_str());
     let database_pool = r2d2::Pool::builder().build(database_manager)?;
 
+    Product::load_dataset()?;
+
     // Setup redis connection
-    let redis_manager = RedisConnectionManager::new(env::REDIS_URL.as_str())?;
+    let redis_manager = RedisConnectionManager::new(env::REDIS_URI.as_str())?;
     let redis_pool = r2d2::Pool::builder().build(redis_manager)?;
 
     let conn = database_pool.get()?;

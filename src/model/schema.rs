@@ -60,31 +60,6 @@ table! {
 }
 
 table! {
-    category (id) {
-        id -> Uuid,
-        name -> Varchar,
-        price -> Int4,
-        pay_with_stamps -> Int2,
-        give_stamps -> Int2,
-        ordering -> Nullable<Int4>,
-    }
-}
-
-table! {
-    product (id) {
-        id -> Uuid,
-        name -> Varchar,
-        price -> Nullable<Int4>,
-        pay_with_stamps -> Nullable<Int2>,
-        give_stamps -> Nullable<Int2>,
-        category_id -> Uuid,
-        image -> Nullable<Varchar>,
-        barcode -> Nullable<Varchar>,
-        ordering -> Nullable<Int4>,
-    }
-}
-
-table! {
     transaction (id) {
         id -> Uuid,
         account_id -> Uuid,
@@ -108,11 +83,10 @@ table! {
         price -> Int4,
         pay_with_stamps -> Int2,
         give_stamps -> Int2,
-        product_id -> Nullable<Uuid>,
+        product_id -> Varchar,
     }
 }
 
-joinable!(product -> category (category_id));
 joinable!(transaction_item -> transaction (transaction_id));
 
 allow_tables_to_appear_in_same_query!(
@@ -122,8 +96,6 @@ allow_tables_to_appear_in_same_query!(
     authentication_nfc,
     authentication_password,
     authentication_password_invitation,
-    category,
-    product,
     transaction,
     transaction_item,
 );

@@ -5,10 +5,8 @@ use chrono::NaiveDate;
 use uuid::Uuid;
 
 use crate::model::session::Session;
-use crate::repo::{
-    self, AccountOutput, CategoryOutput, ProductOutput, SearchElementAccount,
-    SearchElementCategory, SearchElementProduct, TransactionOutput,
-};
+use crate::model::Product;
+use crate::repo::{self, AccountOutput, SearchElementAccount, TransactionOutput};
 use crate::{identity_service::Identity, utils::ServiceResult};
 
 use super::{get_database_conn_from_ctx, get_redis_conn_from_ctx};
@@ -145,59 +143,19 @@ impl Query {
         repo::get_transaction_self(database_conn, identity, transaction_id)
     }
 
-    async fn get_categories(
-        &self,
-        ctx: &Context<'_>,
-        search: Option<String>,
-    ) -> ServiceResult<Vec<SearchElementCategory>> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
+    async fn get_products(&self, ctx: &Context<'_>) -> ServiceResult<Vec<Product>> {
         let identity = ctx.data::<Identity>()?;
-        repo::get_categories(database_conn, identity, search.as_deref())
-            .map(|v| v.into_iter().map(|e| e.into()).collect())
+        repo::get_products(identity)
     }
 
-    async fn get_category(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<CategoryOutput> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
+    async fn get_product(&self, ctx: &Context<'_>, id: String) -> ServiceResult<Product> {
         let identity = ctx.data::<Identity>()?;
-        repo::get_category(database_conn, identity, id)
+        repo::get_product(identity, &id)
     }
 
     #[graphql(entity)]
-    async fn find_category_by_id(
-        &self,
-        ctx: &Context<'_>,
-        id: Uuid,
-    ) -> ServiceResult<CategoryOutput> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
+    async fn find_product_by_id(&self, ctx: &Context<'_>, id: String) -> ServiceResult<Product> {
         let identity = ctx.data::<Identity>()?;
-        repo::get_category(database_conn, identity, id)
-    }
-
-    async fn get_products(
-        &self,
-        ctx: &Context<'_>,
-        search: Option<String>,
-    ) -> ServiceResult<Vec<SearchElementProduct>> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
-        let identity = ctx.data::<Identity>()?;
-        repo::get_products(database_conn, identity, search.as_deref())
-            .map(|v| v.into_iter().map(|e| e.into()).collect())
-    }
-
-    async fn get_product(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<ProductOutput> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
-        let identity = ctx.data::<Identity>()?;
-        repo::get_product(database_conn, identity, id)
-    }
-
-    #[graphql(entity)]
-    async fn find_product_by_id(
-        &self,
-        ctx: &Context<'_>,
-        id: Uuid,
-    ) -> ServiceResult<ProductOutput> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
-        let identity = ctx.data::<Identity>()?;
-        repo::get_product(database_conn, identity, id)
+        repo::get_product(identity, &id)
     }
 }

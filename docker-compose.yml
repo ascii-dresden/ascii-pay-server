@@ -8,16 +8,17 @@ services:
     container_name: "ascii-pay-server-dist"
     environment:
       - HOST=0.0.0.0
-      - PORT=8080
-      - DATABASE_URL=postgres://ascii:ascii@postgres:5432/ascii-pay
-      - REDIS_URL=redis://redis:6379/1
+      - HTTP_PORT=8080
+      - GRPC_PORT=8081
+      - DATABASE_URI=postgres://ascii:ascii@postgres:5432/ascii-pay
+      - REDIS_URI=redis://redis:6379/1
+      - PRODUCT_STORAGE=./ascii-pay-products/main.json
       - MAIL_SENDER=payments@ascii.coffee
       - MAIL_SENDER_NAME=Ascii Pay Service
       - MAIL_URL=mail.example.local
       - MAIL_USER=username
       - MAIL_PASSWORD=password
       - CRON_SECRET=12345678
-      - IMAGE_PATH=./img
       - BASE_URL=https://ascii.pixix4.com/
       - API_ACCESS_KEY=
     expose:
@@ -25,9 +26,9 @@ services:
       - "50051"
     ports:
       - "8080:8080"
-      - "50051:50051"
+      - "8081:8081"
     volumes:
-      - ./dist/img:/opt/ascii-pay-server/img
+      - ./ascii-pay-products:/opt/ascii-pay-server/ascii-pay-products
       - ./certificates:/opt/ascii-pay-server/certificates
       - ./AsciiPayCard.pass:/opt/ascii-pay-server/AsciiPayCard.pass
     depends_on:

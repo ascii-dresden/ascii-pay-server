@@ -4,7 +4,7 @@ use crate::identity_service::{Identity, IdentityRequire};
 use crate::model::session::create_onetime_session;
 use crate::model::{authentication_nfc, redis, wallet, Account, Permission, Product};
 use crate::utils::{
-    bytes_to_string, generate_key_array, mifare_utils, str_to_bytes, uuid_to_str, vec_to_array,
+    bytes_to_string, generate_key_array, mifare_utils, str_to_bytes, vec_to_array,
     DatabaseConnection, RedisConnection, ServiceError, ServiceResult,
 };
 
@@ -51,8 +51,8 @@ pub fn authenticate_barcode(
 ) -> ServiceResult<Token> {
     identity.require_cert()?;
 
-    if let Ok(product) = Product::get_by_barcode(database_conn, code) {
-        return Ok((TokenType::ProductId, uuid_to_str(product.0.id)));
+    if let Ok(product) = Product::get_by_barcode(code) {
+        return Ok((TokenType::ProductId, product.id));
     }
 
     if let Ok(account_id) = wallet::get_by_qr_code(database_conn, code) {

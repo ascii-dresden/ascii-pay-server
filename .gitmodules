@@ -1,0 +1,3 @@
+[submodule "ascii-pay-products"]
+	path = ascii-pay-products
+	url = git@github.com:ascii-dresden/ascii-pay-products.git
