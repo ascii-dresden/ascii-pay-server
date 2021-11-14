@@ -33,6 +33,11 @@ pub fn get_redis_conn_from_ctx(
     Ok(ctx.data::<Arc<RedisPool>>()?.get()?)
 }
 
+pub fn print_grahpql_schema() {
+    let schema = Schema::build(Query, Mutation, EmptySubscription).finish();
+    println!("{}", schema.sdl());
+}
+
 pub fn create_schema_with_context(databse_pool: DatabasePool, redis_pool: RedisPool) -> AppSchema {
     let arc_database_pool = Arc::new(databse_pool);
     let arc_redis_pool = Arc::new(redis_pool);

@@ -37,6 +37,7 @@ mod utils;
 // endpoints
 mod api;
 
+use crate::api::graphql::print_grahpql_schema;
 use crate::demo_data::load_demo_data;
 use crate::model::{authentication_password, Account, Permission, Product};
 use crate::utils::{env, DatabaseConnection, DatabasePool, ServiceResult};
@@ -68,6 +69,24 @@ async fn main() {
 }
 
 async fn init() -> ServiceResult<()> {
+    let matches = App::new(crate_name!())
+        .version(crate_version!())
+        .about(crate_description!())
+        .author(crate_authors!("\n"))
+        .subcommand(SubCommand::with_name("run").about("Start the web server"))
+        .subcommand(
+            SubCommand::with_name("load-demo-data")
+                .about("Initilize the database with demo data. This requires an empty database!"),
+        )
+        .subcommand(SubCommand::with_name("admin").about("Create a new admin user"))
+        .subcommand(SubCommand::with_name("graphql").about("Print graphql definition"))
+        .get_matches();
+
+    if let Some(_matches) = matches.subcommand_matches("graphql") {
+        print_grahpql_schema();
+        return Ok(());
+    }
+
     // Setup database connection
     let database_manager = ConnectionManager::<DatabaseConnection>::new(env::DATABASE_URI.as_str());
     let database_pool = r2d2::Pool::builder().build(database_manager)?;
@@ -80,18 +99,6 @@ async fn init() -> ServiceResult<()> {
 
     let conn = database_pool.get()?;
     embedded_migrations::run_with_output(&conn, &mut std::io::stdout())?;
-
-    let matches = App::new(crate_name!())
-        .version(crate_version!())
-        .about(crate_description!())
-        .author(crate_authors!("\n"))
-        .subcommand(SubCommand::with_name("run").about("Start the web server"))
-        .subcommand(
-            SubCommand::with_name("load-demo-data")
-                .about("Initilize the database with demo data. This requires an empty database!"),
-        )
-        .subcommand(SubCommand::with_name("admin").about("Create a new admin user"))
-        .get_matches();
 
     if let Some(_matches) = matches.subcommand_matches("run") {
         // Setup web server
