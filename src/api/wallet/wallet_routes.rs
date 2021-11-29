@@ -1,6 +1,7 @@
 use crate::model::{wallet, Account};
 use crate::utils::{env, DatabasePool, ServiceError, ServiceResult};
 use actix_web::{web, HttpRequest, HttpResponse};
+use lazy_static::__Deref;
 use log::info;
 use uuid::Uuid;
 
@@ -49,20 +50,30 @@ pub async fn register_device(
         None => return Ok(HttpResponse::Unauthorized().finish()),
     };
 
-    let database_conn = &database_pool.get()?;
-
-    if wallet::check_pass_authorization(database_conn, path.serial_number, authentication_token)? {
-        if wallet::is_pass_registered_on_device(database_conn, &path.device_id, path.serial_number)?
+    if wallet::check_pass_authorization(
+        database_pool.deref(),
+        path.serial_number,
+        authentication_token,
+    )
+    .await?
+    {
+        if wallet::is_pass_registered_on_device(
+            database_pool.deref(),
+            &path.device_id,
+            path.serial_number,
+        )
+        .await?
         {
             Ok(HttpResponse::NotModified().finish())
         } else {
             wallet::register_pass_on_device(
-                database_conn,
+                database_pool.deref(),
                 &path.device_id,
                 path.serial_number,
                 &path.pass_type_id,
                 &data.push_token,
-            )?;
+            )
+            .await?;
             Ok(HttpResponse::Created().finish())
         }
     } else {
@@ -101,17 +112,21 @@ pub async fn update_passes(
     path: web::Path<UpdatePassesPath>,
     query: web::Query<UpdatePassesQuery>,
 ) -> ServiceResult<HttpResponse> {
-    let database_conn = &database_pool.get()?;
-
-    if wallet::is_device_registered(database_conn, &path.device_id)? {
-        let passes =
-            wallet::list_passes_for_device(database_conn, &path.device_id, &path.pass_type_id)?;
+    if wallet::is_device_registered(database_pool.deref(), &path.device_id).await? {
+        let passes = wallet::list_passes_for_device(
+            database_pool.deref(),
+            &path.device_id,
+            &path.pass_type_id,
+        )
+        .await?;
 
         let updated_passes = if let Some(passes_updated_since) = query.passes_updated_since {
             let mut updated_passes = Vec::<Uuid>::new();
 
             for pass in passes {
-                if wallet::get_pass_updated_at(database_conn, pass)? > passes_updated_since {
+                if wallet::get_pass_updated_at(database_pool.deref(), pass).await?
+                    > passes_updated_since
+                {
                     updated_passes.push(pass);
                 }
             }
@@ -184,12 +199,26 @@ pub async fn unregister_device(
         None => return Ok(HttpResponse::Unauthorized().finish()),
     };
 
-    let database_conn = &database_pool.get()?;
-
-    if wallet::check_pass_authorization(database_conn, path.serial_number, authentication_token)? {
-        if wallet::is_pass_registered_on_device(database_conn, &path.device_id, path.serial_number)?
+    if wallet::check_pass_authorization(
+        database_pool.deref(),
+        path.serial_number,
+        authentication_token,
+    )
+    .await?
+    {
+        if wallet::is_pass_registered_on_device(
+            database_pool.deref(),
+            &path.device_id,
+            path.serial_number,
+        )
+        .await?
         {
-            wallet::unregister_pass_on_device(database_conn, &path.device_id, path.serial_number)?;
+            wallet::unregister_pass_on_device(
+                database_pool.deref(),
+                &path.device_id,
+                path.serial_number,
+            )
+            .await?;
             Ok(HttpResponse::Ok().finish())
         } else {
             Ok(HttpResponse::NotFound().finish())
@@ -224,24 +253,29 @@ pub async fn pass_delivery(
         None => return Ok(HttpResponse::Unauthorized().finish()),
     };
 
-    let database_conn = &database_pool.get()?;
-
-    if wallet::check_pass_authorization(database_conn, path.serial_number, authentication_token)? {
+    if wallet::check_pass_authorization(
+        database_pool.deref(),
+        path.serial_number,
+        authentication_token,
+    )
+    .await?
+    {
         if path.pass_type_id != env::APPLE_WALLET_PASS_TYPE_IDENTIFIER.to_string() {
             return Err(ServiceError::NotFound);
         }
 
-        let updated_at = wallet::get_pass_updated_at(database_conn, path.serial_number)?;
+        let updated_at =
+            wallet::get_pass_updated_at(database_pool.deref(), path.serial_number).await?;
 
         let last_modified = chrono::NaiveDateTime::from_timestamp(updated_at as i64, 0)
             .format("%a, %d %b %G %T GMT")
             .to_string();
 
-        let account = Account::get(database_conn, path.serial_number)?;
-        let vec = wallet::create_pass(database_conn, &account)?;
+        let account = Account::get(database_pool.deref(), path.serial_number).await?;
+        let vec = wallet::create_pass(database_pool.deref(), &account).await?;
         Ok(HttpResponse::Ok()
             .content_type("application/vnd.apple.pkpass")
-            .header(http::header::LAST_MODIFIED, last_modified)
+            .append_header((http::header::LAST_MODIFIED, last_modified))
             .body(vec))
     } else {
         Ok(HttpResponse::Unauthorized().finish())

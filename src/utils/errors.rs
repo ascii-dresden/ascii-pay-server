@@ -60,22 +60,33 @@ impl From<diesel_migrations::RunMigrationsError> for ServiceError {
     }
 }
 
-impl From<r2d2_redis::redis::RedisError> for ServiceError {
-    fn from(error: r2d2_redis::redis::RedisError) -> Self {
-        warn!("Redis error: {}", error);
+impl From<bb8_redis::redis::RedisError> for ServiceError {
+    fn from(error: bb8_redis::redis::RedisError) -> Self {
         ServiceError::InternalServerError("Redis error", format!("{}", error))
+    }
+}
+
+impl From<diesel::r2d2::Error> for ServiceError {
+    fn from(error: diesel::r2d2::Error) -> Self {
+        ServiceError::InternalServerError("Diesel r2d2 error", format!("{}", error))
+    }
+}
+
+impl From<bb8::RunError<diesel::r2d2::Error>> for ServiceError {
+    fn from(error: bb8::RunError<diesel::r2d2::Error>) -> Self {
+        ServiceError::InternalServerError("Diesel r2d2 error", format!("{}", error))
+    }
+}
+
+impl From<bb8::RunError<bb8_redis::redis::RedisError>> for ServiceError {
+    fn from(error: bb8::RunError<bb8_redis::redis::RedisError>) -> Self {
+        ServiceError::InternalServerError("Redis bb8 error", format!("{}", error))
     }
 }
 
 impl From<std::io::Error> for ServiceError {
     fn from(error: std::io::Error) -> Self {
         ServiceError::InternalServerError("IO error", format!("{}", error))
-    }
-}
-
-impl From<r2d2::Error> for ServiceError {
-    fn from(error: r2d2::Error) -> Self {
-        ServiceError::InternalServerError("r2d2 error", format!("{}", error))
     }
 }
 
@@ -91,15 +102,15 @@ impl From<serde_json::Error> for ServiceError {
     }
 }
 
-impl From<actix_multipart::MultipartError> for ServiceError {
-    fn from(error: actix_multipart::MultipartError) -> Self {
-        ServiceError::InternalServerError("Error in Multipart stream", format!("{}", error))
-    }
-}
-
 impl From<actix_http::Error> for ServiceError {
     fn from(error: actix_http::Error) -> Self {
         ServiceError::InternalServerError("Http error", format!("{}", error))
+    }
+}
+
+impl From<awc::error::SendRequestError> for ServiceError {
+    fn from(error: awc::error::SendRequestError) -> Self {
+        ServiceError::InternalServerError("actix client error", format!("{}", error))
     }
 }
 
@@ -160,12 +171,6 @@ impl From<actix_http::error::PayloadError> for ServiceError {
     }
 }
 
-impl From<actix_http::client::SendRequestError> for ServiceError {
-    fn from(error: actix_http::client::SendRequestError) -> Self {
-        ServiceError::InternalServerError("Http client (actix) error", format!("{}", error))
-    }
-}
-
 impl From<openssl::error::ErrorStack> for ServiceError {
     fn from(error: openssl::error::ErrorStack) -> Self {
         ServiceError::InternalServerError("OpenSSL error", format!("{}", error))
@@ -214,20 +219,20 @@ impl<T> From<std::sync::PoisonError<std::sync::RwLockReadGuard<'_, T>>> for Serv
     }
 }
 
-impl From<ServiceError> for grpc::Error {
-    fn from(error: ServiceError) -> Self {
-        grpc::Error::Panic(format!("{:?}", error))
+impl<T> From<tokio::sync::mpsc::error::SendError<T>> for ServiceError
+where
+    T: std::fmt::Debug,
+{
+    fn from(error: tokio::sync::mpsc::error::SendError<T>) -> Self {
+        ServiceError::InternalServerError("Tokio mpsc send error", format!("{:?}", error))
     }
 }
 
-/*
-/// nightly - allow `?` on Option<T> to unwrap
-impl From<std::option::NoneError> for ServiceError {
-    fn from(error: std::option::NoneError) -> ServiceError {
-        ServiceError::InternalServerError("None error", format!("{}", error))
+impl From<ServiceError> for grpcio::Error {
+    fn from(_error: ServiceError) -> Self {
+        grpcio::Error::RemoteStopped
     }
 }
-*/
 
 /// Transform `ServiceError` to `HttpResponse`
 impl ResponseError for ServiceError {

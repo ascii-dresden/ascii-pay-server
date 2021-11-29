@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 mod apns;
+pub mod bb8_diesel;
 pub mod env;
 mod errors;
 pub mod mail;

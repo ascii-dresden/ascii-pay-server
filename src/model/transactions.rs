@@ -1,10 +1,13 @@
 use chrono::{Local, NaiveDateTime};
 use diesel::prelude::*;
+use lazy_static::__Deref;
 use uuid::Uuid;
 
 use crate::model::schema::{transaction, transaction_item};
 use crate::model::{Account, Product};
-use crate::utils::{generate_uuid, DatabaseConnection, Money, ServiceError, ServiceResult};
+use crate::utils::{
+    generate_uuid, DatabaseConnection, DatabasePool, Money, ServiceError, ServiceResult,
+};
 
 use super::enums::StampType;
 
@@ -59,8 +62,8 @@ pub struct TransactionItemInput {
 /// * 4 Check if the account minimum_credit allows the new credit
 /// * 5 Create and save the transaction
 /// * 6 Save the new credit to the account
-pub fn execute_at(
-    database_conn: &DatabaseConnection,
+pub async fn execute_at(
+    database_pool: &DatabasePool,
     account: &mut Account,
     transaction_items: Vec<TransactionItemInput>,
     stop_if_stamp_payment_is_possible: bool,
@@ -69,8 +72,9 @@ pub fn execute_at(
     use crate::model::schema::transaction::dsl;
     use crate::model::schema::transaction_item::dsl as dsl_item;
 
+    let database_conn = &database_pool.get().await?;
     let result = database_conn.build_transaction().serializable().run(|| {
-        let mut account = Account::get(database_conn, account.id)?;
+        let mut account = Account::get_sync(database_conn, account.id)?;
 
         let before_credit = account.credit;
         let mut after_credit = account.credit;
@@ -208,10 +212,10 @@ pub fn execute_at(
         account.coffee_stamps = after_coffee_stamps;
         account.bottle_stamps = after_bottle_stamps;
 
-        account.update(database_conn)?;
+        account.update_sync(database_conn)?;
         diesel::insert_into(dsl::transaction)
             .values(&t)
-            .execute(database_conn)?;
+            .execute(database_conn.deref())?;
 
         for (i, item) in transaction_items.iter().enumerate() {
             let ti = TransactionItem {
@@ -225,7 +229,7 @@ pub fn execute_at(
 
             diesel::insert_into(dsl_item::transaction_item)
                 .values(&ti)
-                .execute(database_conn)?;
+                .execute(database_conn.deref())?;
         }
 
         Ok((t, account))
@@ -251,70 +255,73 @@ pub fn execute_at(
 /// * 4 Check if the account minimum_credit allows the new credit
 /// * 5 Create and save the transaction (with optional cashier refernece)
 /// * 6 Save the new credit to the account
-pub fn execute(
-    database_conn: &DatabaseConnection,
+pub async fn execute(
+    database_pool: &DatabasePool,
     account: &mut Account,
     transaction_items: Vec<TransactionItemInput>,
     stop_if_stamp_payment_is_possible: bool,
 ) -> ServiceResult<Transaction> {
     execute_at(
-        database_conn,
+        database_pool,
         account,
         transaction_items,
         stop_if_stamp_payment_is_possible,
         Local::now().naive_local(),
     )
+    .await
 }
 
 /// List all transactions of a account between the given datetimes
-pub fn get_by_account(
-    database_conn: &DatabaseConnection,
+pub async fn get_by_account(
+    database_pool: &DatabasePool,
     account: &Account,
     from: Option<NaiveDateTime>,
     to: Option<NaiveDateTime>,
 ) -> ServiceResult<Vec<Transaction>> {
     use crate::model::schema::transaction::dsl;
 
+    let database_conn = &database_pool.get().await?;
     let results = match from {
         Some(f) => match to {
             Some(t) => dsl::transaction
                 .filter(dsl::account_id.eq(&account.id).and(dsl::date.between(f, t)))
                 .order(dsl::date.desc())
-                .load::<Transaction>(database_conn)?,
+                .load::<Transaction>(database_conn.deref())?,
             None => dsl::transaction
                 .filter(dsl::account_id.eq(&account.id).and(dsl::date.ge(f)))
                 .order(dsl::date.desc())
-                .load::<Transaction>(database_conn)?,
+                .load::<Transaction>(database_conn.deref())?,
         },
         None => match to {
             Some(t) => dsl::transaction
                 .filter(dsl::account_id.eq(&account.id).and(dsl::date.le(t)))
                 .order(dsl::date.desc())
-                .load::<Transaction>(database_conn)?,
+                .load::<Transaction>(database_conn.deref())?,
             None => dsl::transaction
                 .filter(dsl::account_id.eq(&account.id))
                 .order(dsl::date.desc())
-                .load::<Transaction>(database_conn)?,
+                .load::<Transaction>(database_conn.deref())?,
         },
     };
 
     Ok(results)
 }
 
-pub fn get_by_account_and_id(
-    database_conn: &DatabaseConnection,
+pub async fn get_by_account_and_id(
+    database_pool: &DatabasePool,
     account: &Account,
     transaction_id: Uuid,
 ) -> ServiceResult<Transaction> {
     use crate::model::schema::transaction::dsl;
 
+    let database_conn = &database_pool.get().await?;
     let mut results = dsl::transaction
         .filter(
             dsl::account_id
                 .eq(&account.id)
                 .and(dsl::id.eq(transaction_id)),
         )
-        .load::<Transaction>(database_conn)?;
+        .load::<Transaction>(database_conn.deref())?;
 
     results.pop().ok_or(ServiceError::NotFound)
 }
@@ -329,6 +336,6 @@ impl Transaction {
 
         Ok(dsl::transaction_item
             .filter(dsl::transaction_id.eq(&self.id))
-            .load::<TransactionItem>(database_conn)?)
+            .load::<TransactionItem>(database_conn.deref())?)
     }
 }

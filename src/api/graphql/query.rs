@@ -1,4 +1,5 @@
-use std::ops::DerefMut;
+use std::ops::Deref;
+use std::sync::Arc;
 
 use async_graphql::{Context, Object};
 use chrono::NaiveDate;
@@ -7,9 +8,8 @@ use uuid::Uuid;
 use crate::model::session::Session;
 use crate::model::Product;
 use crate::repo::{self, AccountOutput, SearchElementAccount, TransactionOutput};
+use crate::utils::{DatabasePool, RedisPool};
 use crate::{identity_service::Identity, utils::ServiceResult};
-
-use super::{get_database_conn_from_ctx, get_redis_conn_from_ctx};
 
 pub struct Query;
 
@@ -25,16 +25,17 @@ impl Query {
         ctx: &Context<'_>,
         search: Option<String>,
     ) -> ServiceResult<Vec<SearchElementAccount>> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
+        let database_pool = ctx.data::<Arc<DatabasePool>>()?;
         let identity = ctx.data::<Identity>()?;
-        repo::get_accounts(database_conn, identity, search.as_deref())
+        repo::get_accounts(database_pool.deref(), identity, search.as_deref())
+            .await
             .map(|v| v.into_iter().map(|e| e.into()).collect())
     }
 
     async fn get_account(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<AccountOutput> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
+        let database_pool = ctx.data::<Arc<DatabasePool>>()?;
         let identity = ctx.data::<Identity>()?;
-        repo::get_account(database_conn, identity, id)
+        repo::get_account(database_pool.deref(), identity, id).await
     }
 
     async fn get_account_by_access_token(
@@ -42,15 +43,16 @@ impl Query {
         ctx: &Context<'_>,
         account_access_token: Session,
     ) -> ServiceResult<AccountOutput> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
-        let mut redis_conn = get_redis_conn_from_ctx(ctx)?;
+        let redis_pool = ctx.data::<Arc<RedisPool>>()?;
+        let database_pool = ctx.data::<Arc<DatabasePool>>()?;
         let identity = ctx.data::<Identity>()?;
         repo::get_account_by_access_token(
-            database_conn,
-            redis_conn.deref_mut(),
+            database_pool.deref(),
+            redis_pool.deref(),
             identity,
             account_access_token,
         )
+        .await
     }
 
     #[graphql(entity)]
@@ -59,9 +61,9 @@ impl Query {
         ctx: &Context<'_>,
         id: Uuid,
     ) -> ServiceResult<AccountOutput> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
+        let database_pool = ctx.data::<Arc<DatabasePool>>()?;
         let identity = ctx.data::<Identity>()?;
-        repo::get_account(database_conn, identity, id)
+        repo::get_account(database_pool.deref(), identity, id).await
     }
 
     async fn get_transactions(
@@ -71,10 +73,10 @@ impl Query {
         transaction_filter_from: Option<String>,
         transaction_filter_to: Option<String>,
     ) -> ServiceResult<Vec<TransactionOutput>> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
+        let database_pool = ctx.data::<Arc<DatabasePool>>()?;
         let identity = ctx.data::<Identity>()?;
         repo::get_transactions_by_account(
-            database_conn,
+            database_pool.deref(),
             identity,
             account_id,
             transaction_filter_from
@@ -92,6 +94,7 @@ impl Query {
                 })
                 .flatten(),
         )
+        .await
     }
 
     async fn get_transaction(
@@ -100,9 +103,15 @@ impl Query {
         account_id: Uuid,
         transaction_id: Uuid,
     ) -> ServiceResult<TransactionOutput> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
+        let database_pool = ctx.data::<Arc<DatabasePool>>()?;
         let identity = ctx.data::<Identity>()?;
-        repo::get_transaction_by_account(database_conn, identity, account_id, transaction_id)
+        repo::get_transaction_by_account(
+            database_pool.deref(),
+            identity,
+            account_id,
+            transaction_id,
+        )
+        .await
     }
 
     async fn get_own_transactions(
@@ -111,10 +120,10 @@ impl Query {
         transaction_filter_from: Option<String>,
         transaction_filter_to: Option<String>,
     ) -> ServiceResult<Vec<TransactionOutput>> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
+        let database_pool = ctx.data::<Arc<DatabasePool>>()?;
         let identity = ctx.data::<Identity>()?;
         repo::get_transactions_self(
-            database_conn,
+            database_pool.deref(),
             identity,
             transaction_filter_from
                 .map(|s| {
@@ -131,6 +140,7 @@ impl Query {
                 })
                 .flatten(),
         )
+        .await
     }
 
     async fn get_own_transaction(
@@ -138,9 +148,9 @@ impl Query {
         ctx: &Context<'_>,
         transaction_id: Uuid,
     ) -> ServiceResult<TransactionOutput> {
-        let database_conn = &get_database_conn_from_ctx(ctx)?;
+        let database_pool = ctx.data::<Arc<DatabasePool>>()?;
         let identity = ctx.data::<Identity>()?;
-        repo::get_transaction_self(database_conn, identity, transaction_id)
+        repo::get_transaction_self(database_pool.deref(), identity, transaction_id).await
     }
 
     async fn get_products(&self, ctx: &Context<'_>) -> ServiceResult<Vec<Product>> {

@@ -4,8 +4,7 @@ use std::{
     path::Path,
 };
 
-use actix_http::client::Connector;
-use actix_web::client::Client;
+use awc::{Client, Connector};
 use log::error;
 use openssl::{
     pkcs12::Pkcs12,
@@ -47,11 +46,9 @@ impl ApplePushNotificationService {
         connector_builder.set_alpn_protos(b"\x02h2")?;
         let ssl_connector = connector_builder.build();
 
-        let connector = Connector::new().ssl(ssl_connector).finish();
+        let connector = Connector::new().ssl(ssl_connector);
 
-        let client = actix_web::client::Client::builder()
-            .connector(connector)
-            .finish();
+        let client = Client::builder().connector(connector).finish();
 
         Ok(Self { client })
     }

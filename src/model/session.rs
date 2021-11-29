@@ -1,8 +1,10 @@
+#![allow(clippy::from_over_into)]
+
 use uuid::Uuid;
 
 use crate::utils::{
-    create_token_from_obj, generate_uuid, parse_obj_from_token, uuid_to_str, DatabaseConnection,
-    RedisConnection, ServiceResult,
+    create_token_from_obj, generate_uuid, parse_obj_from_token, uuid_to_str, DatabasePool,
+    RedisPool, ServiceResult,
 };
 
 use super::{redis, Account};
@@ -38,42 +40,42 @@ struct LongtimeSession {
     account_id: Uuid,
 }
 
-pub fn create_longtime_session(
-    redis_conn: &mut RedisConnection,
+pub async fn create_longtime_session(
+    redis_pool: &RedisPool,
     account: &Account,
 ) -> ServiceResult<Session> {
     let (session_key, session) = Session::new()?;
 
     redis::create_data::<LongtimeSession>(
-        redis_conn,
+        redis_pool,
         &uuid_to_str(session_key),
         &LongtimeSession {
             account_id: account.id,
         },
         300,
-    )?;
+    )
+    .await?;
 
     Ok(session)
 }
 
-pub fn get_longtime_session(
-    database_conn: &DatabaseConnection,
-    redis_conn: &mut RedisConnection,
+pub async fn get_longtime_session(
+    database_pool: &DatabasePool,
+    redis_pool: &RedisPool,
     session: &Session,
 ) -> ServiceResult<Account> {
     let session =
-        redis::get_data::<LongtimeSession>(redis_conn, &uuid_to_str(session.get_key()?), 10 * 60)?;
+        redis::get_data::<LongtimeSession>(redis_pool, &uuid_to_str(session.get_key()?), 10 * 60)
+            .await?;
 
-    let account = Account::get(database_conn, session.account_id)?;
-
-    Ok(account)
+    Account::get(database_pool, session.account_id).await
 }
 
-pub fn delete_longtime_session(
-    redis_conn: &mut RedisConnection,
+pub async fn delete_longtime_session(
+    redis_pool: &RedisPool,
     session: &Session,
 ) -> ServiceResult<()> {
-    redis::delete_data::<LongtimeSession>(redis_conn, &uuid_to_str(session.get_key()?))
+    redis::delete_data::<LongtimeSession>(redis_pool, &uuid_to_str(session.get_key()?)).await
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -81,41 +83,41 @@ struct OnetimeSession {
     account_id: Uuid,
 }
 
-pub fn create_onetime_session(
-    redis_conn: &mut RedisConnection,
+pub async fn create_onetime_session(
+    redis_pool: &RedisPool,
     account: &Account,
 ) -> ServiceResult<Session> {
-    create_onetime_session_ttl(redis_conn, account, 10)
+    create_onetime_session_ttl(redis_pool, account, 10).await
 }
 
-pub fn create_onetime_session_ttl(
-    redis_conn: &mut RedisConnection,
+pub async fn create_onetime_session_ttl(
+    redis_pool: &RedisPool,
     account: &Account,
     ttl: i32,
 ) -> ServiceResult<Session> {
     let (session_key, session) = Session::new()?;
 
     redis::create_data::<OnetimeSession>(
-        redis_conn,
+        redis_pool,
         &uuid_to_str(session_key),
         &OnetimeSession {
             account_id: account.id,
         },
         ttl,
-    )?;
+    )
+    .await?;
 
     Ok(session)
 }
 
-pub fn get_onetime_session(
-    database_conn: &DatabaseConnection,
-    redis_conn: &mut RedisConnection,
+pub async fn get_onetime_session(
+    database_pool: &DatabasePool,
+    redis_pool: &RedisPool,
     session: &Session,
 ) -> ServiceResult<Account> {
     let session =
-        redis::get_delete_data::<OnetimeSession>(redis_conn, &uuid_to_str(session.get_key()?))?;
+        redis::get_delete_data::<OnetimeSession>(redis_pool, &uuid_to_str(session.get_key()?))
+            .await?;
 
-    let account = Account::get(database_conn, session.account_id)?;
-
-    Ok(account)
+    Account::get(database_pool, session.account_id).await
 }

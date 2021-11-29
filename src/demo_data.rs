@@ -3,23 +3,23 @@ use rand::prelude::SliceRandom;
 
 use crate::model::transactions::{execute_at, TransactionItemInput};
 use crate::model::{authentication_password, Account, Permission, Product, StampType};
-use crate::utils::{DatabaseConnection, DatabasePool, Money, ServiceError, ServiceResult};
+use crate::utils::{DatabasePool, Money, ServiceError, ServiceResult};
 
-fn add_account(
-    database_conn: &DatabaseConnection,
+async fn add_account(
+    database_pool: &DatabasePool,
     username: &str,
     name: &str,
     permission: Permission,
 ) -> ServiceResult<Account> {
-    let mut account = Account::create(database_conn, name, permission)?;
+    let mut account = Account::create(database_pool, name, permission).await?;
     account.username = username.to_owned();
-    account.update(database_conn)?;
-    authentication_password::register(database_conn, &account, "password")?;
+    account.update(database_pool).await?;
+    authentication_password::register(database_pool, &account, "password").await?;
     Ok(account)
 }
 
-fn generate_transactions(
-    database_conn: &DatabaseConnection,
+async fn generate_transactions(
+    database_pool: &DatabasePool,
     account: &mut Account,
     from: NaiveDateTime,
     to: NaiveDateTime,
@@ -70,7 +70,7 @@ fn generate_transactions(
 
             while account.credit - price < account.minimum_credit {
                 execute_at(
-                    database_conn,
+                    database_pool,
                     account,
                     vec![TransactionItemInput {
                         price: avg_up,
@@ -81,17 +81,19 @@ fn generate_transactions(
                     }],
                     false,
                     date_time + Duration::seconds(seconds),
-                )?;
+                )
+                .await?;
                 seconds += 60;
             }
 
             let result = execute_at(
-                database_conn,
+                database_pool,
                 account,
                 transaction_items,
                 false,
                 date_time + Duration::seconds(seconds),
-            );
+            )
+            .await;
 
             match result {
                 Ok(_) => {}
@@ -108,53 +110,56 @@ fn generate_transactions(
     Ok(())
 }
 
-pub fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
-    let database_conn = &database_pool.get()?;
-
+pub async fn load_demo_data(database_pool: &DatabasePool) -> ServiceResult<()> {
     let mut account_admin =
-        add_account(database_conn, "admin", "Demo Admin User", Permission::Admin)?;
+        add_account(database_pool, "admin", "Demo Admin User", Permission::Admin).await?;
     let mut account_member = add_account(
-        database_conn,
+        database_pool,
         "member",
         "Demo Member User",
         Permission::Member,
-    )?;
+    )
+    .await?;
     let mut account_default = add_account(
-        database_conn,
+        database_pool,
         "default",
         "Demo Default User",
         Permission::Default,
-    )?;
+    )
+    .await?;
 
     let now = Local::now().naive_local();
 
     generate_transactions(
-        database_conn,
+        database_pool,
         &mut account_admin,
         now - Duration::days(90),
         now,
         3,
         150,
         2000,
-    )?;
+    )
+    .await?;
     generate_transactions(
-        database_conn,
+        database_pool,
         &mut account_member,
         now - Duration::days(60),
         now,
         2,
         150,
         2000,
-    )?;
+    )
+    .await?;
     generate_transactions(
-        database_conn,
+        database_pool,
         &mut account_default,
         now - Duration::days(30),
         now,
         1,
         150,
         2000,
-    )?;
+    )
+    .await?;
 
     Ok(())
 }

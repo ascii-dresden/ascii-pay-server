@@ -4,14 +4,17 @@ use crate::identity_service::{Identity, IdentityRequire};
 use crate::model::session::create_onetime_session;
 use crate::model::{authentication_nfc, redis, wallet, Account, Permission, Product};
 use crate::utils::{
-    bytes_to_string, generate_key_array, mifare_utils, str_to_bytes, vec_to_array,
-    DatabaseConnection, RedisConnection, ServiceError, ServiceResult,
+    bytes_to_string, generate_key_array, mifare_utils, str_to_bytes, vec_to_array, DatabasePool,
+    RedisPool, ServiceError, ServiceResult,
 };
 
+#[derive(Debug, Clone, Copy)]
 pub enum TokenType {
     AccountAccessToken,
     ProductId,
 }
+
+#[derive(Debug, Clone, Copy)]
 pub enum NfcCardType {
     Generic,
     MifareDesfire,
@@ -27,25 +30,25 @@ pub struct AccountAccessTokenOutput {
     pub token: String,
 }
 
-pub fn authenticate_account(
-    database_conn: &DatabaseConnection,
-    redis_conn: &mut RedisConnection,
+pub async fn authenticate_account(
+    database_pool: &DatabasePool,
+    redis_pool: &RedisPool,
     identity: &Identity,
     account_id: Uuid,
 ) -> ServiceResult<AccountAccessTokenOutput> {
     identity.require_account(Permission::Admin)?;
 
-    let account = Account::get(database_conn, account_id)?;
-    let session = create_onetime_session(redis_conn, &account)?;
+    let account = Account::get(database_pool, account_id).await?;
+    let session = create_onetime_session(redis_pool, &account).await?;
 
     Ok(AccountAccessTokenOutput {
         token: session.into(),
     })
 }
 
-pub fn authenticate_barcode(
-    database_conn: &DatabaseConnection,
-    redis_conn: &mut RedisConnection,
+pub async fn authenticate_barcode(
+    database_pool: &DatabasePool,
+    redis_pool: &RedisPool,
     identity: &Identity,
     code: &str,
 ) -> ServiceResult<Token> {
@@ -55,9 +58,9 @@ pub fn authenticate_barcode(
         return Ok((TokenType::ProductId, product.id));
     }
 
-    if let Ok(account_id) = wallet::get_by_qr_code(database_conn, code) {
-        let account = Account::get(database_conn, account_id)?;
-        let session = create_onetime_session(redis_conn, &account)?;
+    if let Ok(account_id) = wallet::get_by_qr_code(database_pool, code).await {
+        let account = Account::get(database_pool, account_id).await?;
+        let session = create_onetime_session(redis_pool, &account).await?;
 
         return Ok((TokenType::AccountAccessToken, session.into()));
     }
@@ -65,14 +68,14 @@ pub fn authenticate_barcode(
     Err(ServiceError::NotFound)
 }
 
-pub fn authenticate_nfc_type(
-    database_conn: &DatabaseConnection,
+pub async fn authenticate_nfc_type(
+    database_pool: &DatabasePool,
     identity: &Identity,
     id: &str,
 ) -> ServiceResult<NfcCardType> {
     identity.require_cert()?;
 
-    let nfc_entry = authentication_nfc::get_by_card_id(database_conn, id)?;
+    let nfc_entry = authentication_nfc::get_by_card_id(database_pool, id).await?;
 
     match nfc_entry.card_type.as_str() {
         CARD_TYPE_GENERIC => Ok(NfcCardType::Generic),
@@ -84,21 +87,21 @@ pub fn authenticate_nfc_type(
     }
 }
 
-pub fn authenticate_nfc_generic(
-    database_conn: &DatabaseConnection,
-    redis_conn: &mut RedisConnection,
+pub async fn authenticate_nfc_generic(
+    database_pool: &DatabasePool,
+    redis_pool: &RedisPool,
     identity: &Identity,
     id: &str,
 ) -> ServiceResult<Token> {
     identity.require_cert()?;
 
-    let nfc_entry = authentication_nfc::get_by_card_id(database_conn, id)?;
+    let nfc_entry = authentication_nfc::get_by_card_id(database_pool, id).await?;
     if nfc_entry.card_type != CARD_TYPE_GENERIC {
         return Err(ServiceError::Unauthorized("nfc card type does not match!"));
     }
 
-    let account = Account::get(database_conn, nfc_entry.account_id)?;
-    let session = create_onetime_session(redis_conn, &account)?;
+    let account = Account::get(database_pool, nfc_entry.account_id).await?;
+    let session = create_onetime_session(redis_pool, &account).await?;
 
     Ok((TokenType::AccountAccessToken, session.into()))
 }
@@ -110,16 +113,16 @@ struct AuthenticateNfcMifareDesfire {
 }
 
 #[allow(non_snake_case)]
-pub fn authenticate_nfc_mifare_desfire_phase1(
-    database_conn: &DatabaseConnection,
-    redis_conn: &mut RedisConnection,
+pub async fn authenticate_nfc_mifare_desfire_phase1(
+    database_pool: &DatabasePool,
+    redis_pool: &RedisPool,
     identity: &Identity,
     id: &str,
     ek_rndB: &str,
 ) -> ServiceResult<String> {
     identity.require_cert()?;
 
-    let nfc_entry = authentication_nfc::get_by_card_id(database_conn, id)?;
+    let nfc_entry = authentication_nfc::get_by_card_id(database_pool, id).await?;
     if nfc_entry.card_type != CARD_TYPE_MIFARE_DESFIRE {
         return Err(ServiceError::Unauthorized("nfc card type does not match!"));
     }
@@ -141,22 +144,23 @@ pub fn authenticate_nfc_mifare_desfire_phase1(
     let dk_rndA_rndBshifted = mifare_utils::tdes_encrypt(&key, &rndA_rndBshifted)?;
 
     redis::create_data::<AuthenticateNfcMifareDesfire>(
-        redis_conn,
+        redis_pool,
         id,
         &AuthenticateNfcMifareDesfire {
             rnd_a: rndA,
             rnd_b: rndB,
         },
         10,
-    )?;
+    )
+    .await?;
 
     Ok(bytes_to_string(&dk_rndA_rndBshifted))
 }
 
 #[allow(non_snake_case)]
-pub fn authenticate_nfc_mifare_desfire_phase2(
-    database_conn: &DatabaseConnection,
-    redis_conn: &mut RedisConnection,
+pub async fn authenticate_nfc_mifare_desfire_phase2(
+    database_pool: &DatabasePool,
+    redis_pool: &RedisPool,
     identity: &Identity,
     id: &str,
     dk_rndA_rndBshifted: &str,
@@ -164,13 +168,14 @@ pub fn authenticate_nfc_mifare_desfire_phase2(
 ) -> ServiceResult<(String, Token)> {
     identity.require_cert()?;
 
-    let nfc_entry = authentication_nfc::get_by_card_id(database_conn, id)?;
+    let nfc_entry = authentication_nfc::get_by_card_id(database_pool, id).await?;
     if nfc_entry.card_type != CARD_TYPE_MIFARE_DESFIRE {
         return Err(ServiceError::Unauthorized("nfc card type does not match!"));
     }
 
     let key = str_to_bytes(&nfc_entry.data);
-    let redis_cache = redis::get_delete_data::<AuthenticateNfcMifareDesfire>(redis_conn, id)?;
+    let redis_cache =
+        redis::get_delete_data::<AuthenticateNfcMifareDesfire>(redis_pool, id).await?;
     let rndA = redis_cache.rnd_a;
     let rndB = redis_cache.rnd_b;
 
@@ -208,8 +213,8 @@ pub fn authenticate_nfc_mifare_desfire_phase2(
         session_key.extend(&rndB[4..8]);
     }
 
-    let account = Account::get(database_conn, nfc_entry.account_id)?;
-    let session = create_onetime_session(redis_conn, &account)?;
+    let account = Account::get(database_pool, nfc_entry.account_id).await?;
+    let session = create_onetime_session(redis_pool, &account).await?;
 
     Ok((
         bytes_to_string(&session_key),
@@ -217,57 +222,59 @@ pub fn authenticate_nfc_mifare_desfire_phase2(
     ))
 }
 
-pub fn authenticate_nfc_delete_card(
-    database_conn: &DatabaseConnection,
+pub async fn authenticate_nfc_delete_card(
+    database_pool: &DatabasePool,
     identity: &Identity,
     account_id: Uuid,
 ) -> ServiceResult<()> {
     identity.require_cert()?;
 
-    let account = Account::get(database_conn, account_id)?;
+    let account = Account::get(database_pool, account_id).await?;
 
-    authentication_nfc::remove(database_conn, &account)
+    authentication_nfc::remove(database_pool, &account).await
 }
 
-pub fn authenticate_nfc_generic_init_card(
-    database_conn: &DatabaseConnection,
+pub async fn authenticate_nfc_generic_init_card(
+    database_pool: &DatabasePool,
     identity: &Identity,
     card_id: &str,
     account_id: Uuid,
 ) -> ServiceResult<()> {
     identity.require_cert()?;
 
-    let account = Account::get(database_conn, account_id)?;
+    let account = Account::get(database_pool, account_id).await?;
 
     authentication_nfc::register(
-        database_conn,
+        database_pool,
         &account,
         card_id,
         CARD_TYPE_GENERIC,
         "Generic NFC Card",
         "",
     )
+    .await
 }
 
-pub fn authenticate_nfc_mifare_desfire_init_card(
-    database_conn: &DatabaseConnection,
+pub async fn authenticate_nfc_mifare_desfire_init_card(
+    database_pool: &DatabasePool,
     identity: &Identity,
     card_id: &str,
     account_id: Uuid,
 ) -> ServiceResult<String> {
     identity.require_cert()?;
 
-    let account = Account::get(database_conn, account_id)?;
+    let account = Account::get(database_pool, account_id).await?;
     let key = bytes_to_string(&generate_key_array::<16>());
 
     authentication_nfc::register(
-        database_conn,
+        database_pool,
         &account,
         card_id,
         CARD_TYPE_MIFARE_DESFIRE,
         "Ascii Pay Card",
         &key,
-    )?;
+    )
+    .await?;
 
     Ok(key)
 }

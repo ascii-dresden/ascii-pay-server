@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use uuid::Uuid;
 
 use crate::model::schema::authentication_nfc;
-use crate::utils::{DatabaseConnection, ServiceError, ServiceResult};
+use crate::utils::{DatabasePool, ServiceError, ServiceResult};
 
 use super::Account;
 
@@ -20,8 +20,8 @@ pub struct AuthenticationNfc {
 }
 
 /// Set the nfc as authentication method for the given account
-pub fn register(
-    database_conn: &DatabaseConnection,
+pub async fn register(
+    database_pool: &DatabasePool,
     account: &Account,
     card_id: &str,
     card_type: &str,
@@ -42,46 +42,46 @@ pub fn register(
         data: data.to_owned(),
     };
 
-    remove(database_conn, account)?;
+    remove(database_pool, account).await?;
     diesel::insert_into(dsl::authentication_nfc)
         .values(&a)
-        .execute(database_conn)?;
+        .execute(&*database_pool.get().await?)?;
 
     Ok(())
 }
 
 /// Remove the nfc authentication for the given account
-pub fn remove(database_conn: &DatabaseConnection, account: &Account) -> ServiceResult<()> {
+pub async fn remove(database_pool: &DatabasePool, account: &Account) -> ServiceResult<()> {
     use crate::model::schema::authentication_nfc::dsl;
 
     diesel::delete(dsl::authentication_nfc.filter(dsl::account_id.eq(&account.id)))
-        .execute(database_conn)?;
+        .execute(&*database_pool.get().await?)?;
 
     Ok(())
 }
 
-pub fn get_by_account(
-    database_conn: &DatabaseConnection,
+pub async fn get_by_account(
+    database_pool: &DatabasePool,
     account: &Account,
 ) -> ServiceResult<Vec<AuthenticationNfc>> {
     use crate::model::schema::authentication_nfc::dsl;
 
     let results = dsl::authentication_nfc
         .filter(dsl::account_id.eq(&account.id))
-        .load::<AuthenticationNfc>(database_conn)?;
+        .load::<AuthenticationNfc>(&*database_pool.get().await?)?;
 
     Ok(results)
 }
 
-pub fn get_by_card_id(
-    database_conn: &DatabaseConnection,
+pub async fn get_by_card_id(
+    database_pool: &DatabasePool,
     card_id: &str,
 ) -> ServiceResult<AuthenticationNfc> {
     use crate::model::schema::authentication_nfc::dsl;
 
     let mut results = dsl::authentication_nfc
         .filter(dsl::card_id.eq(&card_id))
-        .load::<AuthenticationNfc>(database_conn)?;
+        .load::<AuthenticationNfc>(&*database_pool.get().await?)?;
 
     results.pop().ok_or(ServiceError::NotFound)
 }

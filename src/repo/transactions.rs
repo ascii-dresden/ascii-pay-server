@@ -1,11 +1,9 @@
-use crate::{
-    identity_service::{Identity, IdentityRequire},
-    model::{
-        session::{create_onetime_session_ttl, get_onetime_session, Session},
-        transactions::{self, TransactionItem, TransactionItemInput},
-        Account, Permission, Product, StampType, Transaction,
-    },
-    utils::{DatabaseConnection, Money, RedisConnection, ServiceError, ServiceResult},
+use crate::identity_service::{Identity, IdentityRequire};
+use crate::model::session::{create_onetime_session_ttl, get_onetime_session, Session};
+use crate::model::transactions::{self, TransactionItem, TransactionItemInput};
+use crate::model::{Account, Permission, Product, StampType, Transaction};
+use crate::utils::{
+    DatabaseConnection, DatabasePool, Money, RedisPool, ServiceError, ServiceResult,
 };
 
 use chrono::NaiveDateTime;
@@ -146,17 +144,18 @@ pub fn map_transaction_output(
     Ok((transaction, items).into())
 }
 
-pub fn transaction_payment(
-    database_conn: &DatabaseConnection,
-    redis_conn: &mut RedisConnection,
+pub async fn transaction_payment(
+    database_pool: &DatabasePool,
+    redis_pool: &RedisPool,
     identity: &Identity,
     input: PaymentInput,
 ) -> ServiceResult<PaymentOutput> {
     identity.require_cert()?;
 
-    let mut account = get_onetime_session(database_conn, redis_conn, &input.account_access_token)?;
+    let mut account =
+        get_onetime_session(database_pool, redis_pool, &input.account_access_token).await?;
     let result = transactions::execute(
-        database_conn,
+        database_pool,
         &mut account,
         input
             .transaction_items
@@ -170,10 +169,12 @@ pub fn transaction_payment(
             })
             .collect(),
         input.stop_if_stamp_payment_is_possible,
-    );
+    )
+    .await;
 
     let error = match result {
         Ok(transaction) => {
+            let database_conn = &database_pool.get().await?;
             return Ok(PaymentOutput {
                 account: account.into(),
                 transaction: Some(map_transaction_output(database_conn, transaction)?),
@@ -185,7 +186,7 @@ pub fn transaction_payment(
     };
 
     if let ServiceError::TransactionCancelled(message) = error {
-        let account_access_token = create_onetime_session_ttl(redis_conn, &account, 30)?;
+        let account_access_token = create_onetime_session_ttl(redis_pool, &account, 30).await?;
 
         return Ok(PaymentOutput {
             account: account.into(),
@@ -198,8 +199,8 @@ pub fn transaction_payment(
     Err(error)
 }
 
-pub fn get_transactions_by_account(
-    database_conn: &DatabaseConnection,
+pub async fn get_transactions_by_account(
+    database_pool: &DatabasePool,
     identity: &Identity,
     account_id: Uuid,
     transaction_filer_from: Option<NaiveDateTime>,
@@ -207,55 +208,63 @@ pub fn get_transactions_by_account(
 ) -> ServiceResult<Vec<TransactionOutput>> {
     identity.require_account(Permission::Member)?;
 
-    let account = Account::get(database_conn, account_id)?;
+    let account = Account::get(database_pool, account_id).await?;
     let entities = transactions::get_by_account(
-        database_conn,
+        database_pool,
         &account,
         transaction_filer_from,
         transaction_filer_to,
-    )?;
+    )
+    .await?;
 
+    let database_conn = &database_pool.get().await?;
     map_with_result(entities, |t| map_transaction_output(database_conn, t))
 }
 
-pub fn get_transaction_by_account(
-    database_conn: &DatabaseConnection,
+pub async fn get_transaction_by_account(
+    database_pool: &DatabasePool,
     identity: &Identity,
     account_id: Uuid,
     transaction_id: Uuid,
 ) -> ServiceResult<TransactionOutput> {
     identity.require_account(Permission::Member)?;
 
-    let account = Account::get(database_conn, account_id)?;
-    let transaction = transactions::get_by_account_and_id(database_conn, &account, transaction_id)?;
+    let account = Account::get(database_pool, account_id).await?;
+    let transaction =
+        transactions::get_by_account_and_id(database_pool, &account, transaction_id).await?;
 
+    let database_conn = &database_pool.get().await?;
     map_transaction_output(database_conn, transaction)
 }
 
-pub fn get_transactions_self(
-    database_conn: &DatabaseConnection,
+pub async fn get_transactions_self(
+    database_pool: &DatabasePool,
     identity: &Identity,
     transaction_filer_from: Option<NaiveDateTime>,
     transaction_filer_to: Option<NaiveDateTime>,
 ) -> ServiceResult<Vec<TransactionOutput>> {
     let account = identity.require_account(Permission::Default)?;
     let entities = transactions::get_by_account(
-        database_conn,
+        database_pool,
         &account,
         transaction_filer_from,
         transaction_filer_to,
-    )?;
+    )
+    .await?;
 
+    let database_conn = &database_pool.get().await?;
     map_with_result(entities, |t| map_transaction_output(database_conn, t))
 }
 
-pub fn get_transaction_self(
-    database_conn: &DatabaseConnection,
+pub async fn get_transaction_self(
+    database_pool: &DatabasePool,
     identity: &Identity,
     transaction_id: Uuid,
 ) -> ServiceResult<TransactionOutput> {
     let account = identity.require_account(Permission::Default)?;
-    let transaction = transactions::get_by_account_and_id(database_conn, &account, transaction_id)?;
+    let transaction =
+        transactions::get_by_account_and_id(database_pool, &account, transaction_id).await?;
 
+    let database_conn = &database_pool.get().await?;
     map_transaction_output(database_conn, transaction)
 }

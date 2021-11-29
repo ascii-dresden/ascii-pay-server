@@ -5,8 +5,8 @@ use std::fmt;
 use uuid::Uuid;
 
 use crate::model::schema::{authentication_password, authentication_password_invitation};
-use crate::utils::mail;
-use crate::utils::{env, generate_uuid_str, DatabaseConnection, ServiceError, ServiceResult};
+use crate::utils::{env, generate_uuid_str, ServiceError, ServiceResult};
+use crate::utils::{mail, DatabasePool};
 
 use super::Account;
 
@@ -39,8 +39,8 @@ impl fmt::Display for InvitationLink {
     }
 }
 
-pub fn create_invitation_link(
-    database_conn: &DatabaseConnection,
+pub async fn create_invitation_link(
+    database_pool: &DatabasePool,
     account: &Account,
 ) -> ServiceResult<String> {
     use crate::model::schema::authentication_password_invitation::dsl;
@@ -51,10 +51,10 @@ pub fn create_invitation_link(
         valid_until: Local::now().naive_local() + Duration::days(1),
     };
 
-    revoke_invitation_link(database_conn, account)?;
+    revoke_invitation_link(database_pool, account).await?;
     diesel::insert_into(dsl::authentication_password_invitation)
         .values(&a)
-        .execute(database_conn)?;
+        .execute(&*database_pool.get().await?)?;
 
     // send invite link if account has an associated mail address
     if !account.mail.is_empty() {
@@ -64,8 +64,8 @@ pub fn create_invitation_link(
     Ok(a.link)
 }
 
-pub fn get_invitation_link(
-    database_conn: &DatabaseConnection,
+pub async fn get_invitation_link(
+    database_pool: &DatabasePool,
     account: &Account,
 ) -> ServiceResult<Option<String>> {
     use crate::model::schema::authentication_password_invitation::dsl;
@@ -73,25 +73,25 @@ pub fn get_invitation_link(
     let mut results = dsl::authentication_password_invitation
         .filter(dsl::account_id.eq(&account.id))
         .limit(1)
-        .load::<InvitationLink>(database_conn)?;
+        .load::<InvitationLink>(&*database_pool.get().await?)?;
 
     Ok(results.pop().map(|i| i.link))
 }
 
-pub fn revoke_invitation_link(
-    database_conn: &DatabaseConnection,
+pub async fn revoke_invitation_link(
+    database_pool: &DatabasePool,
     account: &Account,
 ) -> ServiceResult<()> {
     use crate::model::schema::authentication_password_invitation::dsl;
 
     diesel::delete(dsl::authentication_password_invitation.filter(dsl::account_id.eq(&account.id)))
-        .execute(database_conn)?;
+        .execute(&*database_pool.get().await?)?;
 
     Ok(())
 }
 
-pub fn get_account_by_invitation_link(
-    database_conn: &DatabaseConnection,
+pub async fn get_account_by_invitation_link(
+    database_pool: &DatabasePool,
     link: &str,
 ) -> ServiceResult<Account> {
     use crate::model::schema::authentication_password_invitation::dsl;
@@ -99,12 +99,12 @@ pub fn get_account_by_invitation_link(
     let mut results = dsl::authentication_password_invitation
         .filter(dsl::link.eq(link))
         .limit(1)
-        .load::<InvitationLink>(database_conn)?;
+        .load::<InvitationLink>(&*database_pool.get().await?)?;
 
     let invitation_link = results.pop();
 
     match invitation_link {
-        Some(invitation_link) => Account::get(database_conn, invitation_link.account_id),
+        Some(invitation_link) => Account::get(database_pool, invitation_link.account_id).await,
         None => Err(ServiceError::InternalServerError(
             "Invalid link",
             "".to_owned(),
@@ -113,8 +113,8 @@ pub fn get_account_by_invitation_link(
 }
 
 /// Set the username and password as authentication method for the given account
-pub fn register(
-    database_conn: &DatabaseConnection,
+pub async fn register(
+    database_pool: &DatabasePool,
     account: &Account,
     password: &str,
 ) -> ServiceResult<()> {
@@ -125,50 +125,50 @@ pub fn register(
         password: hash_password(password)?,
     };
 
-    revoke_invitation_link(database_conn, account)?;
+    revoke_invitation_link(database_pool, account).await?;
 
-    remove(database_conn, account)?;
+    remove(database_pool, account).await?;
     diesel::insert_into(dsl::authentication_password)
         .values(&a)
-        .execute(database_conn)?;
+        .execute(&*database_pool.get().await?)?;
 
     Ok(())
 }
 
 /// Remove the username -password authentication for the given account
-pub fn remove(database_conn: &DatabaseConnection, account: &Account) -> ServiceResult<()> {
+pub async fn remove(database_pool: &DatabasePool, account: &Account) -> ServiceResult<()> {
     use crate::model::schema::authentication_password::dsl;
 
     diesel::delete(dsl::authentication_password.filter(dsl::account_id.eq(&account.id)))
-        .execute(database_conn)?;
+        .execute(&*database_pool.get().await?)?;
 
     Ok(())
 }
 
-pub fn has_password(database_conn: &DatabaseConnection, account: &Account) -> ServiceResult<bool> {
+pub async fn has_password(database_pool: &DatabasePool, account: &Account) -> ServiceResult<bool> {
     use crate::model::schema::authentication_password::dsl;
 
     let results = dsl::authentication_password
         .filter(dsl::account_id.eq(&account.id))
-        .load::<AuthenticationPassword>(database_conn)?;
+        .load::<AuthenticationPassword>(&*database_pool.get().await?)?;
 
     Ok(!results.is_empty())
 }
 
 /// Get account by username and password.
 /// Return `ServiceError` if no account is registered for given username - passoword pair
-pub fn get(
-    database_conn: &DatabaseConnection,
+pub async fn get(
+    database_pool: &DatabasePool,
     login: &str,
     password: &str,
 ) -> ServiceResult<Account> {
     use crate::model::schema::authentication_password::dsl;
 
-    let account = Account::find_by_login(database_conn, login)?;
+    let account = Account::find_by_login(database_pool, login).await?;
 
     let mut results = dsl::authentication_password
         .filter(dsl::account_id.eq(account.id))
-        .load::<AuthenticationPassword>(database_conn)?;
+        .load::<AuthenticationPassword>(&*database_pool.get().await?)?;
 
     let entry = results.pop().ok_or(ServiceError::NotFound)?;
 
@@ -176,13 +176,11 @@ pub fn get(
         return Err(ServiceError::NotFound);
     }
 
-    let a = Account::get(database_conn, entry.account_id)?;
-
-    Ok(a)
+    Account::get(database_pool, entry.account_id).await
 }
 
-pub fn verify_password(
-    database_conn: &DatabaseConnection,
+pub async fn verify_password(
+    database_pool: &DatabasePool,
     account: &Account,
     password: &str,
 ) -> ServiceResult<bool> {
@@ -190,7 +188,7 @@ pub fn verify_password(
 
     let mut results = dsl::authentication_password
         .filter(dsl::account_id.eq(account.id))
-        .load::<AuthenticationPassword>(database_conn)?;
+        .load::<AuthenticationPassword>(&*database_pool.get().await?)?;
 
     let entry = results.pop().ok_or(ServiceError::NotFound)?;
 

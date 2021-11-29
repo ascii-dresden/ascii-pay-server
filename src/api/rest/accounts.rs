@@ -1,9 +1,8 @@
-use std::ops::DerefMut;
-
 use crate::identity_service::Identity;
 use crate::repo::{self, AccountCreateInput, AccountUpdateInput};
 use crate::utils::{DatabasePool, RedisPool, ServiceResult};
 use actix_web::{web, HttpResponse};
+use lazy_static::__Deref;
 use uuid::Uuid;
 
 use super::Search;
@@ -14,8 +13,8 @@ pub async fn get_accounts(
     identity: Identity,
     query: web::Query<Search>,
 ) -> ServiceResult<HttpResponse> {
-    let conn = &database_pool.get()?;
-    let result = repo::get_accounts(conn, &identity, query.search.as_deref())?;
+    let result =
+        repo::get_accounts(database_pool.deref(), &identity, query.search.as_deref()).await?;
     Ok(HttpResponse::Ok().json(&result))
 }
 
@@ -25,8 +24,7 @@ pub async fn put_accounts(
     identity: Identity,
     input: web::Json<AccountCreateInput>,
 ) -> ServiceResult<HttpResponse> {
-    let conn = &database_pool.get()?;
-    let result = repo::create_account(conn, &identity, input.into_inner())?;
+    let result = repo::create_account(database_pool.deref(), &identity, input.into_inner()).await?;
     Ok(HttpResponse::Ok().json(&result))
 }
 
@@ -36,8 +34,7 @@ pub async fn get_account(
     identity: Identity,
     id: web::Path<Uuid>,
 ) -> ServiceResult<HttpResponse> {
-    let conn = &database_pool.get()?;
-    let result = repo::get_account(conn, &identity, id.into_inner())?;
+    let result = repo::get_account(database_pool.deref(), &identity, id.into_inner()).await?;
     Ok(HttpResponse::Ok().json(&result))
 }
 
@@ -48,8 +45,13 @@ pub async fn post_account(
     id: web::Path<Uuid>,
     input: web::Json<AccountUpdateInput>,
 ) -> ServiceResult<HttpResponse> {
-    let conn = &database_pool.get()?;
-    let result = repo::update_account(conn, &identity, id.into_inner(), input.into_inner())?;
+    let result = repo::update_account(
+        database_pool.deref(),
+        &identity,
+        id.into_inner(),
+        input.into_inner(),
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(&result))
 }
 
@@ -59,8 +61,7 @@ pub async fn delete_account(
     identity: Identity,
     id: web::Path<Uuid>,
 ) -> ServiceResult<HttpResponse> {
-    let conn = &database_pool.get()?;
-    let result = repo::delete_account(conn, &identity, id.into_inner())?;
+    let result = repo::delete_account(database_pool.deref(), &identity, id.into_inner())?;
     Ok(HttpResponse::Ok().json(&result))
 }
 
@@ -70,8 +71,9 @@ pub async fn delete_account_nfc(
     identity: Identity,
     id: web::Path<Uuid>,
 ) -> ServiceResult<HttpResponse> {
-    let conn = &database_pool.get()?;
-    let result = repo::authenticate_nfc_delete_card(conn, &identity, id.into_inner())?;
+    let result =
+        repo::authenticate_nfc_delete_card(database_pool.deref(), &identity, id.into_inner())
+            .await?;
     Ok(HttpResponse::Ok().json(&result))
 }
 
@@ -82,13 +84,12 @@ pub async fn get_account_access_token(
     identity: Identity,
     id: web::Path<Uuid>,
 ) -> ServiceResult<HttpResponse> {
-    let database_conn = &database_pool.get()?;
-    let mut redis_conn = redis_pool.get()?;
     let result = repo::authenticate_account(
-        database_conn,
-        redis_conn.deref_mut(),
+        database_pool.deref(),
+        redis_pool.deref(),
         &identity,
         id.into_inner(),
-    )?;
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(&result))
 }

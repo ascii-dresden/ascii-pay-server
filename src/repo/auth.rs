@@ -5,7 +5,7 @@ use crate::{
         session::{get_onetime_session, Session},
         Permission,
     },
-    utils::{DatabaseConnection, RedisConnection, ServiceError, ServiceResult},
+    utils::{DatabasePool, RedisPool, ServiceError, ServiceResult},
 };
 
 use super::accounts::AccountOutput;
@@ -28,18 +28,21 @@ pub fn get_me(identity: &Identity) -> ServiceResult<AccountOutput> {
     Ok(entity.into())
 }
 
-pub fn login(
-    database_conn: &DatabaseConnection,
-    redis_conn: &mut RedisConnection,
+pub async fn login(
+    database_pool: &DatabasePool,
+    redis_pool: &RedisPool,
     identity: &Identity,
     input: LoginInput,
 ) -> ServiceResult<LoginOutput> {
     if let Some(account_access_token) = input.account_access_token {
-        let login_result = get_onetime_session(database_conn, redis_conn, &account_access_token);
+        let login_result =
+            get_onetime_session(database_pool, redis_pool, &account_access_token).await;
 
         return match login_result {
             Ok(account) => {
-                identity.store(database_conn, redis_conn, account.id)?;
+                identity
+                    .store(database_pool, redis_pool, account.id)
+                    .await?;
 
                 let token = identity.require_auth_token()?;
                 Ok(LoginOutput {
@@ -54,10 +57,12 @@ pub fn login(
     let username = input.username.unwrap_or_default();
     let password = input.password.unwrap_or_default();
 
-    let login_result = authentication_password::get(database_conn, &username, &password);
+    let login_result = authentication_password::get(database_pool, &username, &password).await;
     match login_result {
         Ok(account) => {
-            identity.store(database_conn, redis_conn, account.id)?;
+            identity
+                .store(database_pool, redis_pool, account.id)
+                .await?;
 
             let token = identity.require_auth_token()?;
             Ok(LoginOutput {
@@ -69,18 +74,21 @@ pub fn login(
     }
 }
 
-pub fn login_mut(
-    database_conn: &DatabaseConnection,
-    redis_conn: &mut RedisConnection,
+pub async fn login_mut(
+    database_pool: &DatabasePool,
+    redis_pool: &RedisPool,
     identity: &IdentityMut,
     input: LoginInput,
 ) -> ServiceResult<LoginOutput> {
     if let Some(account_access_token) = input.account_access_token {
-        let login_result = get_onetime_session(database_conn, redis_conn, &account_access_token);
+        let login_result =
+            get_onetime_session(database_pool, redis_pool, &account_access_token).await;
 
         return match login_result {
             Ok(account) => {
-                identity.store(database_conn, redis_conn, account.id)?;
+                identity
+                    .store(database_pool, redis_pool, account.id)
+                    .await?;
 
                 let token = identity.require_auth_token()?;
                 Ok(LoginOutput {
@@ -95,10 +103,12 @@ pub fn login_mut(
     let username = input.username.unwrap_or_default();
     let password = input.password.unwrap_or_default();
 
-    let login_result = authentication_password::get(database_conn, &username, &password);
+    let login_result = authentication_password::get(database_pool, &username, &password).await;
     match login_result {
         Ok(account) => {
-            identity.store(database_conn, redis_conn, account.id)?;
+            identity
+                .store(database_pool, redis_pool, account.id)
+                .await?;
 
             let token = identity.require_auth_token()?;
             Ok(LoginOutput {
@@ -110,12 +120,12 @@ pub fn login_mut(
     }
 }
 
-pub fn logout(conn: &mut RedisConnection, identity: &Identity) -> ServiceResult<()> {
-    identity.forget(conn)?;
+pub async fn logout(redis_pool: &RedisPool, identity: &Identity) -> ServiceResult<()> {
+    identity.forget(redis_pool).await?;
     Ok(())
 }
 
-pub fn logout_mut(conn: &mut RedisConnection, identity: &IdentityMut) -> ServiceResult<()> {
-    identity.forget(conn)?;
+pub async fn logout_mut(redis_pool: &RedisPool, identity: &IdentityMut) -> ServiceResult<()> {
+    identity.forget(redis_pool).await?;
     Ok(())
 }

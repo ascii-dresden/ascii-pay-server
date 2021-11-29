@@ -1,6 +1,5 @@
-use std::ops::DerefMut;
-
 use actix_web::{web, HttpResponse};
+use lazy_static::__Deref;
 
 use crate::{
     identity_service::{Identity, IdentityMut},
@@ -21,14 +20,13 @@ pub async fn post_auth(
     redis_pool: web::Data<RedisPool>,
     input: web::Json<LoginInput>,
 ) -> ServiceResult<HttpResponse> {
-    let database_conn = &database_pool.get()?;
-    let mut redis_conn = redis_pool.get()?;
     let result = repo::login_mut(
-        database_conn,
-        redis_conn.deref_mut(),
+        database_pool.deref(),
+        redis_pool.deref(),
         &identity,
         input.into_inner(),
-    )?;
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(&result))
 }
 
@@ -37,7 +35,6 @@ pub async fn delete_auth(
     identity: IdentityMut,
     redis_pool: web::Data<RedisPool>,
 ) -> ServiceResult<HttpResponse> {
-    let mut redis_conn = redis_pool.get()?;
-    let result = repo::logout_mut(redis_conn.deref_mut(), &identity)?;
+    let result = repo::logout_mut(redis_pool.deref(), &identity).await?;
     Ok(HttpResponse::Ok().json(&result))
 }

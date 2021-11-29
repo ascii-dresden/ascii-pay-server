@@ -24,7 +24,7 @@ pub async fn get_product_image(
 ) -> ServiceResult<HttpResponse> {
     let path = repo::get_product_image(&identity, &id.into_inner())?;
 
-    Ok(NamedFile::open(path)?.into_response(&req)?)
+    Ok(NamedFile::open(path)?.into_response(&req))
 }
 
 /// GET route for `/api/v1/products/update`

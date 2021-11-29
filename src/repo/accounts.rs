@@ -1,9 +1,7 @@
 use crate::identity_service::{Identity, IdentityRequire};
 use crate::model::session::{get_onetime_session, Session};
 use crate::model::{Account, Permission};
-use crate::utils::{
-    fuzzy_vec_match, DatabaseConnection, Money, RedisConnection, ServiceError, ServiceResult,
-};
+use crate::utils::{fuzzy_vec_match, DatabasePool, Money, RedisPool, ServiceError, ServiceResult};
 use log::warn;
 use uuid::Uuid;
 
@@ -108,8 +106,8 @@ fn search_account(entity: Account, search: &str) -> Option<SearchElement<Account
     Some(search_element)
 }
 
-pub fn get_accounts(
-    database_conn: &DatabaseConnection,
+pub async fn get_accounts(
+    database_pool: &DatabasePool,
     identity: &Identity,
     search: Option<&str>,
 ) -> ServiceResult<Vec<SearchElement<AccountOutput>>> {
@@ -121,7 +119,8 @@ pub fn get_accounts(
     };
 
     let lower_search = search.trim().to_ascii_lowercase();
-    let entities: Vec<SearchElement<AccountOutput>> = Account::all(database_conn)?
+    let entities: Vec<SearchElement<AccountOutput>> = Account::all(database_pool)
+        .await?
         .into_iter()
         .filter_map(|a| search_account(a, &lower_search))
         .collect();
@@ -129,31 +128,31 @@ pub fn get_accounts(
     Ok(entities)
 }
 
-pub fn get_account(
-    database_conn: &DatabaseConnection,
+pub async fn get_account(
+    database_pool: &DatabasePool,
     identity: &Identity,
     id: Uuid,
 ) -> ServiceResult<AccountOutput> {
     identity.require_account_or_cert(Permission::Member)?;
 
-    let entity = Account::get(database_conn, id)?;
+    let entity = Account::get(database_pool, id).await?;
     Ok(entity.into())
 }
 
-pub fn get_account_by_access_token(
-    database_conn: &DatabaseConnection,
-    redis_conn: &mut RedisConnection,
+pub async fn get_account_by_access_token(
+    database_pool: &DatabasePool,
+    redis_pool: &RedisPool,
     identity: &Identity,
     account_access_token: Session,
 ) -> ServiceResult<AccountOutput> {
     identity.require_cert()?;
 
-    let entity = get_onetime_session(database_conn, redis_conn, &account_access_token)?;
+    let entity = get_onetime_session(database_pool, redis_pool, &account_access_token).await?;
     Ok(entity.into())
 }
 
-pub fn create_account(
-    database_conn: &DatabaseConnection,
+pub async fn create_account(
+    database_pool: &DatabasePool,
     identity: &Identity,
     input: AccountCreateInput,
 ) -> ServiceResult<AccountOutput> {
@@ -163,7 +162,7 @@ pub fn create_account(
         identity.require_account_or_cert(Permission::Member)?;
     }
 
-    let mut entity = Account::create(database_conn, &input.name, input.permission)?;
+    let mut entity = Account::create(database_pool, &input.name, input.permission).await?;
 
     if let Some(value) = input.minimum_credit {
         entity.minimum_credit = value;
@@ -184,20 +183,20 @@ pub fn create_account(
         entity.receives_monthly_report = value;
     }
 
-    entity.update(database_conn)?;
+    entity.update(database_pool).await?;
 
     Ok(entity.into())
 }
 
-pub fn update_account(
-    database_conn: &DatabaseConnection,
+pub async fn update_account(
+    database_pool: &DatabasePool,
     identity: &Identity,
     id: Uuid,
     input: AccountUpdateInput,
 ) -> ServiceResult<AccountOutput> {
     identity.require_account_or_cert(Permission::Member)?;
 
-    let mut entity = Account::get(database_conn, id)?;
+    let mut entity = Account::get(database_pool, id).await?;
 
     if let Permission::Admin = entity.permission {
         identity.require_account(Permission::Admin)?;
@@ -232,13 +231,13 @@ pub fn update_account(
         entity.receives_monthly_report = value;
     }
 
-    entity.update(database_conn)?;
+    entity.update(database_pool).await?;
 
     Ok(entity.into())
 }
 
 pub fn delete_account(
-    _database_conn: &DatabaseConnection,
+    _database_pool: &DatabasePool,
     identity: &Identity,
     _id: Uuid,
 ) -> ServiceResult<()> {

@@ -1,5 +1,6 @@
-use actix_http::cookie::Cookie;
+use actix_http::body::{AnyBody, MessageBody};
 use actix_http::Payload;
+use actix_web::cookie::Cookie;
 use actix_web::{web, FromRequest, HttpRequest};
 use futures::future::ok;
 use futures::prelude::*;
@@ -10,12 +11,11 @@ use futures_util::future::{ready, LocalBoxFuture, Ready};
 
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
-use std::ops::DerefMut;
+use std::error::Error as StdError;
 use std::rc::Rc;
 use std::str::from_utf8;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll};
 
 use actix_web::{
     dev::{Service, ServiceRequest, ServiceResponse, Transform},
@@ -26,9 +26,7 @@ use crate::model::session::{
     create_longtime_session, delete_longtime_session, get_longtime_session, Session,
 };
 use crate::model::{Account, Permission};
-use crate::utils::{
-    env, DatabaseConnection, DatabasePool, RedisConnection, RedisPool, ServiceError, ServiceResult,
-};
+use crate::utils::{env, DatabasePool, RedisPool, ServiceError, ServiceResult};
 
 const SESSION_COOKIE_NAME: &str = "session";
 const API_ACCESS_KEY_HEADER: &str = "X-Client-Cert";
@@ -45,14 +43,14 @@ impl IdentityService {
     }
 }
 
-impl<S, B> Transform<S> for IdentityService
+impl<S, B> Transform<S, ServiceRequest> for IdentityService
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
-    B: 'static,
+    B: MessageBody + 'static,
+    B::Error: StdError,
 {
-    type Request = ServiceRequest;
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse;
     type Error = Error;
     type InitError = ();
     type Transform = IdentityServiceMiddleware<S>;
@@ -72,9 +70,10 @@ pub struct IdentityServiceMiddleware<S> {
 
 impl<S, B> IdentityServiceMiddleware<S>
 where
-    B: 'static,
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
+    B: MessageBody + 'static,
+    B::Error: StdError,
 {
     async fn on_request(req: &mut ServiceRequest) -> ServiceResult<()> {
         let app_data_database = req.app_data::<web::Data<DatabasePool>>();
@@ -82,25 +81,24 @@ where
             Some(pool) => pool,
             None => {
                 return Err(ServiceError::InternalServerError(
-                    "r2d2 error",
+                    "app_data error",
                     "Cannot extract database from request".to_owned(),
                 ))
             }
         };
-        let database_conn = &database_pool.get()?;
 
         let app_data_redis = req.app_data::<web::Data<RedisPool>>();
         let redis_pool: &web::Data<RedisPool> = match app_data_redis {
             Some(pool) => pool,
             None => {
                 return Err(ServiceError::InternalServerError(
-                    "r2d2 error",
+                    "app_data error",
                     "Cannot extract redis from request".to_owned(),
                 ))
             }
         };
 
-        let identity_info = IdentityInfo::get(req, database_conn, redis_pool.get()?.deref_mut())?;
+        let identity_info = IdentityInfo::get(req, database_pool, redis_pool).await?;
         req.extensions_mut().insert(identity_info);
         Ok(())
     }
@@ -123,22 +121,27 @@ where
     }
 }
 
-impl<S, B> Service for IdentityServiceMiddleware<S>
+impl<S, B> Service<ServiceRequest> for IdentityServiceMiddleware<S>
 where
-    B: 'static,
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
+    B: MessageBody + 'static,
+    B::Error: StdError,
 {
-    type Request = ServiceRequest;
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse;
     type Error = Error;
     type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.service.borrow_mut().poll_ready(cx)
+    fn poll_ready(
+        &self,
+        cx: &mut ::core::task::Context<'_>,
+    ) -> ::core::task::Poll<Result<(), Self::Error>> {
+        self.service
+            .poll_ready(cx)
+            .map_err(::core::convert::Into::into)
     }
 
-    fn call(&mut self, mut req: ServiceRequest) -> Self::Future {
+    fn call(&self, mut req: ServiceRequest) -> Self::Future {
         let mut srv = self.service.clone();
 
         async move {
@@ -147,8 +150,8 @@ where
                     let mut res = srv.borrow_mut().call(req).await?;
 
                     match IdentityServiceMiddleware::<S>::on_response(&mut res) {
-                        Ok(_) => Ok(res),
-                        Err(err) => Ok(res.error_response(err)),
+                        Ok(_) => Ok(res.map_body(|_, body| AnyBody::new_boxed(body))),
+                        Err(e) => Ok(res.error_response(e)),
                     }
                 }
                 Err(err) => Ok(req.error_response(err)),
@@ -166,10 +169,10 @@ struct IdentityInfo {
 }
 
 impl IdentityInfo {
-    fn get(
+    async fn get(
         request: &ServiceRequest,
-        database_conn: &DatabaseConnection,
-        redis_conn: &mut RedisConnection,
+        database_pool: &DatabasePool,
+        redis_pool: &RedisPool,
     ) -> ServiceResult<Self> {
         let is_cert_present = env::API_ACCESS_KEY.is_empty()
             || if let Some(auth_header) = request.headers().get(API_ACCESS_KEY_HEADER) {
@@ -186,12 +189,13 @@ impl IdentityInfo {
             .map(|t| t.trim_start_matches("Bearer "))
             .map(|t| Session::from(t.to_owned()));
         if let Some(session_id) = authorization_header {
-            let session =
-                if let Ok(account) = get_longtime_session(database_conn, redis_conn, &session_id) {
-                    Some((session_id, account))
-                } else {
-                    None
-                };
+            let session = if let Ok(account) =
+                get_longtime_session(database_pool, redis_pool, &session_id).await
+            {
+                Some((session_id, account))
+            } else {
+                None
+            };
 
             return Ok(Self {
                 session,
@@ -205,12 +209,13 @@ impl IdentityInfo {
             .cookie(SESSION_COOKIE_NAME)
             .map(|t| Session::from(t.value().to_owned()));
         if let Some(session_id) = session_cookie {
-            let session =
-                if let Ok(account) = get_longtime_session(database_conn, redis_conn, &session_id) {
-                    Some((session_id, account))
-                } else {
-                    None
-                };
+            let session = if let Ok(account) =
+                get_longtime_session(database_pool, redis_pool, &session_id).await
+            {
+                Some((session_id, account))
+            } else {
+                None
+            };
 
             return Ok(Self {
                 session,
@@ -231,12 +236,13 @@ impl IdentityInfo {
         }
         let auth_token_query = auth_token_query.map(|t| Session::from(t.to_owned()));
         if let Some(session_id) = auth_token_query {
-            let session =
-                if let Ok(account) = get_longtime_session(database_conn, redis_conn, &session_id) {
-                    Some((session_id, account))
-                } else {
-                    None
-                };
+            let session = if let Ok(account) =
+                get_longtime_session(database_pool, redis_pool, &session_id).await
+            {
+                Some((session_id, account))
+            } else {
+                None
+            };
 
             return Ok(Self {
                 session,
@@ -329,7 +335,6 @@ pub struct Identity {
 impl FromRequest for Identity {
     type Error = Error;
     type Future = Ready<Result<Self, Error>>;
-    type Config = ();
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         if let Some(info) = req.extensions().get::<IdentityInfo>() {
@@ -347,22 +352,23 @@ impl FromRequest for Identity {
 }
 
 impl Identity {
-    pub fn store(
+    pub async fn store(
         &self,
-        database_conn: &DatabaseConnection,
-        redis_conn: &mut RedisConnection,
+        database_pool: &DatabasePool,
+        redis_pool: &RedisPool,
         account_id: Uuid,
     ) -> ServiceResult<()> {
-        let account = Account::get(database_conn, account_id)?;
-        let session = create_longtime_session(redis_conn, &account)?;
+        let account = Account::get(database_pool, account_id).await?;
+        let session = create_longtime_session(redis_pool, &account).await?;
         let mut s = self.session.lock().unwrap();
         *s = Some((session, account));
         Ok(())
     }
 
-    pub fn forget(&self, conn: &mut RedisConnection) -> ServiceResult<()> {
-        if let Some((session, _)) = self.session.lock().unwrap().as_ref() {
-            delete_longtime_session(conn, session)?;
+    pub async fn forget(&self, redis_pool: &RedisPool) -> ServiceResult<()> {
+        let current_session = self.session.lock().unwrap().clone();
+        if let Some((session, _)) = current_session {
+            delete_longtime_session(redis_pool, &session.clone()).await?;
         }
         let mut s = self.session.lock().unwrap();
         *s = None;
@@ -388,11 +394,16 @@ impl IdentityRequire for Identity {
     }
 }
 
-impl From<grpc::Metadata> for Identity {
-    fn from(metadata: grpc::Metadata) -> Self {
+impl From<&grpcio::RpcContext<'_>> for Identity {
+    fn from(ctx: &grpcio::RpcContext<'_>) -> Self {
+        let auth_header = ctx
+            .request_headers()
+            .iter()
+            .find(|(key, _)| *key == API_ACCESS_KEY_HEADER);
+
         let is_cert_present = env::API_ACCESS_KEY.is_empty()
-            || if let Some(auth_header) = metadata.get(API_ACCESS_KEY_HEADER) {
-                from_utf8(auth_header).unwrap_or("") == env::API_ACCESS_KEY.as_str()
+            || if let Some(auth_header) = auth_header {
+                from_utf8(auth_header.1).unwrap_or("") == env::API_ACCESS_KEY.as_str()
             } else {
                 false
             };
@@ -412,7 +423,6 @@ pub struct IdentityMut {
 impl FromRequest for IdentityMut {
     type Error = Error;
     type Future = Ready<Result<Self, Error>>;
-    type Config = ();
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         ok(Self {
@@ -422,14 +432,14 @@ impl FromRequest for IdentityMut {
 }
 
 impl IdentityMut {
-    pub fn store(
+    pub async fn store(
         &self,
-        database_conn: &DatabaseConnection,
-        redis_conn: &mut RedisConnection,
+        database_pool: &DatabasePool,
+        redis_pool: &RedisPool,
         account_id: Uuid,
     ) -> ServiceResult<()> {
-        let account = Account::get(database_conn, account_id)?;
-        let session = create_longtime_session(redis_conn, &account)?;
+        let account = Account::get(database_pool, account_id).await?;
+        let session = create_longtime_session(redis_pool, &account).await?;
 
         if let Some(info) = self.request.extensions_mut().get_mut::<IdentityInfo>() {
             info.session = Some((session, account));
@@ -441,10 +451,10 @@ impl IdentityMut {
         }
     }
 
-    pub fn forget(&self, conn: &mut RedisConnection) -> ServiceResult<()> {
+    pub async fn forget(&self, redis_pool: &RedisPool) -> ServiceResult<()> {
         if let Some(info) = self.request.extensions_mut().get_mut::<IdentityInfo>() {
             if let Some((s, _)) = &info.session {
-                delete_longtime_session(conn, s)?;
+                delete_longtime_session(redis_pool, s).await?;
             }
 
             info.session = None;

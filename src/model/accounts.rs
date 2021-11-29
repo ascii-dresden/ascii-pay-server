@@ -1,8 +1,11 @@
 use diesel::prelude::*;
+use lazy_static::__Deref;
 use uuid::Uuid;
 
 use crate::model::schema::account;
-use crate::utils::{generate_uuid, DatabaseConnection, Money, ServiceError, ServiceResult};
+use crate::utils::{
+    generate_uuid, DatabaseConnection, DatabasePool, Money, ServiceError, ServiceResult,
+};
 
 use super::enums::Permission;
 
@@ -39,8 +42,8 @@ pub struct Account {
 
 impl Account {
     /// Create a new account with the given permission level
-    pub fn create(
-        database_conn: &DatabaseConnection,
+    pub async fn create(
+        database_pool: &DatabasePool,
         name: &str,
         permission: Permission,
     ) -> ServiceResult<Account> {
@@ -61,6 +64,7 @@ impl Account {
             bottle_stamps: 0,
         };
 
+        let database_conn = &database_pool.get().await?;
         if !a.exist_conflicting_account(database_conn)? {
             return Err(ServiceError::InternalServerError(
                 "Conflicting account settings",
@@ -70,13 +74,32 @@ impl Account {
 
         diesel::insert_into(dsl::account)
             .values(&a)
-            .execute(database_conn)?;
+            .execute(database_conn.deref())?;
 
         Ok(a)
     }
 
     /// Save the current account data to the database
-    pub fn update(&self, database_conn: &DatabaseConnection) -> ServiceResult<()> {
+    pub async fn update(&self, database_pool: &DatabasePool) -> ServiceResult<()> {
+        use crate::model::schema::account::dsl;
+
+        let database_conn = &database_pool.get().await?;
+        if !self.exist_conflicting_account(database_conn)? {
+            return Err(ServiceError::InternalServerError(
+                "Conflicting account settings",
+                "The given account settings conflict with the other existing accounts".to_owned(),
+            ));
+        }
+
+        diesel::update(dsl::account.find(&self.id))
+            .set(self)
+            .execute(database_conn.deref())?;
+
+        Ok(())
+    }
+
+    /// Save the current account data to the database
+    pub fn update_sync(&self, database_conn: &DatabaseConnection) -> ServiceResult<()> {
         use crate::model::schema::account::dsl;
 
         if !self.exist_conflicting_account(database_conn)? {
@@ -94,30 +117,41 @@ impl Account {
     }
 
     /// List all accounts
-    pub fn all(database_conn: &DatabaseConnection) -> ServiceResult<Vec<Account>> {
+    pub async fn all(database_pool: &DatabasePool) -> ServiceResult<Vec<Account>> {
         use crate::model::schema::account::dsl;
 
         let results = dsl::account
             .order(dsl::name.asc())
-            .load::<Account>(database_conn)?;
+            .load::<Account>(&*database_pool.get().await?)?;
 
         Ok(results)
     }
 
     /// Get an account by the `id`
-    pub fn get(database_conn: &DatabaseConnection, id: Uuid) -> ServiceResult<Account> {
+    pub async fn get(database_pool: &DatabasePool, id: Uuid) -> ServiceResult<Account> {
         use crate::model::schema::account::dsl;
 
         let mut results = dsl::account
             .filter(dsl::id.eq(id))
-            .load::<Account>(database_conn)?;
+            .load::<Account>(&*database_pool.get().await?)?;
 
         results.pop().ok_or(ServiceError::NotFound)
     }
 
     /// Get an account by the `id`
-    pub fn find_by_login(
-        database_conn: &DatabaseConnection,
+    pub fn get_sync(database_conn: &DatabaseConnection, id: Uuid) -> ServiceResult<Account> {
+        use crate::model::schema::account::dsl;
+
+        let mut results = dsl::account
+            .filter(dsl::id.eq(id))
+            .load::<Account>(database_conn.deref())?;
+
+        results.pop().ok_or(ServiceError::NotFound)
+    }
+
+    /// Get an account by the `id`
+    pub async fn find_by_login(
+        database_pool: &DatabasePool,
         login: &str,
     ) -> ServiceResult<Account> {
         use crate::model::schema::account::dsl;
@@ -125,7 +159,7 @@ impl Account {
         let mut results = match Uuid::parse_str(login) {
             Ok(uuid) => dsl::account
                 .filter(dsl::id.eq(uuid))
-                .load::<Account>(database_conn)?,
+                .load::<Account>(&*database_pool.get().await?)?,
             Err(_) => dsl::account
                 .filter(
                     dsl::mail
@@ -133,7 +167,7 @@ impl Account {
                         .or(dsl::username.eq(login))
                         .or(dsl::account_number.eq(login)),
                 )
-                .load::<Account>(database_conn)?,
+                .load::<Account>(&*database_pool.get().await?)?,
         };
 
         if results.len() > 1 {

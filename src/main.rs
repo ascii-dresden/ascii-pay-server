@@ -18,11 +18,11 @@ extern crate wallet_pass;
 extern crate async_graphql;
 
 use std::io::Write;
+use std::ops::Deref;
 
 use clap::{App, SubCommand};
-use diesel::r2d2::{self, ConnectionManager};
+use diesel::PgConnection;
 use log::{error, info, warn};
-use r2d2_redis::RedisConnectionManager;
 
 // Internal services
 mod demo_data;
@@ -40,13 +40,13 @@ mod api;
 use crate::api::graphql::print_grahpql_schema;
 use crate::demo_data::load_demo_data;
 use crate::model::{authentication_password, Account, Permission, Product};
-use crate::utils::{env, DatabaseConnection, DatabasePool, ServiceResult};
+use crate::utils::{bb8_diesel, env, DatabasePool, ServiceResult};
 use grpc_server::start_tcp_server;
 use http_server::start_http_server;
 
 embed_migrations!();
 
-#[actix_web::main]
+#[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
     std::env::set_var(
@@ -88,17 +88,20 @@ async fn init() -> ServiceResult<()> {
     }
 
     // Setup database connection
-    let database_manager = ConnectionManager::<DatabaseConnection>::new(env::DATABASE_URI.as_str());
-    let database_pool = r2d2::Pool::builder().build(database_manager)?;
+    let database_manager =
+        bb8_diesel::DieselConnectionManager::<PgConnection>::new(env::DATABASE_URI.as_str());
+    let database_pool = bb8::Pool::builder().build(database_manager).await?;
 
     Product::load_dataset()?;
 
     // Setup redis connection
-    let redis_manager = RedisConnectionManager::new(env::REDIS_URI.as_str())?;
-    let redis_pool = r2d2::Pool::builder().build(redis_manager)?;
+    let redis_manager = bb8_redis::RedisConnectionManager::new(env::REDIS_URI.as_str()).unwrap();
+    let redis_pool = bb8::Pool::builder().build(redis_manager).await?;
 
-    let conn = database_pool.get()?;
-    embedded_migrations::run_with_output(&conn, &mut std::io::stdout())?;
+    {
+        let conn = database_pool.get().await?;
+        embedded_migrations::run_with_output(conn.deref(), &mut std::io::stdout())?;
+    }
 
     if let Some(_matches) = matches.subcommand_matches("run") {
         // Setup web server
@@ -109,12 +112,12 @@ async fn init() -> ServiceResult<()> {
 
     if let Some(_matches) = matches.subcommand_matches("admin") {
         // Check if admin exists, create otherwise
-        create_admin_user(&database_pool)?;
+        create_admin_user(&database_pool).await?;
         return Ok(());
     }
 
     if let Some(_matches) = matches.subcommand_matches("load-demo-data") {
-        load_demo_data(&database_pool)?;
+        load_demo_data(&database_pool).await?;
         return Ok(());
     }
 
@@ -147,17 +150,15 @@ fn read_value(prompt: &str, hide_input: bool) -> String {
     }
 }
 
-fn create_admin_user(database_pool: &DatabasePool) -> ServiceResult<()> {
-    let database_conn = &database_pool.get()?;
-
+async fn create_admin_user(database_pool: &DatabasePool) -> ServiceResult<()> {
     let fullname = read_value("Fullname: ", false);
     let username = read_value("Username: ", false);
     let password = read_value("Password: ", true);
 
-    let mut account = Account::create(database_conn, &fullname, Permission::Admin)?;
+    let mut account = Account::create(database_pool, &fullname, Permission::Admin).await?;
     account.username = username.clone();
-    account.update(database_conn)?;
-    authentication_password::register(database_conn, &account, &password)?;
+    account.update(database_pool).await?;
+    authentication_password::register(database_pool, &account, &password).await?;
 
     info!("Admin user '{}' was successfully created!", username);
 

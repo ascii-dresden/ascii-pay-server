@@ -1,4 +1,4 @@
-use std::ops::DerefMut;
+use std::ops::Deref;
 
 use actix_web::{web, HttpResponse};
 use chrono::NaiveDateTime;
@@ -19,16 +19,16 @@ pub async fn post_transaction_payment(
     identity: Identity,
     input: web::Json<PaymentInput>,
 ) -> ServiceResult<HttpResponse> {
-    let database_conn = &database_pool.get()?;
-    let mut redis_conn = redis_pool.get()?;
     let result = repo::transaction_payment(
-        database_conn,
-        redis_conn.deref_mut(),
+        database_pool.deref(),
+        redis_pool.deref(),
         &identity,
         input.into_inner(),
-    )?;
+    )
+    .await?;
 
-    if let Err(e) = wallet::send_update_notification(database_conn, result.account.id).await {
+    if let Err(e) = wallet::send_update_notification(database_pool.deref(), result.account.id).await
+    {
         error!("Error while communicating with APNS: {:?}", e);
     }
 
@@ -48,10 +48,15 @@ pub async fn get_transactions_by_account(
     id: web::Path<Uuid>,
     transaction_filter: web::Query<TransactionFilterInput>,
 ) -> ServiceResult<HttpResponse> {
-    let conn = &database_pool.get()?;
-
     let TransactionFilterInput { from, to } = transaction_filter.into_inner();
-    let result = repo::get_transactions_by_account(conn, &identity, id.into_inner(), from, to)?;
+    let result = repo::get_transactions_by_account(
+        database_pool.deref(),
+        &identity,
+        id.into_inner(),
+        from,
+        to,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(&result))
 }
 
@@ -61,9 +66,13 @@ pub async fn get_transaction_by_account(
     identity: Identity,
     id: web::Path<(Uuid, Uuid)>,
 ) -> ServiceResult<HttpResponse> {
-    let conn = &database_pool.get()?;
-
     let (account_id, transaction_id) = id.into_inner();
-    let result = repo::get_transaction_by_account(conn, &identity, account_id, transaction_id)?;
+    let result = repo::get_transaction_by_account(
+        database_pool.deref(),
+        &identity,
+        account_id,
+        transaction_id,
+    )
+    .await?;
     Ok(HttpResponse::Ok().json(&result))
 }

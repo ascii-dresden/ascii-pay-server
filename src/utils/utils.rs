@@ -1,17 +1,17 @@
 use std::convert::TryInto;
 
 use aes::Aes128;
+use bb8_redis::{redis, RedisConnectionManager};
 use block_modes::block_padding::Pkcs7;
 use block_modes::{BlockMode, Cbc};
 use diesel::prelude::*;
-use diesel::r2d2::{self, ConnectionManager};
-use r2d2_redis::{redis, RedisConnectionManager};
 use rand::RngCore;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 use sublime_fuzzy as fuzzy;
 use uuid::Uuid;
 
+use super::bb8_diesel::DieselConnectionManager;
 use super::{ServiceError, ServiceResult};
 
 lazy_static::lazy_static! {
@@ -27,11 +27,11 @@ pub type DB = diesel::pg::Pg;
 
 /// Reference type to the current database connection
 pub type DatabaseConnection = PgConnection;
-pub type RedisConnection = redis::Connection;
+pub type RedisConnection = redis::aio::Connection;
 
 /// Reference type to the threaded pool of the current database connection
-pub type DatabasePool = r2d2::Pool<ConnectionManager<DatabaseConnection>>;
-pub type RedisPool = r2d2::Pool<RedisConnectionManager>;
+pub type DatabasePool = bb8::Pool<DieselConnectionManager<DatabaseConnection>>;
+pub type RedisPool = bb8::Pool<RedisConnectionManager>;
 
 /// Generate a new random uuid
 pub fn generate_uuid() -> Uuid {
