@@ -213,9 +213,6 @@ impl AuthenticationRunner {
             t::authenticate_nfc_type(&self.database_pool, &identity, req.get_card_id()).await,
         )?;
 
-        println!("{:?}", req.get_card_id());
-        println!("{:?}", nfc_card_type);
-
         let mut response = AuthenticateNfcTypeResponse::new();
         response.set_card_id(req.get_card_id().to_owned());
         response.set_tokenType(nfc_card_type.into());
@@ -661,8 +658,6 @@ pub fn start_tcp_server(database_pool: DatabasePool, redis_pool: RedisPool) {
             .expect("GRPC server could not be started!");
         server.start();
         for (host, port) in server.bind_addrs() {
-            info!("listening on {}:{}", host, port);
-
             info!("Start grpc server at {}:{}", host, port);
         }
 
