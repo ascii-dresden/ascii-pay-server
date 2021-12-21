@@ -17,5 +17,9 @@ pub fn init(config: &mut web::ServiceConfig) {
             web::resource("/v1/passes/{pass_type_id}/{serial_number}")
                 .route(web::get().to(wallet_routes::pass_delivery)),
         )
-        .service(web::resource("/v1/log").route(web::post().to(wallet_routes::log)));
+        .service(web::resource("/v1/log").route(web::post().to(wallet_routes::log)))
+        .service(
+            web::resource("/v1/AsciiPayCard.pkpass")
+                .route(web::get().to(wallet_routes::create_pass)),
+        );
 }

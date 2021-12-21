@@ -1,4 +1,5 @@
-use crate::model::{wallet, Account};
+use crate::identity_service::{Identity, IdentityRequire};
+use crate::model::{wallet, Account, Permission};
 use crate::utils::{env, DatabasePool, ServiceError, ServiceResult};
 use actix_web::{web, HttpRequest, HttpResponse};
 use lazy_static::__Deref;
@@ -280,6 +281,18 @@ pub async fn pass_delivery(
     } else {
         Ok(HttpResponse::Unauthorized().finish())
     }
+}
+
+/// GET route for `/v1/AsciiPayCard.pkpass` if user is logged in
+pub async fn create_pass(
+    database_pool: web::Data<DatabasePool>,
+    identity: Identity,
+) -> ServiceResult<HttpResponse> {
+    let account = identity.require_account(Permission::Default)?;
+    let vec = wallet::create_pass(database_pool.deref(), &account).await?;
+    Ok(HttpResponse::Ok()
+        .content_type("application/vnd.apple.pkpass")
+        .body(vec))
 }
 
 #[derive(Debug, Deserialize)]
