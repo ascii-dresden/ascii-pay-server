@@ -177,6 +177,51 @@ impl Account {
         results.pop().ok_or(ServiceError::NotFound)
     }
 
+    /// Create a new account with the given permission level
+    pub async fn create_admin_account(
+        database_pool: &DatabasePool,
+        fullname: &str,
+        username: &str,
+    ) -> ServiceResult<(Account, bool)> {
+        use crate::model::schema::account::dsl;
+        let database_conn = &database_pool.get().await?;
+
+        let admin_id = Uuid::nil();
+        let admin_account = Self::get_sync(database_conn, admin_id).ok();
+
+        if let Some(mut admin_account) = admin_account {
+            admin_account.name = fullname.to_owned();
+            admin_account.username = username.to_owned();
+
+            diesel::update(dsl::account.find(&admin_account.id))
+                .set(&admin_account)
+                .execute(database_conn.deref())?;
+
+            Ok((admin_account, false))
+        } else {
+            let admin_account = Account {
+                id: admin_id,
+                credit: 0,
+                minimum_credit: 0,
+                name: fullname.to_owned(),
+                mail: String::new(),
+                username: username.to_owned(),
+                account_number: String::new(),
+                permission: Permission::Admin,
+                receives_monthly_report: false,
+                use_digital_stamps: true,
+                coffee_stamps: 0,
+                bottle_stamps: 0,
+            };
+
+            diesel::insert_into(dsl::account)
+                .values(&admin_account)
+                .execute(database_conn.deref())?;
+
+            Ok((admin_account, true))
+        }
+    }
+
     fn exist_conflicting_account(&self, database_conn: &DatabaseConnection) -> ServiceResult<bool> {
         use crate::model::schema::account::dsl;
 

@@ -5,17 +5,9 @@ use log::error;
 use super::StampType;
 use crate::utils::{env, Money, ServiceError, ServiceResult};
 
-#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone, SimpleObject)]
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone, SimpleObject, Default)]
 pub struct Category {
     pub name: String,
-}
-
-impl Default for Category {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-        }
-    }
 }
 
 /// Represent a product

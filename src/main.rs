@@ -12,17 +12,15 @@ extern crate clap;
 extern crate uuid;
 #[macro_use]
 extern crate hex_literal;
-extern crate rpassword;
 extern crate wallet_pass;
 #[macro_use]
 extern crate async_graphql;
 
-use std::io::Write;
 use std::ops::Deref;
 
 use clap::{App, SubCommand};
 use diesel::PgConnection;
-use log::{error, info, warn};
+use log::{error, info};
 
 // Internal services
 mod demo_data;
@@ -39,7 +37,7 @@ mod api;
 
 use crate::api::graphql::print_grahpql_schema;
 use crate::demo_data::load_demo_data;
-use crate::model::{authentication_password, Account, Permission, Product};
+use crate::model::{authentication_password, Account, Product};
 use crate::utils::{bb8_diesel, env, DatabasePool, ServiceResult};
 use grpc_server::start_tcp_server;
 use http_server::start_http_server;
@@ -124,43 +122,20 @@ async fn init() -> ServiceResult<()> {
     Ok(())
 }
 
-/// Read a value from stdin
-///
-/// # Arguments
-/// * `prompt` - A prompt that descripes the required input
-/// * `hide_input` - Specifies if the input value is visible or hidden
-fn read_value(prompt: &str, hide_input: bool) -> String {
-    if hide_input {
-        loop {
-            let p1 = rpassword::prompt_password_stdout(prompt).unwrap();
-            let p2 = rpassword::prompt_password_stdout(prompt).unwrap();
-
-            if p1 == p2 {
-                return p1;
-            } else {
-                warn!("Passwords does not match, retry.");
-            }
-        }
-    } else {
-        print!("{}", prompt);
-        std::io::stdout().flush().unwrap();
-        let mut value = String::new();
-        std::io::stdin().read_line(&mut value).unwrap();
-        value.trim().to_owned()
-    }
-}
-
 async fn create_admin_user(database_pool: &DatabasePool) -> ServiceResult<()> {
-    let fullname = read_value("Fullname: ", false);
-    let username = read_value("Username: ", false);
-    let password = read_value("Password: ", true);
+    let mut password = String::new();
+    std::io::stdin().read_line(&mut password)?;
+    password = password.trim().to_owned();
 
-    let mut account = Account::create(database_pool, &fullname, Permission::Admin).await?;
-    account.username = username.clone();
-    account.update(database_pool).await?;
+    let (account, created) =
+        Account::create_admin_account(database_pool, "Administrator", "admin").await?;
     authentication_password::register(database_pool, &account, &password).await?;
 
-    info!("Admin user '{}' was successfully created!", username);
+    if created {
+        info!("Admin user was successfully created!");
+    } else {
+        info!("Admin user was successfully updated!");
+    }
 
     Ok(())
 }
