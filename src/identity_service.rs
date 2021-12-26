@@ -1,4 +1,4 @@
-use actix_http::body::{AnyBody, MessageBody};
+use actix_http::body::{EitherBody, MessageBody};
 use actix_http::Payload;
 use actix_web::cookie::Cookie;
 use actix_web::{web, FromRequest, HttpRequest};
@@ -50,7 +50,7 @@ where
     B: MessageBody + 'static,
     B::Error: StdError,
 {
-    type Response = ServiceResponse;
+    type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
     type InitError = ();
     type Transform = IdentityServiceMiddleware<S>;
@@ -128,7 +128,7 @@ where
     B: MessageBody + 'static,
     B::Error: StdError,
 {
-    type Response = ServiceResponse;
+    type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
     type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -150,11 +150,11 @@ where
                     let mut res = srv.borrow_mut().call(req).await?;
 
                     match IdentityServiceMiddleware::<S>::on_response(&mut res) {
-                        Ok(_) => Ok(res.map_body(|_, body| AnyBody::new_boxed(body))),
-                        Err(e) => Ok(res.error_response(e)),
+                        Ok(_) => Ok(res.map_into_left_body()),
+                        Err(err) => Ok(res.error_response(err).map_into_right_body()),
                     }
                 }
-                Err(err) => Ok(req.error_response(err)),
+                Err(err) => Ok(req.error_response(err).map_into_right_body()),
             }
         }
         .boxed_local()

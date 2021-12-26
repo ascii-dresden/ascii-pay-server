@@ -4,4 +4,3 @@ dist/
 backup/
 target/
 docker/
-Dockerfile
