@@ -176,7 +176,7 @@ pub async fn transaction_payment(
         Ok(transaction) => {
             let database_conn = &database_pool.get().await?;
             return Ok(PaymentOutput {
-                account: account.into(),
+                account: account.joined_sync(database_conn)?.into(),
                 transaction: Some(map_transaction_output(database_conn, transaction)?),
                 account_access_token: None,
                 error: None,
@@ -187,9 +187,10 @@ pub async fn transaction_payment(
 
     if let ServiceError::TransactionCancelled(message) = error {
         let account_access_token = create_onetime_session_ttl(redis_pool, &account, 30).await?;
+        let database_conn = &database_pool.get().await?;
 
         return Ok(PaymentOutput {
-            account: account.into(),
+            account: account.joined_sync(database_conn)?.into(),
             transaction: None,
             account_access_token: Some(account_access_token),
             error: Some(PaymentOutputError { message }),

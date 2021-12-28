@@ -2,11 +2,13 @@ use diesel::prelude::*;
 use lazy_static::__Deref;
 use uuid::Uuid;
 
+use crate::model::authentication_password::AuthenticationPassword;
 use crate::model::schema::account;
 use crate::utils::{
     generate_uuid, DatabaseConnection, DatabasePool, Money, ServiceError, ServiceResult,
 };
 
+use super::authentication_nfc::AuthenticationNfc;
 use super::enums::Permission;
 
 /// Represent a account
@@ -39,6 +41,8 @@ pub struct Account {
     pub bottle_stamps: i32,
     pub receives_monthly_report: bool,
 }
+
+pub type AccountJoined = (Account, bool, Vec<AuthenticationNfc>);
 
 impl Account {
     /// Create a new account with the given permission level
@@ -136,6 +140,84 @@ impl Account {
             .load::<Account>(&*database_pool.get().await?)?;
 
         results.pop().ok_or(ServiceError::NotFound)
+    }
+
+    pub async fn all_joined(database_pool: &DatabasePool) -> ServiceResult<Vec<AccountJoined>> {
+        use crate::model::schema::account::dsl as dsl1;
+        use crate::model::schema::authentication_nfc::dsl as dsl3;
+        use crate::model::schema::authentication_password::dsl as dsl2;
+
+        let conn = &*database_pool.get().await?;
+
+        let results = dsl1::account
+            .left_join(dsl2::authentication_password)
+            .load::<(Account, Option<AuthenticationPassword>)>(conn)?;
+
+        let mut vec = Vec::with_capacity(results.len());
+
+        for (account, pw) in results {
+            let nfc_tokens = dsl3::authentication_nfc
+                .filter(dsl3::account_id.eq(&account.id))
+                .load::<AuthenticationNfc>(conn)?;
+            vec.push((account, pw.is_some(), nfc_tokens));
+        }
+
+        Ok(vec)
+    }
+
+    pub async fn get_joined(
+        database_pool: &DatabasePool,
+        id: Uuid,
+    ) -> ServiceResult<AccountJoined> {
+        use crate::model::schema::account::dsl as dsl1;
+        use crate::model::schema::authentication_nfc::dsl as dsl3;
+        use crate::model::schema::authentication_password::dsl as dsl2;
+
+        let conn = &*database_pool.get().await?;
+
+        let mut results = dsl1::account
+            .left_join(dsl2::authentication_password)
+            .filter(dsl1::id.eq(id))
+            .load::<(Account, Option<AuthenticationPassword>)>(conn)?;
+        let (account, pw) = results.pop().ok_or(ServiceError::NotFound)?;
+
+        let nfc_tokens = dsl3::authentication_nfc
+            .filter(dsl3::account_id.eq(&account.id))
+            .load::<AuthenticationNfc>(conn)?;
+
+        Ok((account, pw.is_some(), nfc_tokens))
+    }
+
+    pub async fn joined(self, database_pool: &DatabasePool) -> ServiceResult<AccountJoined> {
+        use crate::model::schema::authentication_nfc::dsl as dsl3;
+        use crate::model::schema::authentication_password::dsl as dsl2;
+
+        let conn = &*database_pool.get().await?;
+
+        let passwords = dsl2::authentication_password
+            .filter(dsl2::account_id.eq(&self.id))
+            .load::<AuthenticationPassword>(conn)?;
+
+        let nfc_tokens = dsl3::authentication_nfc
+            .filter(dsl3::account_id.eq(&self.id))
+            .load::<AuthenticationNfc>(conn)?;
+
+        Ok((self, !passwords.is_empty(), nfc_tokens))
+    }
+
+    pub fn joined_sync(self, database_conn: &DatabaseConnection) -> ServiceResult<AccountJoined> {
+        use crate::model::schema::authentication_nfc::dsl as dsl3;
+        use crate::model::schema::authentication_password::dsl as dsl2;
+
+        let passwords = dsl2::authentication_password
+            .filter(dsl2::account_id.eq(&self.id))
+            .load::<AuthenticationPassword>(database_conn.deref())?;
+
+        let nfc_tokens = dsl3::authentication_nfc
+            .filter(dsl3::account_id.eq(&self.id))
+            .load::<AuthenticationNfc>(database_conn.deref())?;
+
+        Ok((self, !passwords.is_empty(), nfc_tokens))
     }
 
     /// Get an account by the `id`

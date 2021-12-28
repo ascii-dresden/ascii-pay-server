@@ -23,8 +23,12 @@ pub struct LoginOutput {
     pub authorization: String,
 }
 
-pub fn get_me(identity: &Identity) -> ServiceResult<AccountOutput> {
+pub async fn get_me(
+    database_pool: &DatabasePool,
+    identity: &Identity,
+) -> ServiceResult<AccountOutput> {
     let entity = identity.require_account(Permission::Default)?;
+    let entity = entity.joined(database_pool).await?;
     Ok(entity.into())
 }
 

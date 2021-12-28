@@ -8,8 +8,11 @@ use crate::{
 };
 
 /// GET route for `/api/v1/auth`
-pub async fn get_auth(identity: Identity) -> ServiceResult<HttpResponse> {
-    let result = repo::get_me(&identity)?;
+pub async fn get_auth(
+    database_pool: web::Data<DatabasePool>,
+    identity: Identity,
+) -> ServiceResult<HttpResponse> {
+    let result = repo::get_me(database_pool.deref(), &identity).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

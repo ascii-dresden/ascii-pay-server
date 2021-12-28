@@ -42,7 +42,6 @@ pub async fn register(
         data: data.to_owned(),
     };
 
-    remove(database_pool, account).await?;
     diesel::insert_into(dsl::authentication_nfc)
         .values(&a)
         .execute(&*database_pool.get().await?)?;
@@ -51,11 +50,21 @@ pub async fn register(
 }
 
 /// Remove the nfc authentication for the given account
-pub async fn remove(database_pool: &DatabasePool, account: &Account) -> ServiceResult<()> {
+pub async fn remove(
+    database_pool: &DatabasePool,
+    account: &Account,
+    card_id: &str,
+) -> ServiceResult<()> {
     use crate::model::schema::authentication_nfc::dsl;
 
-    diesel::delete(dsl::authentication_nfc.filter(dsl::account_id.eq(&account.id)))
-        .execute(&*database_pool.get().await?)?;
+    diesel::delete(
+        dsl::authentication_nfc.filter(
+            dsl::account_id
+                .eq(&account.id)
+                .and(dsl::card_id.eq(&card_id)),
+        ),
+    )
+    .execute(&*database_pool.get().await?)?;
 
     Ok(())
 }

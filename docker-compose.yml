@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: docker/server.Dockerfile
+    image: asciipay/server:latest
     restart: always
     container_name: "ascii-pay-server"
     environment:

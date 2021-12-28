@@ -23,7 +23,6 @@ use diesel::PgConnection;
 use log::{error, info};
 
 // Internal services
-mod demo_data;
 mod grpc;
 mod grpc_server;
 mod http_server;
@@ -36,7 +35,6 @@ mod utils;
 mod api;
 
 use crate::api::graphql::print_grahpql_schema;
-use crate::demo_data::load_demo_data;
 use crate::model::{authentication_password, Account, Product};
 use crate::utils::{bb8_diesel, env, DatabasePool, ServiceResult};
 use grpc_server::start_tcp_server;
@@ -71,11 +69,6 @@ async fn init() -> ServiceResult<()> {
         .version(crate_version!())
         .about(crate_description!())
         .author(crate_authors!("\n"))
-        .subcommand(SubCommand::with_name("run").about("Start the web server"))
-        .subcommand(
-            SubCommand::with_name("load-demo-data")
-                .about("Initilize the database with demo data. This requires an empty database!"),
-        )
         .subcommand(SubCommand::with_name("admin").about("Create a new admin user"))
         .subcommand(SubCommand::with_name("graphql").about("Print graphql definition"))
         .get_matches();
@@ -101,23 +94,14 @@ async fn init() -> ServiceResult<()> {
         embedded_migrations::run_with_output(conn.deref(), &mut std::io::stdout())?;
     }
 
-    if let Some(_matches) = matches.subcommand_matches("run") {
-        // Setup web server
-        start_tcp_server(database_pool.clone(), redis_pool.clone());
-        start_http_server(database_pool, redis_pool).await?;
-        return Ok(());
-    }
-
     if let Some(_matches) = matches.subcommand_matches("admin") {
         // Check if admin exists, create otherwise
         create_admin_user(&database_pool).await?;
         return Ok(());
     }
 
-    if let Some(_matches) = matches.subcommand_matches("load-demo-data") {
-        load_demo_data(&database_pool).await?;
-        return Ok(());
-    }
+    start_tcp_server(database_pool.clone(), redis_pool.clone());
+    start_http_server(database_pool, redis_pool).await?;
 
     Ok(())
 }

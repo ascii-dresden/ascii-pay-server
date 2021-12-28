@@ -35,7 +35,7 @@ table! {
 }
 
 table! {
-    authentication_nfc (account_id, card_id) {
+    authentication_nfc (card_id) {
         account_id -> Uuid,
         card_id -> Varchar,
         card_type -> Varchar,
@@ -87,6 +87,9 @@ table! {
     }
 }
 
+joinable!(authentication_nfc -> account (account_id));
+joinable!(authentication_password -> account (account_id));
+joinable!(transaction -> account (account_id));
 joinable!(transaction_item -> transaction (transaction_id));
 
 allow_tables_to_appear_in_same_query!(

@@ -14,7 +14,7 @@ pub enum TokenType {
     ProductId,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Enum)]
 pub enum NfcCardType {
     Generic,
     MifareDesfire,
@@ -226,12 +226,13 @@ pub async fn authenticate_nfc_delete_card(
     database_pool: &DatabasePool,
     identity: &Identity,
     account_id: Uuid,
+    card_id: &str,
 ) -> ServiceResult<()> {
     identity.require_cert()?;
 
     let account = Account::get(database_pool, account_id).await?;
 
-    authentication_nfc::remove(database_pool, &account).await
+    authentication_nfc::remove(database_pool, &account, card_id).await
 }
 
 pub async fn authenticate_nfc_generic_init_card(

@@ -26,7 +26,7 @@ pub fn init(config: &mut web::ServiceConfig) {
                 .route(web::put().to(accounts::put_accounts)),
         )
         .service(
-            web::resource("/account/{account_id}/nfc")
+            web::resource("/account/{account_id}/nfc/{card_id}")
                 .route(web::delete().to(accounts::delete_account_nfc)),
         )
         .service(

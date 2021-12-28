@@ -75,10 +75,15 @@ impl Mutation {
         Ok("ok".to_string())
     }
 
-    async fn delete_account_nfc_card(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<String> {
+    async fn delete_account_nfc_card(
+        &self,
+        ctx: &Context<'_>,
+        id: Uuid,
+        card_id: String,
+    ) -> ServiceResult<String> {
         let database_pool = ctx.data::<Arc<DatabasePool>>()?;
         let identity = ctx.data::<Identity>()?;
-        repo::authenticate_nfc_delete_card(database_pool.deref(), identity, id).await?;
+        repo::authenticate_nfc_delete_card(database_pool.deref(), identity, id, &card_id).await?;
         Ok("ok".to_string())
     }
 

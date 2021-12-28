@@ -1,6 +1,7 @@
 use crate::identity_service::{Identity, IdentityRequire};
+use crate::model::authentication_nfc::AuthenticationNfc;
 use crate::model::session::{get_onetime_session, Session};
-use crate::model::{Account, Permission};
+use crate::model::{Account, AccountJoined, Permission};
 use crate::utils::{fuzzy_vec_match, DatabasePool, Money, RedisPool, ServiceError, ServiceResult};
 use log::warn;
 use uuid::Uuid;
@@ -32,6 +33,23 @@ pub struct AccountUpdateInput {
 }
 
 #[derive(Debug, Serialize, SimpleObject)]
+pub struct AccountNfcTokenOutput {
+    pub card_id: String,
+    pub card_type: String,
+    pub name: String,
+}
+
+impl From<AuthenticationNfc> for AccountNfcTokenOutput {
+    fn from(entity: AuthenticationNfc) -> Self {
+        Self {
+            card_id: entity.card_id,
+            card_type: entity.card_type,
+            name: entity.name,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, SimpleObject)]
 pub struct AccountOutput {
     pub id: Uuid,
     pub credit: Money,
@@ -45,39 +63,44 @@ pub struct AccountOutput {
     pub coffee_stamps: i32,
     pub bottle_stamps: i32,
     pub receives_monthly_report: bool,
+    pub is_password_set: bool,
+    pub nfc_tokens: Vec<AccountNfcTokenOutput>,
 }
 
-impl From<Account> for AccountOutput {
-    fn from(entity: Account) -> Self {
+impl From<AccountJoined> for AccountOutput {
+    fn from(entity: AccountJoined) -> Self {
         Self {
-            id: entity.id,
-            credit: entity.credit,
-            minimum_credit: entity.minimum_credit,
-            name: entity.name,
-            mail: entity.mail,
-            username: entity.username,
-            account_number: entity.account_number,
-            permission: entity.permission,
-            use_digital_stamps: entity.use_digital_stamps,
-            coffee_stamps: entity.coffee_stamps,
-            bottle_stamps: entity.bottle_stamps,
-            receives_monthly_report: entity.receives_monthly_report,
+            id: entity.0.id,
+            credit: entity.0.credit,
+            minimum_credit: entity.0.minimum_credit,
+            name: entity.0.name,
+            mail: entity.0.mail,
+            username: entity.0.username,
+            account_number: entity.0.account_number,
+            permission: entity.0.permission,
+            use_digital_stamps: entity.0.use_digital_stamps,
+            coffee_stamps: entity.0.coffee_stamps,
+            bottle_stamps: entity.0.bottle_stamps,
+            receives_monthly_report: entity.0.receives_monthly_report,
+            is_password_set: entity.1,
+            nfc_tokens: entity.2.into_iter().map(|token| token.into()).collect(),
         }
     }
 }
 
-fn search_account(entity: Account, search: &str) -> Option<SearchElement<AccountOutput>> {
+fn search_account(entity: AccountJoined, search: &str) -> Option<SearchElement<AccountOutput>> {
     let values = vec![
         entity
+            .0
             .id
             .to_hyphenated()
             .encode_upper(&mut Uuid::encode_buffer())
             .to_owned(),
-        entity.name.clone(),
-        entity.mail.clone(),
-        entity.username.clone(),
-        entity.account_number.clone(),
-        match entity.permission {
+        entity.0.name.clone(),
+        entity.0.mail.clone(),
+        entity.0.username.clone(),
+        entity.0.account_number.clone(),
+        match entity.0.permission {
             Permission::Default => "",
             Permission::Member => "member",
             Permission::Admin => "admin",
@@ -119,7 +142,7 @@ pub async fn get_accounts(
     };
 
     let lower_search = search.trim().to_ascii_lowercase();
-    let entities: Vec<SearchElement<AccountOutput>> = Account::all(database_pool)
+    let entities: Vec<SearchElement<AccountOutput>> = Account::all_joined(database_pool)
         .await?
         .into_iter()
         .filter_map(|a| search_account(a, &lower_search))
@@ -135,7 +158,7 @@ pub async fn get_account(
 ) -> ServiceResult<AccountOutput> {
     identity.require_account_or_cert(Permission::Member)?;
 
-    let entity = Account::get(database_pool, id).await?;
+    let entity = Account::get_joined(database_pool, id).await?;
     Ok(entity.into())
 }
 
@@ -148,6 +171,8 @@ pub async fn get_account_by_access_token(
     identity.require_cert()?;
 
     let entity = get_onetime_session(database_pool, redis_pool, &account_access_token).await?;
+
+    let entity = entity.joined(database_pool).await?;
     Ok(entity.into())
 }
 
@@ -185,6 +210,7 @@ pub async fn create_account(
 
     entity.update(database_pool).await?;
 
+    let entity = entity.joined(database_pool).await?;
     Ok(entity.into())
 }
 
@@ -233,6 +259,7 @@ pub async fn update_account(
 
     entity.update(database_pool).await?;
 
+    let entity = entity.joined(database_pool).await?;
     Ok(entity.into())
 }
 

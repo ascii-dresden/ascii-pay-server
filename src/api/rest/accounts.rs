@@ -65,14 +65,15 @@ pub async fn delete_account(
     Ok(HttpResponse::Ok().json(&result))
 }
 
-/// DELETE route for `/api/v1/account/{account_id}/nfc`
+/// DELETE route for `/api/v1/account/{account_id}/nfc/{card_id}`
 pub async fn delete_account_nfc(
     database_pool: web::Data<DatabasePool>,
     identity: Identity,
-    id: web::Path<Uuid>,
+    path: web::Path<(Uuid, String)>,
 ) -> ServiceResult<HttpResponse> {
+    let (account_id, card_id) = path.into_inner();
     let result =
-        repo::authenticate_nfc_delete_card(database_pool.deref(), &identity, id.into_inner())
+        repo::authenticate_nfc_delete_card(database_pool.deref(), &identity, account_id, &card_id)
             .await?;
     Ok(HttpResponse::Ok().json(&result))
 }

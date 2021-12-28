@@ -5,8 +5,9 @@ use async_graphql::{Context, Object};
 use chrono::NaiveDate;
 use uuid::Uuid;
 
+use crate::identity_service::IdentityRequire;
 use crate::model::session::Session;
-use crate::model::Product;
+use crate::model::{Permission, Product};
 use crate::repo::{self, AccountOutput, SearchElementAccount, TransactionOutput};
 use crate::utils::{DatabasePool, RedisPool};
 use crate::{identity_service::Identity, utils::ServiceResult};
@@ -15,11 +16,6 @@ pub struct Query;
 
 #[Object]
 impl Query {
-    async fn get_self(&self, ctx: &Context<'_>) -> ServiceResult<AccountOutput> {
-        let identity = ctx.data::<Identity>()?;
-        repo::get_me(identity)
-    }
-
     async fn get_accounts(
         &self,
         ctx: &Context<'_>,
@@ -32,9 +28,18 @@ impl Query {
             .map(|v| v.into_iter().map(|e| e.into()).collect())
     }
 
-    async fn get_account(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<AccountOutput> {
+    async fn get_account(
+        &self,
+        ctx: &Context<'_>,
+        id: Option<Uuid>,
+    ) -> ServiceResult<AccountOutput> {
         let database_pool = ctx.data::<Arc<DatabasePool>>()?;
         let identity = ctx.data::<Identity>()?;
+
+        let id = match id {
+            Some(id) => id,
+            None => identity.require_account(Permission::Default)?.id,
+        };
         repo::get_account(database_pool.deref(), identity, id).await
     }
 
@@ -69,12 +74,17 @@ impl Query {
     async fn get_transactions(
         &self,
         ctx: &Context<'_>,
-        account_id: Uuid,
+        account_id: Option<Uuid>,
         transaction_filter_from: Option<String>,
         transaction_filter_to: Option<String>,
     ) -> ServiceResult<Vec<TransactionOutput>> {
         let database_pool = ctx.data::<Arc<DatabasePool>>()?;
         let identity = ctx.data::<Identity>()?;
+
+        let account_id = match account_id {
+            Some(id) => id,
+            None => identity.require_account(Permission::Default)?.id,
+        };
         repo::get_transactions_by_account(
             database_pool.deref(),
             identity,
@@ -100,11 +110,16 @@ impl Query {
     async fn get_transaction(
         &self,
         ctx: &Context<'_>,
-        account_id: Uuid,
+        account_id: Option<Uuid>,
         transaction_id: Uuid,
     ) -> ServiceResult<TransactionOutput> {
         let database_pool = ctx.data::<Arc<DatabasePool>>()?;
         let identity = ctx.data::<Identity>()?;
+
+        let account_id = match account_id {
+            Some(id) => id,
+            None => identity.require_account(Permission::Default)?.id,
+        };
         repo::get_transaction_by_account(
             database_pool.deref(),
             identity,
@@ -112,45 +127,6 @@ impl Query {
             transaction_id,
         )
         .await
-    }
-
-    async fn get_own_transactions(
-        &self,
-        ctx: &Context<'_>,
-        transaction_filter_from: Option<String>,
-        transaction_filter_to: Option<String>,
-    ) -> ServiceResult<Vec<TransactionOutput>> {
-        let database_pool = ctx.data::<Arc<DatabasePool>>()?;
-        let identity = ctx.data::<Identity>()?;
-        repo::get_transactions_self(
-            database_pool.deref(),
-            identity,
-            transaction_filter_from
-                .map(|s| {
-                    NaiveDate::parse_from_str(&s, "%Y-%m-%d")
-                        .ok()
-                        .map(|d| d.and_hms(0, 0, 0))
-                })
-                .flatten(),
-            transaction_filter_to
-                .map(|s| {
-                    NaiveDate::parse_from_str(&s, "%Y-%m-%d")
-                        .ok()
-                        .map(|d| d.and_hms(23, 59, 59))
-                })
-                .flatten(),
-        )
-        .await
-    }
-
-    async fn get_own_transaction(
-        &self,
-        ctx: &Context<'_>,
-        transaction_id: Uuid,
-    ) -> ServiceResult<TransactionOutput> {
-        let database_pool = ctx.data::<Arc<DatabasePool>>()?;
-        let identity = ctx.data::<Identity>()?;
-        repo::get_transaction_self(database_pool.deref(), identity, transaction_id).await
     }
 
     async fn get_products(&self, ctx: &Context<'_>) -> ServiceResult<Vec<Product>> {

@@ -14,7 +14,7 @@ use super::Account;
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset)]
 #[table_name = "authentication_password"]
 #[primary_key(account_id)]
-struct AuthenticationPassword {
+pub struct AuthenticationPassword {
     account_id: Uuid,
     password: String,
 }
