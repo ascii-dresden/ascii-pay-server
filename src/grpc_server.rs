@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::thread;
 
 use futures_util::TryFutureExt;
-use grpcio::{ChannelBuilder, Environment, ResourceQuota, RpcStatus, ServerBuilder};
+use grpcio::{ChannelBuilder, Environment, ResourceQuota, RpcStatus, RpcStatusCode, ServerBuilder};
 use log::{error, info};
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -475,6 +475,23 @@ impl AuthenticationImpl {
     }
 }
 
+fn fail<T>(sink: grpcio::UnarySink<T>, error: ServiceError) -> grpcio::UnarySinkResult {
+    let status = match error {
+        ServiceError::NotFound => RpcStatus::new(RpcStatusCode::NOT_FOUND),
+        ServiceError::BadRequest(_, _) => {
+            RpcStatus::with_message(RpcStatusCode::INVALID_ARGUMENT, error.to_string())
+        }
+        ServiceError::Unauthorized(_) => {
+            RpcStatus::with_message(RpcStatusCode::UNAUTHENTICATED, error.to_string())
+        }
+        ServiceError::InsufficientPrivileges => {
+            RpcStatus::with_message(RpcStatusCode::UNAUTHENTICATED, error.to_string())
+        }
+        _ => RpcStatus::with_message(RpcStatusCode::INTERNAL, error.to_string()),
+    };
+    sink.fail(status)
+}
+
 impl AsciiPayAuthentication for AuthenticationImpl {
     fn authenticate_barcode(
         &mut self,
@@ -487,7 +504,7 @@ impl AsciiPayAuthentication for AuthenticationImpl {
         ctx.spawn(async {
             match response {
                 Ok(r) => sink.success(r),
-                Err(_) => sink.fail(RpcStatus::new(400)),
+                Err(e) => fail(sink, e),
             }
             .map_err(move |e| error!("failed to reply authenticate_barcode: {:?}", e))
             .await
@@ -506,7 +523,7 @@ impl AsciiPayAuthentication for AuthenticationImpl {
         ctx.spawn(async {
             match response {
                 Ok(r) => sink.success(r),
-                Err(_) => sink.fail(RpcStatus::new(400)),
+                Err(e) => fail(sink, e),
             }
             .map_err(move |e| error!("failed to reply authenticate_nfc_type: {:?}", e))
             .await
@@ -525,7 +542,7 @@ impl AsciiPayAuthentication for AuthenticationImpl {
         ctx.spawn(async {
             match response {
                 Ok(r) => sink.success(r),
-                Err(_) => sink.fail(RpcStatus::new(400)),
+                Err(e) => fail(sink, e),
             }
             .map_err(move |e| error!("failed to reply authenticate_nfc_generic: {:?}", e))
             .await
@@ -546,7 +563,7 @@ impl AsciiPayAuthentication for AuthenticationImpl {
         ctx.spawn(async {
             match response {
                 Ok(r) => sink.success(r),
-                Err(_) => sink.fail(RpcStatus::new(400)),
+                Err(e) => fail(sink, e),
             }
             .map_err(move |e| {
                 error!(
@@ -572,7 +589,7 @@ impl AsciiPayAuthentication for AuthenticationImpl {
         ctx.spawn(async {
             match response {
                 Ok(r) => sink.success(r),
-                Err(_) => sink.fail(RpcStatus::new(400)),
+                Err(e) => fail(sink, e),
             }
             .map_err(move |e| {
                 error!(
@@ -598,7 +615,7 @@ impl AsciiPayAuthentication for AuthenticationImpl {
         ctx.spawn(async {
             match response {
                 Ok(r) => sink.success(r),
-                Err(_) => sink.fail(RpcStatus::new(400)),
+                Err(e) => fail(sink, e),
             }
             .map_err(move |e| {
                 error!(
