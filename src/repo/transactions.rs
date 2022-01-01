@@ -237,35 +237,3 @@ pub async fn get_transaction_by_account(
     let database_conn = &database_pool.get().await?;
     map_transaction_output(database_conn, transaction)
 }
-
-pub async fn get_transactions_self(
-    database_pool: &DatabasePool,
-    identity: &Identity,
-    transaction_filer_from: Option<NaiveDateTime>,
-    transaction_filer_to: Option<NaiveDateTime>,
-) -> ServiceResult<Vec<TransactionOutput>> {
-    let account = identity.require_account(Permission::Default)?;
-    let entities = transactions::get_by_account(
-        database_pool,
-        &account,
-        transaction_filer_from,
-        transaction_filer_to,
-    )
-    .await?;
-
-    let database_conn = &database_pool.get().await?;
-    map_with_result(entities, |t| map_transaction_output(database_conn, t))
-}
-
-pub async fn get_transaction_self(
-    database_pool: &DatabasePool,
-    identity: &Identity,
-    transaction_id: Uuid,
-) -> ServiceResult<TransactionOutput> {
-    let account = identity.require_account(Permission::Default)?;
-    let transaction =
-        transactions::get_by_account_and_id(database_pool, &account, transaction_id).await?;
-
-    let database_conn = &database_pool.get().await?;
-    map_transaction_output(database_conn, transaction)
-}

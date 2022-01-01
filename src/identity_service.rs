@@ -396,10 +396,9 @@ impl IdentityRequire for Identity {
 
 impl From<&grpcio::RpcContext<'_>> for Identity {
     fn from(ctx: &grpcio::RpcContext<'_>) -> Self {
-        let auth_header = ctx
-            .request_headers()
-            .iter()
-            .find(|(key, _)| *key == API_ACCESS_KEY_HEADER);
+        let auth_header = ctx.request_headers().iter().find(|(key, _)| {
+            *key.to_ascii_lowercase() == API_ACCESS_KEY_HEADER.to_ascii_lowercase()
+        });
 
         let is_cert_present = env::API_ACCESS_KEY.is_empty()
             || if let Some(auth_header) = auth_header {
