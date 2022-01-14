@@ -1,9 +1,11 @@
+use uuid::Uuid;
+
 use crate::{
     identity_service::{Identity, IdentityMut, IdentityRequire},
     model::{
         authentication_password,
         session::{get_onetime_session, Session},
-        Permission,
+        Account, Permission,
     },
     utils::{DatabasePool, RedisPool, ServiceError, ServiceResult},
 };
@@ -131,5 +133,60 @@ pub async fn logout(redis_pool: &RedisPool, identity: &Identity) -> ServiceResul
 
 pub async fn logout_mut(redis_pool: &RedisPool, identity: &IdentityMut) -> ServiceResult<()> {
     identity.forget(redis_pool).await?;
+    Ok(())
+}
+
+pub async fn set_account_password(
+    database_pool: &DatabasePool,
+    identity: &Identity,
+    account_id: Uuid,
+    old_password: Option<&str>,
+    new_password: &str,
+) -> ServiceResult<()> {
+    let own_account = identity.require_account(Permission::Default)?;
+
+    if account_id == own_account.id || identity.require_account(Permission::Admin).is_ok() {
+        let account = Account::get(database_pool, account_id).await?;
+
+        let has_password = authentication_password::has_password(database_pool, &account).await?;
+
+        if has_password {
+            if !authentication_password::verify_password(
+                database_pool,
+                &account,
+                old_password.unwrap_or(""),
+            )
+            .await?
+            {
+                return Err(ServiceError::Unauthorized("Old password does not match!"));
+            }
+            authentication_password::register(database_pool, &account, new_password).await?;
+        } else {
+            if old_password.is_some() {
+                return Err(ServiceError::Unauthorized("Old password does not match!"));
+            }
+            authentication_password::register(database_pool, &account, new_password).await?;
+        }
+    } else {
+        return Err(ServiceError::Unauthorized(""));
+    }
+
+    Ok(())
+}
+
+pub async fn delete_account_password(
+    database_pool: &DatabasePool,
+    identity: &Identity,
+    account_id: Uuid,
+) -> ServiceResult<()> {
+    let own_account = identity.require_account(Permission::Default)?;
+
+    if account_id == own_account.id || identity.require_account(Permission::Admin).is_ok() {
+        let account = Account::get(database_pool, account_id).await?;
+        authentication_password::remove(database_pool, &account).await?;
+    } else {
+        return Err(ServiceError::Unauthorized(""));
+    }
+
     Ok(())
 }

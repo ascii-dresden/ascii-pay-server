@@ -87,6 +87,33 @@ impl Mutation {
         Ok("ok".to_string())
     }
 
+    async fn set_account_password(
+        &self,
+        ctx: &Context<'_>,
+        id: Uuid,
+        old_password: Option<String>,
+        new_password: String,
+    ) -> ServiceResult<String> {
+        let database_pool = ctx.data::<Arc<DatabasePool>>()?;
+        let identity = ctx.data::<Identity>()?;
+        repo::set_account_password(
+            database_pool.deref(),
+            identity,
+            id,
+            old_password.as_deref(),
+            &new_password,
+        )
+        .await?;
+        Ok("ok".to_string())
+    }
+
+    async fn delete_account_password(&self, ctx: &Context<'_>, id: Uuid) -> ServiceResult<String> {
+        let database_pool = ctx.data::<Arc<DatabasePool>>()?;
+        let identity = ctx.data::<Identity>()?;
+        repo::delete_account_password(database_pool.deref(), identity, id).await?;
+        Ok("ok".to_string())
+    }
+
     async fn get_account_access_token(
         &self,
         ctx: &Context<'_>,

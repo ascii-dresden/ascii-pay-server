@@ -210,7 +210,7 @@ fn hash_password(password: &str) -> ServiceResult<String> {
 }
 
 /// Verify a password to its hash version
-pub fn verify(hash: &str, password: &str) -> ServiceResult<bool> {
+fn verify(hash: &str, password: &str) -> ServiceResult<bool> {
     if password.is_empty() {
         return Ok(false);
     }
