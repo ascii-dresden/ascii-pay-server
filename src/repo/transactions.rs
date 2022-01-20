@@ -114,7 +114,7 @@ where
     Ok(result)
 }
 
-pub fn zip_with_result<A, B, F>(vec: Vec<A>, transform: F) -> ServiceResult<Vec<(A, B)>>
+pub fn associate_with_result<A, B, F>(vec: Vec<A>, transform: F) -> ServiceResult<Vec<(A, B)>>
 where
     F: Fn(&A) -> ServiceResult<B>,
 {
@@ -133,7 +133,7 @@ pub fn map_transaction_output(
     database_conn: &DatabaseConnection,
     transaction: Transaction,
 ) -> ServiceResult<TransactionOutput> {
-    let items = zip_with_result(transaction.get_items(database_conn)?, |item| {
+    let items = associate_with_result(transaction.get_items(database_conn)?, |item| {
         if item.product_id.is_empty() {
             Ok(None)
         } else {

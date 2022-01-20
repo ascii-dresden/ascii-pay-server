@@ -15,3 +15,4 @@ certificates/*
 ._.DS_Store
 ascii.pass
 *.pkpass
+test-certificates/*
