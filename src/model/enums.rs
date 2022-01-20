@@ -95,6 +95,7 @@ where
     Debug, Copy, Clone, FromSqlRow, AsExpression, Hash, PartialEq, Eq, Serialize, Deserialize, Enum,
 )]
 #[sql_type = "SmallInt"]
+#[serde(rename_all = "UPPERCASE")]
 pub enum StampType {
     None,
     Coffee,

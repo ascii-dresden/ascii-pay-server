@@ -12,6 +12,7 @@ pub struct Category {
 
 /// Represent a product
 #[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone, SimpleObject)]
+#[serde(rename_all = "camelCase")]
 pub struct Product {
     pub id: String,
     pub name: String,
