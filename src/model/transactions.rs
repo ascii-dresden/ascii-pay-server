@@ -1,10 +1,12 @@
+use std::ops::{Add, AddAssign, Sub, SubAssign};
+
 use chrono::{Local, NaiveDateTime};
 use diesel::prelude::*;
 use lazy_static::__Deref;
 use uuid::Uuid;
 
 use crate::model::schema::{transaction, transaction_item};
-use crate::model::{Account, Product};
+use crate::model::Account;
 use crate::utils::{
     generate_uuid, DatabaseConnection, DatabasePool, Money, ServiceError, ServiceResult,
 };
@@ -53,6 +55,147 @@ pub struct TransactionItemInput {
     pub product_id: String,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct TransactionHelper {
+    price: Money,
+    coffee_stamps: i32,
+    bottle_stamps: i32,
+}
+
+impl AddAssign<&TransactionItemInput> for TransactionHelper {
+    fn add_assign(&mut self, rhs: &TransactionItemInput) {
+        match rhs.pay_with_stamps {
+            StampType::None => {
+                self.price += rhs.price;
+
+                match rhs.give_stamps {
+                    StampType::None => {}
+                    StampType::Coffee => self.coffee_stamps += 1,
+                    StampType::Bottle => self.bottle_stamps += 1,
+                }
+            }
+            StampType::Coffee => self.coffee_stamps -= 10,
+            StampType::Bottle => self.bottle_stamps -= 10,
+        }
+    }
+}
+
+impl Add<&TransactionItemInput> for TransactionHelper {
+    type Output = Self;
+
+    fn add(self, rhs: &TransactionItemInput) -> Self::Output {
+        let mut result = self;
+        result += rhs;
+        result
+    }
+}
+
+impl SubAssign<&TransactionItemInput> for TransactionHelper {
+    fn sub_assign(&mut self, rhs: &TransactionItemInput) {
+        match rhs.pay_with_stamps {
+            StampType::None => {
+                self.price -= rhs.price;
+
+                match rhs.give_stamps {
+                    StampType::None => {}
+                    StampType::Coffee => self.coffee_stamps -= 1,
+                    StampType::Bottle => self.bottle_stamps -= 1,
+                }
+            }
+            StampType::Coffee => self.coffee_stamps += 10,
+            StampType::Bottle => self.bottle_stamps += 10,
+        }
+    }
+}
+
+impl Sub<&TransactionItemInput> for TransactionHelper {
+    type Output = Self;
+
+    fn sub(self, rhs: &TransactionItemInput) -> Self::Output {
+        let mut result = self;
+        result -= rhs;
+        result
+    }
+}
+
+impl TransactionHelper {
+    pub fn assert_could_item_be_paid_with_stamps(
+        &self,
+        account: &Account,
+        item: &TransactionItemInput,
+    ) -> ServiceResult<()> {
+        if account.use_digital_stamps {
+            match item.could_be_paid_with_stamps {
+                StampType::None => {}
+                StampType::Coffee => {
+                    if account.coffee_stamps + self.coffee_stamps >= 10 {
+                        return Err(ServiceError::TransactionCancelled(
+                            "Payment with coffee stamps is possible!".to_owned(),
+                        ));
+                    }
+                }
+                StampType::Bottle => {
+                    if account.bottle_stamps + self.bottle_stamps >= 10 {
+                        return Err(ServiceError::TransactionCancelled(
+                            "Payment with bottle stamps is possible!".to_owned(),
+                        ));
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn assert_can_be_applied_to_account(&self, account: &Account) -> ServiceResult<()> {
+        if account.credit + self.price < account.minimum_credit {
+            return Err(ServiceError::TransactionError(
+                "Insufficient credit!".to_owned(),
+            ));
+        }
+
+        if account.use_digital_stamps {
+            if account.coffee_stamps + self.coffee_stamps < 0 {
+                return Err(ServiceError::TransactionError(
+                    "Insufficient coffee stamps!".to_owned(),
+                ));
+            }
+            if account.bottle_stamps + self.bottle_stamps < 0 {
+                return Err(ServiceError::TransactionError(
+                    "Insufficient bottle stamps!".to_owned(),
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn apply_to_account(&self, account: &mut Account, date: NaiveDateTime) -> Transaction {
+        let old_account = account.clone();
+
+        account.credit += self.price;
+        if account.use_digital_stamps {
+            account.coffee_stamps += self.coffee_stamps;
+            account.bottle_stamps += self.bottle_stamps;
+        }
+
+        Transaction {
+            id: generate_uuid(),
+            account_id: account.id,
+            total: self.price,
+            before_credit: old_account.credit,
+            after_credit: account.credit,
+            coffee_stamps: self.coffee_stamps,
+            before_coffee_stamps: old_account.coffee_stamps,
+            after_coffee_stamps: account.coffee_stamps,
+            bottle_stamps: self.bottle_stamps,
+            before_bottle_stamps: old_account.bottle_stamps,
+            after_bottle_stamps: account.bottle_stamps,
+            date,
+        }
+    }
+}
+
 /// Execute a transaction on the given `account` with the given `total`
 ///
 /// # Internal steps
@@ -76,155 +219,39 @@ pub async fn execute_at(
     let result = database_conn.build_transaction().serializable().run(|| {
         let mut account = Account::get_sync(database_conn, account.id)?;
 
-        let before_credit = account.credit;
-        let mut after_credit = account.credit;
-
-        let before_coffee_stamps = account.coffee_stamps;
-        let mut after_coffee_stamps = account.coffee_stamps;
-
-        let before_bottle_stamps = account.bottle_stamps;
-        let mut after_bottle_stamps = account.bottle_stamps;
+        let mut transaction_helper = TransactionHelper::default();
 
         // Update credit and stamp values
         for item in transaction_items.iter() {
-            // Update credit if item is not paid with stemps
-            if item.pay_with_stamps.is_none() || !account.use_digital_stamps {
-                after_credit += item.price;
-            }
-
-            // An transaction item cannot give stemps and be paid with stamps at the same time
-            if !item.pay_with_stamps.is_none() && !item.give_stamps.is_none() {
-                return Err(ServiceError::TransactionError(
-                    "An item cannot give stemps and be paid with stamps at the same time!"
-                        .to_owned(),
-                ));
-            }
-
-            if account.use_digital_stamps {
-                // Remove 10 stemps if paid with stemps
-                match item.pay_with_stamps {
-                    StampType::Coffee => {
-                        after_coffee_stamps -= 10;
-                    }
-                    StampType::Bottle => {
-                        after_bottle_stamps -= 10;
-                    }
-                    _ => {}
-                }
-
-                // Add 1 stemp if item gives stemp
-                match item.give_stamps {
-                    StampType::Coffee => {
-                        after_coffee_stamps += 1;
-                    }
-                    StampType::Bottle => {
-                        after_bottle_stamps += 1;
-                    }
-                    _ => {}
-                }
-            }
+            transaction_helper += item;
         }
+
+        transaction_helper.assert_can_be_applied_to_account(&account)?;
 
         // Return error if an item could be paid with stemps
         if stop_if_stamp_payment_is_possible && account.use_digital_stamps {
             for item in transaction_items.iter() {
-                if !item.product_id.is_empty() {
-                    let product = Product::get(&item.product_id)?;
+                let temp = transaction_helper - item;
 
-                    match product.pay_with_stamps {
-                        StampType::Coffee => {
-                            if after_coffee_stamps >= 10 {
-                                return Err(ServiceError::TransactionCancelled(
-                                    "Payment with coffee stamps is possible!".to_owned(),
-                                ));
-                            }
-                        }
-                        StampType::Bottle => {
-                            if after_bottle_stamps >= 10 {
-                                return Err(ServiceError::TransactionCancelled(
-                                    "Payment with bottle stamps is possible!".to_owned(),
-                                ));
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-
-                match item.could_be_paid_with_stamps {
-                    StampType::Coffee => {
-                        if after_coffee_stamps >= 10 {
-                            return Err(ServiceError::TransactionCancelled(
-                                "Payment with coffee stamps is possible!".to_owned(),
-                            ));
-                        }
-                    }
-                    StampType::Bottle => {
-                        if after_bottle_stamps >= 10 {
-                            return Err(ServiceError::TransactionCancelled(
-                                "Payment with bottle stamps is possible!".to_owned(),
-                            ));
-                        }
-                    }
-                    _ => {}
-                }
+                temp.assert_could_item_be_paid_with_stamps(&account, item)?;
             }
         }
 
-        if after_credit < account.minimum_credit && after_credit < account.credit {
-            return Err(ServiceError::TransactionError(
-                "Insufficient credit!".to_owned(),
-            ));
-        }
-
-        if account.use_digital_stamps
-            && after_coffee_stamps < 0
-            && after_coffee_stamps < account.coffee_stamps
-        {
-            return Err(ServiceError::TransactionError(
-                "Insufficient coffee stamps!".to_owned(),
-            ));
-        }
-
-        if account.use_digital_stamps
-            && after_bottle_stamps < 0
-            && after_bottle_stamps < account.bottle_stamps
-        {
-            return Err(ServiceError::TransactionError(
-                "Insufficient bottle stamps!".to_owned(),
-            ));
-        }
-
-        let t = Transaction {
-            id: generate_uuid(),
-            account_id: account.id,
-            total: after_credit - before_credit,
-            before_credit,
-            after_credit,
-            coffee_stamps: after_coffee_stamps - before_coffee_stamps,
-            before_coffee_stamps,
-            after_coffee_stamps,
-            bottle_stamps: after_bottle_stamps - before_bottle_stamps,
-            before_bottle_stamps,
-            after_bottle_stamps,
-            date,
-        };
-        account.credit = after_credit;
-        account.coffee_stamps = after_coffee_stamps;
-        account.bottle_stamps = after_bottle_stamps;
+        let t = transaction_helper.apply_to_account(&mut account, date);
 
         account.update_sync(database_conn)?;
         diesel::insert_into(dsl::transaction)
             .values(&t)
             .execute(database_conn.deref())?;
 
-        for (i, item) in transaction_items.iter().enumerate() {
+        for (i, item) in transaction_items.into_iter().enumerate() {
             let ti = TransactionItem {
                 transaction_id: t.id,
                 index: i as i32,
                 price: item.price,
                 pay_with_stamps: item.pay_with_stamps,
                 give_stamps: item.give_stamps,
-                product_id: item.product_id.clone(),
+                product_id: item.product_id,
             };
 
             diesel::insert_into(dsl_item::transaction_item)
