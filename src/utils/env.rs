@@ -96,7 +96,7 @@ lazy_static::lazy_static! {
     /// Url to this server. This can differ from the BASE_URL if the apple wallet service is not mounted at root.
     ///
     /// Field name: `APPLE_WALLET_SERVICE_URL`
-    pub static ref APPLE_WALLET_SERVICE_URL: String = std::env::var("APPLE_WALLET_SERVICE_URL").unwrap_or_else(|_| "https://ascii.pixix4.com/".to_owned());
+    pub static ref APPLE_WALLET_SERVICE_URL: String = std::env::var("APPLE_WALLET_SERVICE_URL").unwrap_or_else(|_| "https://pay.ascii.coffee/".to_owned());
 
     /// Path to the apple wallet template.
     ///

@@ -47,7 +47,7 @@ async-stream = "0.3"
 async-std = "1.10"
 
 # apple wallet pass
-wallet-pass = "0.2"
+wallet-pass = "0.3"
 
 # utils
 derive_more = "0.99"
@@ -64,7 +64,7 @@ base64 = "0.13"
 generic-array = "0.14"
 tokio = { version = "1.14", features=["full"] }
 threadpool = "1.8"
-grpcio = "0.9"
+grpcio = { version = "0.9", default-features = false, features=["protobuf-codec", "use-bindgen"] }
 protobuf = "2.25"
 git2 = "0.13"
 

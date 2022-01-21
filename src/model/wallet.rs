@@ -1,7 +1,6 @@
 use diesel::prelude::*;
 use log::{error, info};
 use std::io::Cursor;
-use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 use wallet_pass::{template, Pass};
@@ -27,7 +26,7 @@ pub fn get_current_time() -> i32 {
     Debug, Queryable, Insertable, AsChangeset, PartialEq, Eq, Hash, Serialize, Deserialize, Clone,
 )]
 #[table_name = "apple_wallet_pass"]
-struct AppleWalletPass {
+pub struct AppleWalletPass {
     pub serial_number: Uuid,
     pub authentication_token: Uuid,
     pub qr_code: String,
@@ -169,51 +168,9 @@ pub async fn get_by_qr_code(database_pool: &DatabasePool, qr_code: &str) -> Serv
     Ok(results.pop().ok_or(ServiceError::NoneError)?.serial_number)
 }
 
-pub async fn create_pass(
-    database_pool: &DatabasePool,
-    account: &Account,
-) -> ServiceResult<Vec<u8>> {
-    use crate::model::schema::apple_wallet_pass::dsl;
-
-    let mut results = dsl::apple_wallet_pass
-        .filter(dsl::serial_number.eq(&account.id))
-        .load::<AppleWalletPass>(&*database_pool.get().await?)?;
-
-    let db_pass = match results.len() {
-        0 => {
-            let qr_code = format!(
-                "{}-{}",
-                account
-                    .id
-                    .to_hyphenated()
-                    .encode_upper(&mut Uuid::encode_buffer()),
-                generate_uuid()
-                    .to_hyphenated()
-                    .encode_upper(&mut Uuid::encode_buffer())
-            );
-
-            let db_pass = AppleWalletPass {
-                serial_number: account.id,
-                authentication_token: generate_uuid(),
-                qr_code,
-                pass_type_id: env::APPLE_WALLET_PASS_TYPE_IDENTIFIER.as_str().to_owned(),
-                updated_at: get_current_time(),
-            };
-
-            diesel::insert_into(dsl::apple_wallet_pass)
-                .values(&db_pass)
-                .execute(&*database_pool.get().await?)?;
-            db_pass
-        }
-        1 => results.pop().ok_or(ServiceError::NoneError)?,
-        _ => {
-            return Err(ServiceError::NotFound);
-        }
-    };
-
+pub fn create_pass_binary(account: &Account, db_pass: &AppleWalletPass) -> ServiceResult<Vec<u8>> {
     // Load template
-    let pass_path = Path::new(env::APPLE_WALLET_TEMPLATE.as_str());
-    let mut pass = Pass::from_path(pass_path)?;
+    let mut pass = Pass::from_path(env::APPLE_WALLET_TEMPLATE.as_str())?;
 
     // Set general fields
     pass.pass_type_identifier(env::APPLE_WALLET_PASS_TYPE_IDENTIFIER.as_str());
@@ -268,15 +225,60 @@ pub async fn create_pass(
     pass.store_card(store_card);
 
     // Export
-    let vec = Vec::<u8>::with_capacity(100_000);
+    let vec = Vec::<u8>::new();
     let cursor = pass.export(
-        Path::new(env::APPLE_WALLET_PASS_CERTIFICATE.as_str()),
+        env::APPLE_WALLET_PASS_CERTIFICATE.as_str(),
         env::APPLE_WALLET_PASS_CERTIFICATE_PASSWORD.as_str(),
-        Path::new(env::APPLE_WALLET_WWDR_CERTIFICATE.as_str()),
+        env::APPLE_WALLET_WWDR_CERTIFICATE.as_str(),
         Cursor::new(vec),
     )?;
 
     Ok(cursor.into_inner())
+}
+
+pub async fn create_pass(
+    database_pool: &DatabasePool,
+    account: &Account,
+) -> ServiceResult<Vec<u8>> {
+    use crate::model::schema::apple_wallet_pass::dsl;
+
+    let mut results = dsl::apple_wallet_pass
+        .filter(dsl::serial_number.eq(&account.id))
+        .load::<AppleWalletPass>(&*database_pool.get().await?)?;
+
+    let db_pass = match results.len() {
+        0 => {
+            let qr_code = format!(
+                "{}-{}",
+                account
+                    .id
+                    .to_hyphenated()
+                    .encode_upper(&mut Uuid::encode_buffer()),
+                generate_uuid()
+                    .to_hyphenated()
+                    .encode_upper(&mut Uuid::encode_buffer())
+            );
+
+            let db_pass = AppleWalletPass {
+                serial_number: account.id,
+                authentication_token: generate_uuid(),
+                qr_code,
+                pass_type_id: env::APPLE_WALLET_PASS_TYPE_IDENTIFIER.as_str().to_owned(),
+                updated_at: get_current_time(),
+            };
+
+            diesel::insert_into(dsl::apple_wallet_pass)
+                .values(&db_pass)
+                .execute(&*database_pool.get().await?)?;
+            db_pass
+        }
+        1 => results.pop().ok_or(ServiceError::NoneError)?,
+        _ => {
+            return Err(ServiceError::NotFound);
+        }
+    };
+
+    create_pass_binary(account, &db_pass)
 }
 
 pub async fn delete_pass(database_pool: &DatabasePool, account_id: Uuid) -> ServiceResult<()> {

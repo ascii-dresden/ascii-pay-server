@@ -19,6 +19,10 @@ pub fn init(config: &mut web::ServiceConfig) {
         )
         .service(web::resource("/v1/log").route(web::post().to(wallet_routes::log)))
         .service(
+            web::resource("/v1/AsciiPayCard")
+                .route(web::get().to(wallet_routes::forward_pass)),
+        )
+        .service(
             web::resource("/v1/AsciiPayCard.pkpass")
                 .route(web::get().to(wallet_routes::create_pass)),
         );

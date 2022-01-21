@@ -18,9 +18,12 @@ extern crate async_graphql;
 
 use std::ops::Deref;
 
-use clap::{App, SubCommand};
+use clap::{App, Arg, SubCommand};
 use diesel::PgConnection;
 use log::{error, info};
+use model::wallet;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 
 // Internal services
 mod grpc;
@@ -71,6 +74,15 @@ async fn init() -> ServiceResult<()> {
         .author(crate_authors!("\n"))
         .subcommand(SubCommand::with_name("admin").about("Create a new admin user"))
         .subcommand(SubCommand::with_name("graphql").about("Print graphql definition"))
+        .subcommand(
+            SubCommand::with_name("pkpass")
+                .about("Create a wallet pass for the specified user")
+                .arg(
+                    Arg::with_name("username")
+                        .value_name("USERNAME")
+                        .takes_value(true),
+                ),
+        )
         .get_matches();
 
     if let Some(_matches) = matches.subcommand_matches("graphql") {
@@ -82,6 +94,12 @@ async fn init() -> ServiceResult<()> {
     let database_manager =
         bb8_diesel::DieselConnectionManager::<PgConnection>::new(env::DATABASE_URI.as_str());
     let database_pool = bb8::Pool::builder().build(database_manager).await?;
+
+    if let Some(matches) = matches.subcommand_matches("pkpass") {
+        let username = matches.value_of("username").unwrap_or("");
+        generate_pkpass(&database_pool, username).await?;
+        return Ok(());
+    }
 
     Product::load_dataset()?;
 
@@ -120,6 +138,16 @@ async fn create_admin_user(database_pool: &DatabasePool) -> ServiceResult<()> {
     } else {
         info!("Admin user was successfully updated!");
     }
+
+    Ok(())
+}
+
+async fn generate_pkpass(database_pool: &DatabasePool, username: &str) -> ServiceResult<()> {
+    let account = Account::find_by_login(database_pool, username).await?;
+    let data = wallet::create_pass(database_pool, &account).await?;
+
+    let mut file = File::create("./AsciiPayCard.pkpass").await?;
+    file.write_all(&data).await?;
 
     Ok(())
 }

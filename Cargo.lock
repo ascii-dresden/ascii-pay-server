@@ -142,9 +142,9 @@ dependencies = [
 
 [[package]]
 name = "actix-router"
-version = "0.5.0-rc.1"
+version = "0.5.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bdca166b1041184e2108ef05bd9909ec18cc6abc41152d31d30224cebfaac75"
+checksum = "5e0b59ad08167ffbb686ddb495846707231e96908b829b1fc218198ec581e2ad"
 dependencies = [
  "bytestring",
  "firestorm",
@@ -926,15 +926,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "boringssl-src"
-version = "0.3.0+688fc5c"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f901accdf830d2ea2f4e27f923a5e1125cd8b1a39ab578b9db1a42d578a6922b"
-dependencies = [
- "cmake",
-]
-
-[[package]]
 name = "brotli-sys"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1193,9 +1184,9 @@ dependencies = [
 
 [[package]]
 name = "crc32fast"
-version = "1.3.0"
+version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "738c290dfaea84fc1ca15ad9c168d083b05a714e1efddd8edaab678dc28d2836"
+checksum = "a2209c310e29876f7f0b2721e7e26b84aff178aa3da5d091f9bfbf47669e60e3"
 dependencies = [
  "cfg-if",
 ]
@@ -1803,7 +1794,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9447d1a926beeef466606cc45717f80897998b548e7dc622873d453e1ecb4be4"
 dependencies = [
  "bindgen",
- "boringssl-src",
  "cc",
  "cmake",
  "libc",
@@ -3670,9 +3660,9 @@ dependencies = [
 
 [[package]]
 name = "wallet-pass"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60874c7fe5be15bf9daf462ee27140f325965550473bb800fe0eadb57664a6a9"
+checksum = "8c1c6166d877e68565d0dfad6fc21dc3f350ff3c8b4668144ef28eb4234697e0"
 dependencies = [
  "fs_extra",
  "hex",

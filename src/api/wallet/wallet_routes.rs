@@ -283,6 +283,21 @@ pub async fn pass_delivery(
     }
 }
 
+/// GET route for `/v1/AsciiPayCard` if user is logged in
+pub async fn forward_pass(identity: Identity) -> ServiceResult<HttpResponse> {
+    let auth_token = identity.get_auth_token()?;
+
+    match auth_token {
+        Some(auth_token) => Ok(HttpResponse::Found()
+            .append_header((
+                "Location",
+                format!("/v1/AsciiPayCard.pkpass?auth_token={}", auth_token),
+            ))
+            .finish()),
+        None => Err(ServiceError::NotFound),
+    }
+}
+
 /// GET route for `/v1/AsciiPayCard.pkpass` if user is logged in
 pub async fn create_pass(
     database_pool: web::Data<DatabasePool>,
