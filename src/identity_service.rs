@@ -1,6 +1,6 @@
 use actix_http::body::{EitherBody, MessageBody};
 use actix_http::Payload;
-use actix_web::cookie::Cookie;
+use actix_web::cookie::{self, Cookie};
 use actix_web::{web, FromRequest, HttpRequest};
 use futures::future::ok;
 use futures::prelude::*;
@@ -17,10 +17,8 @@ use std::str::from_utf8;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use actix_web::{
-    dev::{Service, ServiceRequest, ServiceResponse, Transform},
-    Error, HttpMessage, Result,
-};
+use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
+use actix_web::{Error, HttpMessage, Result};
 
 use crate::model::session::{
     create_longtime_session, delete_longtime_session, get_longtime_session, Session,
@@ -266,7 +264,7 @@ impl IdentityInfo {
             Ok(Cookie::build(SESSION_COOKIE_NAME, token)
                 .path("/")
                 .domain(env::DOMAIN.as_str())
-                .max_age(time::Duration::days(1))
+                .max_age(cookie::time::Duration::days(1))
                 .secure(*SECURE_COOKIE)
                 .finish())
         } else {

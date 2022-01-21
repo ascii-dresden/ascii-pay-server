@@ -1,5 +1,10 @@
-use std::{collections::HashMap, fs::File, hash::Hash, path::Path, sync::RwLock};
+use std::collections::HashMap;
+use std::fs::File;
+use std::hash::Hash;
+use std::path::{Path, PathBuf};
+use std::sync::RwLock;
 
+use git2::Repository;
 use log::error;
 
 use super::StampType;
@@ -41,25 +46,87 @@ lazy_static::lazy_static! {
     static ref PRODUCT_DATASET: RwLock<HashMap<String, Product>> = RwLock::new(HashMap::new());
 }
 
-impl Product {
-    pub fn load_dataset() -> ServiceResult<()> {
-        let mut map = HashMap::new();
-        if Path::new(env::PRODUCT_STORAGE.as_str()).exists() {
-            let mut file = File::open(env::PRODUCT_STORAGE.as_str())?;
-            let dataset: Vec<CategoryFile> = serde_json::from_reader(&mut file)?;
+#[derive(Debug, Clone)]
+struct DatasetPath {
+    config_file: PathBuf,
+}
 
-            for category in dataset {
-                for mut product in category.products {
-                    product.category = category.category.clone();
+impl DatasetPath {
+    pub fn new() -> Option<Self> {
+        let path = PathBuf::from(env::PRODUCT_STORAGE.as_str());
 
-                    map.insert(product.id.clone(), product);
-                }
+        if path.exists() {
+            if path.is_file() {
+                return Some(Self { config_file: path });
+            } else {
+                return Some(Self {
+                    config_file: path.join("main.json"),
+                });
             }
-        } else {
-            error!("Product storage does not exists!");
         }
-        let mut w = PRODUCT_DATASET.write()?;
-        *w = map;
+
+        None
+    }
+
+    pub fn read_dataset(&self) -> ServiceResult<HashMap<String, Product>> {
+        let mut map = HashMap::new();
+
+        let mut file = File::open(&self.config_file)?;
+        let dataset: Vec<CategoryFile> = serde_json::from_reader(&mut file)?;
+
+        for category in dataset {
+            for mut product in category.products {
+                product.category = category.category.clone();
+                map.insert(product.id.clone(), product);
+            }
+        }
+
+        Ok(map)
+    }
+
+    pub fn update_repo(&self) -> ServiceResult<bool> {
+        let repo_path = self.config_file.parent();
+
+        if let Some(repo_path) = repo_path {
+            let _repo = Repository::open(repo_path)?;
+
+            error!("TODO: Update of product repo is not supported!");
+        }
+
+        Ok(false)
+    }
+}
+
+impl Product {
+    pub fn update_dataset_repo() -> ServiceResult<()> {
+        let dataset = DatasetPath::new();
+
+        match dataset {
+            Some(dataset) => {
+                dataset.update_repo()?;
+            }
+            None => {
+                error!("Product storage does not exists!");
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn load_dataset() -> ServiceResult<()> {
+        let dataset = DatasetPath::new();
+
+        match dataset {
+            Some(dataset) => {
+                let map = dataset.read_dataset()?;
+
+                let mut w = PRODUCT_DATASET.write()?;
+                *w = map;
+            }
+            None => {
+                error!("Product storage does not exists!");
+            }
+        }
 
         Ok(())
     }

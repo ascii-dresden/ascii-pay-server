@@ -201,6 +201,12 @@ impl From<http::Error> for ServiceError {
     }
 }
 
+impl From<git2::Error> for ServiceError {
+    fn from(error: git2::Error) -> Self {
+        ServiceError::InternalServerError("Git error", format!("{:?}", error))
+    }
+}
+
 impl From<argon2rs::verifier::DecodeError> for ServiceError {
     fn from(error: argon2rs::verifier::DecodeError) -> Self {
         ServiceError::InternalServerError("Hash error", format!("{:?}", error))

@@ -46,7 +46,7 @@ impl ApplePushNotificationService {
         connector_builder.set_alpn_protos(b"\x02h2")?;
         let ssl_connector = connector_builder.build();
 
-        let connector = Connector::new().ssl(ssl_connector);
+        let connector = Connector::new().openssl(ssl_connector);
 
         let client = Client::builder().connector(connector).finish();
 
