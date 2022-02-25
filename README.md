@@ -17,3 +17,12 @@ docker-compose up -d
 # Stop service
 docker-compose down
 ```
+
+## Building with Nix
+
+```bash
+nix build
+```
+
+The flake also defines an overlay which you can easily import.
+

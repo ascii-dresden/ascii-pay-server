@@ -14,5 +14,14 @@
       src = ./.;
       naersk = naersk.lib.x86_64-linux;
     };
+
+    overlay = (final: prev: {
+      custom = prev.lib.makeScope final.newScope (self: with self; {
+        ascii-pay-server = pkgs.callPackage ./derivation.nix {
+          src = ./.;
+          naersk = naersk.lib.x86_64-linux;
+        };
+      });
+    });
   };
 }
