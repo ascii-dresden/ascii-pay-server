@@ -11,9 +11,10 @@ naersk.buildPackage {
   nativeBuildInputs = [ pkg-config protobuf gcc cmake ];
   buildInputs = [ openssl libpqxx libiconv postgresql git ];
 
-  installPhase = ''
-    cp -r AsciiPayCard.pass $out/
-  '';
+#  installPhase = ''
+#    ls -a
+#    cp -r ./AsciiPayCard.pass $out/
+#  '';
 
   meta = with lib; {
     description = "Rust server which handles the transactions of the ascii-pay system.";

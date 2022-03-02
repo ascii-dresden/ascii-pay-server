@@ -20,6 +20,7 @@
         src = ./.;
         naersk = naersk.lib.x86_64-linux;
       };
+      ascii-pay-server-src = ./.;
     });
   };
 }
