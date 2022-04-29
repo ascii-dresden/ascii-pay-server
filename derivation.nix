@@ -6,8 +6,6 @@ naersk.buildPackage {
 
   inherit src;
 
-  cargoSha256 = lib.fakeSha256;
-
   nativeBuildInputs = [ pkg-config protobuf gcc cmake ];
   buildInputs = [ openssl libpqxx libiconv postgresql git ];
 
