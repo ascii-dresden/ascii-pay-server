@@ -59,7 +59,7 @@ async fn main() {
     let exit_code = match result {
         Ok(_) => 0,
         Err(e) => {
-            error!("{}", e);
+            error!("{:?}", e);
             1
         }
     };

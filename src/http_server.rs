@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use actix_cors::Cors;
 use actix_web::web::Data;
 use actix_web::{middleware, App, HttpServer};
@@ -39,7 +41,7 @@ async fn start_server(database_pool: DatabasePool, redis_pool: RedisPool) -> Ser
             // Register api module
             .configure(module_api::init)
     })
-    .keep_alive(60)
+    .keep_alive(Duration::from_secs(60))
     .bind(address)?
     .run()
     .await?;
