@@ -1,6 +1,4 @@
-use std::io;
-
-use diesel::backend::Backend;
+use diesel::backend::{self, Backend};
 use diesel::deserialize::{self, FromSql};
 use diesel::serialize::{self, Output, ToSql};
 use diesel::sql_types::*;
@@ -9,7 +7,7 @@ use diesel::sql_types::*;
 #[derive(
     Debug, Copy, Clone, FromSqlRow, AsExpression, Hash, PartialEq, Eq, Serialize, Deserialize, Enum,
 )]
-#[sql_type = "SmallInt"]
+#[diesel(sql_type = SmallInt)]
 pub enum Permission {
     /// default user without the ability to edit anything
     Default,
@@ -61,16 +59,12 @@ impl<DB: Backend> ToSql<SmallInt, DB> for Permission
 where
     i16: ToSql<SmallInt, DB>,
 {
-    fn to_sql<W>(&self, out: &mut Output<W, DB>) -> serialize::Result
-    where
-        W: io::Write,
-    {
-        let v = match *self {
-            Permission::Default => 0,
-            Permission::Member => 1,
-            Permission::Admin => 2,
-        };
-        v.to_sql(out)
+    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, DB>) -> serialize::Result {
+        match *self {
+            Permission::Default => 0.to_sql(out),
+            Permission::Member => 1.to_sql(out),
+            Permission::Admin => 2.to_sql(out),
+        }
     }
 }
 
@@ -79,7 +73,7 @@ impl<DB: Backend> FromSql<SmallInt, DB> for Permission
 where
     i16: FromSql<SmallInt, DB>,
 {
-    fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {
+    fn from_sql(bytes: backend::RawValue<DB>) -> deserialize::Result<Self> {
         let v = i16::from_sql(bytes)?;
         Ok(match v {
             0 => Permission::Default,
@@ -94,7 +88,7 @@ where
 #[derive(
     Debug, Copy, Clone, FromSqlRow, AsExpression, Hash, PartialEq, Eq, Serialize, Deserialize, Enum,
 )]
-#[sql_type = "SmallInt"]
+#[diesel(sql_type = SmallInt)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum StampType {
     None,
@@ -127,16 +121,12 @@ impl<DB: Backend> ToSql<SmallInt, DB> for StampType
 where
     i16: ToSql<SmallInt, DB>,
 {
-    fn to_sql<W>(&self, out: &mut Output<W, DB>) -> serialize::Result
-    where
-        W: io::Write,
-    {
-        let v = match *self {
-            Self::None => 0,
-            Self::Coffee => 1,
-            Self::Bottle => 2,
-        };
-        v.to_sql(out)
+    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, DB>) -> serialize::Result {
+        match *self {
+            Self::None => 0.to_sql(out),
+            Self::Coffee => 1.to_sql(out),
+            Self::Bottle => 2.to_sql(out),
+        }
     }
 }
 
@@ -145,7 +135,7 @@ impl<DB: Backend> FromSql<SmallInt, DB> for StampType
 where
     i16: FromSql<SmallInt, DB>,
 {
-    fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {
+    fn from_sql(bytes: backend::RawValue<DB>) -> deserialize::Result<Self> {
         let v = i16::from_sql(bytes)?;
         Ok(match v {
             0 => Self::None,

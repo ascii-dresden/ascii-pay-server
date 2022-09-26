@@ -38,6 +38,6 @@ pub async fn delete_auth(
     identity: IdentityMut,
     redis_pool: web::Data<RedisPool>,
 ) -> ServiceResult<HttpResponse> {
-    let result = repo::logout_mut(redis_pool.deref(), &identity).await?;
-    Ok(HttpResponse::Ok().json(&result))
+    repo::logout_mut(redis_pool.deref(), &identity).await?;
+    Ok(HttpResponse::Ok().json(()))
 }

@@ -448,14 +448,15 @@ impl IdentityMut {
         }
     }
 
+    #[allow(clippy::await_holding_refcell_ref)]
     pub async fn forget(&self, redis_pool: &RedisPool) -> ServiceResult<()> {
         if let Some(info) = self.request.extensions_mut().get_mut::<IdentityInfo>() {
+            info.session = None;
+            info.should_write_cookie = true;
+
             if let Some((s, _)) = &info.session {
                 delete_longtime_session(redis_pool, s).await?;
             }
-
-            info.session = None;
-            info.should_write_cookie = true;
 
             Ok(())
         } else {

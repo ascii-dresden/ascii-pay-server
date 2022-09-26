@@ -2,7 +2,6 @@ use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 use chrono::{Local, NaiveDateTime};
 use diesel::prelude::*;
-use lazy_static::__Deref;
 use uuid::Uuid;
 
 use crate::model::schema::{transaction, transaction_item};
@@ -17,7 +16,7 @@ use super::enums::StampType;
 #[derive(
     Debug, Queryable, Insertable, Identifiable, AsChangeset, Serialize, Deserialize, Clone,
 )]
-#[table_name = "transaction"]
+#[diesel(table_name = transaction)]
 pub struct Transaction {
     pub id: Uuid,
     pub account_id: Uuid,
@@ -35,8 +34,8 @@ pub struct Transaction {
 
 /// Represent a transaction
 #[derive(Debug, Queryable, Insertable, AsChangeset, Serialize, Deserialize, Clone)]
-#[changeset_options(treat_none_as_null = "true")]
-#[table_name = "transaction_item"]
+#[diesel(treat_none_as_null = true)]
+#[diesel(table_name = transaction_item)]
 pub struct TransactionItem {
     pub transaction_id: Uuid,
     pub index: i32,
@@ -215,52 +214,55 @@ pub async fn execute_at(
     use crate::model::schema::transaction::dsl;
     use crate::model::schema::transaction_item::dsl as dsl_item;
 
-    let database_conn = &database_pool.get().await?;
-    let result = database_conn.build_transaction().serializable().run(|| {
-        let mut account = Account::get_sync(database_conn, account.id)?;
+    let database_conn = &mut database_pool.get().await?;
+    let result = database_conn
+        .build_transaction()
+        .serializable()
+        .run(|conn| {
+            let mut account = Account::get_sync(conn, account.id)?;
 
-        let mut transaction_helper = TransactionHelper::default();
+            let mut transaction_helper = TransactionHelper::default();
 
-        // Update credit and stamp values
-        for item in transaction_items.iter() {
-            transaction_helper += item;
-        }
-
-        transaction_helper.assert_can_be_applied_to_account(&account)?;
-
-        // Return error if an item could be paid with stemps
-        if stop_if_stamp_payment_is_possible && account.use_digital_stamps {
+            // Update credit and stamp values
             for item in transaction_items.iter() {
-                let temp = transaction_helper - item;
-
-                temp.assert_could_item_be_paid_with_stamps(&account, item)?;
+                transaction_helper += item;
             }
-        }
 
-        let t = transaction_helper.apply_to_account(&mut account, date);
+            transaction_helper.assert_can_be_applied_to_account(&account)?;
 
-        account.update_sync(database_conn)?;
-        diesel::insert_into(dsl::transaction)
-            .values(&t)
-            .execute(database_conn.deref())?;
+            // Return error if an item could be paid with stemps
+            if stop_if_stamp_payment_is_possible && account.use_digital_stamps {
+                for item in transaction_items.iter() {
+                    let temp = transaction_helper - item;
 
-        for (i, item) in transaction_items.into_iter().enumerate() {
-            let ti = TransactionItem {
-                transaction_id: t.id,
-                index: i as i32,
-                price: item.price,
-                pay_with_stamps: item.pay_with_stamps,
-                give_stamps: item.give_stamps,
-                product_id: item.product_id,
-            };
+                    temp.assert_could_item_be_paid_with_stamps(&account, item)?;
+                }
+            }
 
-            diesel::insert_into(dsl_item::transaction_item)
-                .values(&ti)
-                .execute(database_conn.deref())?;
-        }
+            let t = transaction_helper.apply_to_account(&mut account, date);
 
-        Ok((t, account))
-    });
+            account.update_sync(conn)?;
+            diesel::insert_into(dsl::transaction)
+                .values(&t)
+                .execute(conn)?;
+
+            for (i, item) in transaction_items.into_iter().enumerate() {
+                let ti = TransactionItem {
+                    transaction_id: t.id,
+                    index: i as i32,
+                    price: item.price,
+                    pay_with_stamps: item.pay_with_stamps,
+                    give_stamps: item.give_stamps,
+                    product_id: item.product_id,
+                };
+
+                diesel::insert_into(dsl_item::transaction_item)
+                    .values(&ti)
+                    .execute(conn)?;
+            }
+
+            Ok((t, account))
+        });
 
     match result {
         Ok((t, a)) => {
@@ -307,27 +309,27 @@ pub async fn get_by_account(
 ) -> ServiceResult<Vec<Transaction>> {
     use crate::model::schema::transaction::dsl;
 
-    let database_conn = &database_pool.get().await?;
+    let database_conn = &mut *database_pool.get().await?;
     let results = match from {
         Some(f) => match to {
             Some(t) => dsl::transaction
                 .filter(dsl::account_id.eq(&account.id).and(dsl::date.between(f, t)))
                 .order(dsl::date.desc())
-                .load::<Transaction>(database_conn.deref())?,
+                .load::<Transaction>(database_conn)?,
             None => dsl::transaction
                 .filter(dsl::account_id.eq(&account.id).and(dsl::date.ge(f)))
                 .order(dsl::date.desc())
-                .load::<Transaction>(database_conn.deref())?,
+                .load::<Transaction>(database_conn)?,
         },
         None => match to {
             Some(t) => dsl::transaction
                 .filter(dsl::account_id.eq(&account.id).and(dsl::date.le(t)))
                 .order(dsl::date.desc())
-                .load::<Transaction>(database_conn.deref())?,
+                .load::<Transaction>(database_conn)?,
             None => dsl::transaction
                 .filter(dsl::account_id.eq(&account.id))
                 .order(dsl::date.desc())
-                .load::<Transaction>(database_conn.deref())?,
+                .load::<Transaction>(database_conn)?,
         },
     };
 
@@ -341,14 +343,14 @@ pub async fn get_by_account_and_id(
 ) -> ServiceResult<Transaction> {
     use crate::model::schema::transaction::dsl;
 
-    let database_conn = &database_pool.get().await?;
+    let database_conn = &mut *database_pool.get().await?;
     let mut results = dsl::transaction
         .filter(
             dsl::account_id
                 .eq(&account.id)
                 .and(dsl::id.eq(transaction_id)),
         )
-        .load::<Transaction>(database_conn.deref())?;
+        .load::<Transaction>(database_conn)?;
 
     results.pop().ok_or(ServiceError::NotFound)
 }
@@ -357,12 +359,12 @@ impl Transaction {
     /// List assigned products with amounts of this transaction
     pub fn get_items(
         &self,
-        database_conn: &DatabaseConnection,
+        database_conn: &mut DatabaseConnection,
     ) -> ServiceResult<Vec<TransactionItem>> {
         use crate::model::schema::transaction_item::dsl;
 
         Ok(dsl::transaction_item
             .filter(dsl::transaction_id.eq(&self.id))
-            .load::<TransactionItem>(database_conn.deref())?)
+            .load::<TransactionItem>(database_conn)?)
     }
 }

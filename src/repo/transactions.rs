@@ -101,9 +101,9 @@ impl From<TransactionWrapper> for TransactionOutput {
     }
 }
 
-pub fn map_with_result<A, B, F>(vec: Vec<A>, transform: F) -> ServiceResult<Vec<B>>
+pub fn map_with_result<A, B, F>(vec: Vec<A>, transform: &mut F) -> ServiceResult<Vec<B>>
 where
-    F: Fn(A) -> ServiceResult<B>,
+    F: FnMut(A) -> ServiceResult<B>,
 {
     let mut result = Vec::<B>::with_capacity(vec.len());
 
@@ -130,7 +130,7 @@ where
 }
 
 pub fn map_transaction_output(
-    database_conn: &DatabaseConnection,
+    database_conn: &mut DatabaseConnection,
     transaction: Transaction,
 ) -> ServiceResult<TransactionOutput> {
     let items = associate_with_result(transaction.get_items(database_conn)?, |item| {
@@ -174,7 +174,7 @@ pub async fn transaction_payment(
 
     let error = match result {
         Ok(transaction) => {
-            let database_conn = &database_pool.get().await?;
+            let database_conn = &mut *database_pool.get().await?;
             return Ok(PaymentOutput {
                 account: account.joined_sync(database_conn)?.into(),
                 transaction: Some(map_transaction_output(database_conn, transaction)?),
@@ -187,7 +187,7 @@ pub async fn transaction_payment(
 
     if let ServiceError::TransactionCancelled(message) = error {
         let account_access_token = create_onetime_session_ttl(redis_pool, &account, 30).await?;
-        let database_conn = &database_pool.get().await?;
+        let database_conn = &mut *database_pool.get().await?;
 
         return Ok(PaymentOutput {
             account: account.joined_sync(database_conn)?.into(),
@@ -218,8 +218,8 @@ pub async fn get_transactions_by_account(
     )
     .await?;
 
-    let database_conn = &database_pool.get().await?;
-    map_with_result(entities, |t| map_transaction_output(database_conn, t))
+    let database_conn = &mut *database_pool.get().await?;
+    map_with_result(entities, &mut |t| map_transaction_output(database_conn, t))
 }
 
 pub async fn get_transaction_by_account(
@@ -234,6 +234,6 @@ pub async fn get_transaction_by_account(
     let transaction =
         transactions::get_by_account_and_id(database_pool, &account, transaction_id).await?;
 
-    let database_conn = &database_pool.get().await?;
+    let database_conn = &mut *database_pool.get().await?;
     map_transaction_output(database_conn, transaction)
 }

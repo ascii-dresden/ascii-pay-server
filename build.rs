@@ -1,8 +1,13 @@
-fn compile_protobuf() {
-    println!("cargo:rerun-if-changed=proto/authentication.proto");
+use grpcio_compiler::prost_codegen::compile_protos;
 
-    protoc_grpcio::compile_grpc_protos(&["proto/authentication.proto"], &[""], "src/grpc", None)
-        .expect("Failed to compile gRPC definitions!");
+fn compile_protobuf() {
+    // println!("cargo:rerun-if-changed=proto/authentication.proto");
+
+    let outdir = match std::env::var("OUT_DIR") {
+        Err(_) => return,
+        Ok(outdir) => outdir,
+    };
+    compile_protos(&["proto/authentication.proto"], &["proto"], &outdir).unwrap();
 }
 
 fn main() {

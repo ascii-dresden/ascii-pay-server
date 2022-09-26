@@ -61,8 +61,8 @@ pub async fn delete_account(
     identity: Identity,
     id: web::Path<Uuid>,
 ) -> ServiceResult<HttpResponse> {
-    let result = repo::delete_account(database_pool.deref(), &identity, id.into_inner())?;
-    Ok(HttpResponse::Ok().json(&result))
+    repo::delete_account(database_pool.deref(), &identity, id.into_inner())?;
+    Ok(HttpResponse::Ok().json(()))
 }
 
 /// DELETE route for `/api/v1/account/{account_id}/nfc/{card_id}`
@@ -72,10 +72,9 @@ pub async fn delete_account_nfc(
     path: web::Path<(Uuid, String)>,
 ) -> ServiceResult<HttpResponse> {
     let (account_id, card_id) = path.into_inner();
-    let result =
-        repo::authenticate_nfc_delete_card(database_pool.deref(), &identity, account_id, &card_id)
-            .await?;
-    Ok(HttpResponse::Ok().json(&result))
+    repo::authenticate_nfc_delete_card(database_pool.deref(), &identity, account_id, &card_id)
+        .await?;
+    Ok(HttpResponse::Ok().json(()))
 }
 
 /// GET route for `/api/v1/account/{account_id}/access-token`

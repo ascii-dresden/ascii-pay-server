@@ -12,16 +12,16 @@ use super::Account;
 
 /// Represent a username - password authentication for the given account
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset)]
-#[table_name = "authentication_password"]
-#[primary_key(account_id)]
+#[diesel(table_name = authentication_password)]
+#[diesel(primary_key(account_id))]
 pub struct AuthenticationPassword {
     account_id: Uuid,
     password: String,
 }
 
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset)]
-#[table_name = "authentication_password_invitation"]
-#[primary_key(account_id)]
+#[diesel(table_name = authentication_password_invitation)]
+#[diesel(primary_key(account_id))]
 pub struct InvitationLink {
     pub account_id: Uuid,
     pub link: String,
@@ -54,7 +54,7 @@ pub async fn create_invitation_link(
     revoke_invitation_link(database_pool, account).await?;
     diesel::insert_into(dsl::authentication_password_invitation)
         .values(&a)
-        .execute(&*database_pool.get().await?)?;
+        .execute(&mut *database_pool.get().await?)?;
 
     // send invite link if account has an associated mail address
     if !account.mail.is_empty() {
@@ -73,7 +73,7 @@ pub async fn get_invitation_link(
     let mut results = dsl::authentication_password_invitation
         .filter(dsl::account_id.eq(&account.id))
         .limit(1)
-        .load::<InvitationLink>(&*database_pool.get().await?)?;
+        .load::<InvitationLink>(&mut *database_pool.get().await?)?;
 
     Ok(results.pop().map(|i| i.link))
 }
@@ -85,7 +85,7 @@ pub async fn revoke_invitation_link(
     use crate::model::schema::authentication_password_invitation::dsl;
 
     diesel::delete(dsl::authentication_password_invitation.filter(dsl::account_id.eq(&account.id)))
-        .execute(&*database_pool.get().await?)?;
+        .execute(&mut *database_pool.get().await?)?;
 
     Ok(())
 }
@@ -99,7 +99,7 @@ pub async fn get_account_by_invitation_link(
     let mut results = dsl::authentication_password_invitation
         .filter(dsl::link.eq(link))
         .limit(1)
-        .load::<InvitationLink>(&*database_pool.get().await?)?;
+        .load::<InvitationLink>(&mut *database_pool.get().await?)?;
 
     let invitation_link = results.pop();
 
@@ -130,7 +130,7 @@ pub async fn register(
     remove(database_pool, account).await?;
     diesel::insert_into(dsl::authentication_password)
         .values(&a)
-        .execute(&*database_pool.get().await?)?;
+        .execute(&mut *database_pool.get().await?)?;
 
     Ok(())
 }
@@ -140,7 +140,7 @@ pub async fn remove(database_pool: &DatabasePool, account: &Account) -> ServiceR
     use crate::model::schema::authentication_password::dsl;
 
     diesel::delete(dsl::authentication_password.filter(dsl::account_id.eq(&account.id)))
-        .execute(&*database_pool.get().await?)?;
+        .execute(&mut *database_pool.get().await?)?;
 
     Ok(())
 }
@@ -150,7 +150,7 @@ pub async fn has_password(database_pool: &DatabasePool, account: &Account) -> Se
 
     let results = dsl::authentication_password
         .filter(dsl::account_id.eq(&account.id))
-        .load::<AuthenticationPassword>(&*database_pool.get().await?)?;
+        .load::<AuthenticationPassword>(&mut *database_pool.get().await?)?;
 
     Ok(!results.is_empty())
 }
@@ -168,7 +168,7 @@ pub async fn get(
 
     let mut results = dsl::authentication_password
         .filter(dsl::account_id.eq(account.id))
-        .load::<AuthenticationPassword>(&*database_pool.get().await?)?;
+        .load::<AuthenticationPassword>(&mut *database_pool.get().await?)?;
 
     let entry = results.pop().ok_or(ServiceError::NotFound)?;
 
@@ -188,7 +188,7 @@ pub async fn verify_password(
 
     let mut results = dsl::authentication_password
         .filter(dsl::account_id.eq(account.id))
-        .load::<AuthenticationPassword>(&*database_pool.get().await?)?;
+        .load::<AuthenticationPassword>(&mut *database_pool.get().await?)?;
 
     let entry = results.pop().ok_or(ServiceError::NotFound)?;
 

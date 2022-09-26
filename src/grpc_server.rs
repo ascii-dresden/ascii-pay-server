@@ -8,7 +8,6 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use crate::grpc::authentication::*;
-use crate::grpc::authentication_grpc::{create_ascii_pay_authentication, AsciiPayAuthentication};
 use crate::identity_service::Identity;
 use crate::repo::authentication_token as t;
 use crate::utils::{env, log_result, DatabasePool, RedisPool, ServiceError, ServiceResult};
@@ -16,8 +15,8 @@ use crate::utils::{env, log_result, DatabasePool, RedisPool, ServiceError, Servi
 impl From<t::TokenType> for TokenType {
     fn from(item: t::TokenType) -> TokenType {
         match item {
-            t::TokenType::AccountAccessToken => TokenType::ACCOUNT_ACCESS_TOKEN,
-            t::TokenType::ProductId => TokenType::PRODUCT_ID,
+            t::TokenType::AccountAccessToken => TokenType::AccountAccessToken,
+            t::TokenType::ProductId => TokenType::ProductId,
         }
     }
 }
@@ -25,8 +24,8 @@ impl From<t::TokenType> for TokenType {
 impl From<t::NfcCardType> for NfcCardType {
     fn from(item: t::NfcCardType) -> NfcCardType {
         match item {
-            t::NfcCardType::Generic => NfcCardType::GENERIC,
-            t::NfcCardType::MifareDesfire => NfcCardType::MIFARE_DESFIRE,
+            t::NfcCardType::Generic => NfcCardType::Generic,
+            t::NfcCardType::MifareDesfire => NfcCardType::MifareDesfire,
         }
     }
 }
@@ -188,20 +187,17 @@ impl AuthenticationRunner {
         req: crate::grpc::authentication::AuthenticateBarcodeRequest,
     ) -> ServiceResult<crate::grpc::authentication::AuthenticateBarcodeResponse> {
         let (token_type, token) = log_result(
-            t::authenticate_barcode(
-                &self.database_pool,
-                &self.redis_pool,
-                &identity,
-                req.get_code(),
-            )
-            .await,
+            t::authenticate_barcode(&self.database_pool, &self.redis_pool, &identity, &req.code)
+                .await,
         )?;
 
-        let mut response = AuthenticateBarcodeResponse::new();
-        response.set_tokenType(token_type.into());
-        response.set_token(token);
-
-        Ok(response)
+        Ok(AuthenticateBarcodeResponse {
+            token_type: match token_type {
+                t::TokenType::AccountAccessToken => 0,
+                t::TokenType::ProductId => 1,
+            },
+            token,
+        })
     }
 
     async fn authenticate_nfc_type_async(
@@ -210,14 +206,16 @@ impl AuthenticationRunner {
         req: crate::grpc::authentication::AuthenticateNfcTypeRequest,
     ) -> ServiceResult<crate::grpc::authentication::AuthenticateNfcTypeResponse> {
         let nfc_card_type = log_result(
-            t::authenticate_nfc_type(&self.database_pool, &identity, req.get_card_id()).await,
+            t::authenticate_nfc_type(&self.database_pool, &identity, &req.card_id).await,
         )?;
 
-        let mut response = AuthenticateNfcTypeResponse::new();
-        response.set_card_id(req.get_card_id().to_owned());
-        response.set_tokenType(nfc_card_type.into());
-
-        Ok(response)
+        Ok(AuthenticateNfcTypeResponse {
+            card_id: req.card_id,
+            token_type: match nfc_card_type {
+                t::NfcCardType::Generic => 0,
+                t::NfcCardType::MifareDesfire => 1,
+            },
+        })
     }
 
     async fn authenticate_nfc_generic_async(
@@ -230,17 +228,19 @@ impl AuthenticationRunner {
                 &self.database_pool,
                 &self.redis_pool,
                 &identity,
-                req.get_card_id(),
+                &req.card_id,
             )
             .await,
         )?;
 
-        let mut response = AuthenticateNfcGenericResponse::new();
-        response.set_card_id(req.get_card_id().to_owned());
-        response.set_tokenType(token_type.into());
-        response.set_token(token);
-
-        Ok(response)
+        Ok(AuthenticateNfcGenericResponse {
+            card_id: req.card_id,
+            token_type: match token_type {
+                t::TokenType::AccountAccessToken => 0,
+                t::TokenType::ProductId => 1,
+            },
+            token,
+        })
     }
 
     async fn authenticate_nfc_mifare_desfire_phase1_async(
@@ -254,17 +254,16 @@ impl AuthenticationRunner {
                 &self.database_pool,
                 &self.redis_pool,
                 &identity,
-                req.get_card_id(),
-                req.get_ek_rndB(),
+                &req.card_id,
+                &req.ek_rnd_b,
             )
             .await,
         )?;
 
-        let mut response = AuthenticateNfcMifareDesfirePhase1Response::new();
-        response.set_card_id(req.get_card_id().to_owned());
-        response.set_dk_rndA_rndBshifted(challenge);
-
-        Ok(response)
+        Ok(AuthenticateNfcMifareDesfirePhase1Response {
+            card_id: req.card_id,
+            dk_rnd_a_rnd_bshifted: challenge,
+        })
     }
 
     async fn authenticate_nfc_mifare_desfire_phase2_async(
@@ -278,20 +277,22 @@ impl AuthenticationRunner {
                 &self.database_pool,
                 &self.redis_pool,
                 &identity,
-                req.get_card_id(),
-                req.get_dk_rndA_rndBshifted(),
-                req.get_ek_rndAshifted_card(),
+                &req.card_id,
+                &req.dk_rnd_a_rnd_bshifted,
+                &req.ek_rnd_ashifted_card,
             )
             .await,
         )?;
 
-        let mut response = AuthenticateNfcMifareDesfirePhase2Response::new();
-        response.set_card_id(req.get_card_id().to_owned());
-        response.set_session_key(session);
-        response.set_tokenType(token_type.into());
-        response.set_token(token);
-
-        Ok(response)
+        Ok(AuthenticateNfcMifareDesfirePhase2Response {
+            card_id: req.card_id,
+            session_key: session,
+            token_type: match token_type {
+                t::TokenType::AccountAccessToken => 0,
+                t::TokenType::ProductId => 1,
+            },
+            token,
+        })
     }
 
     async fn authenticate_nfc_generic_init_card_async(
@@ -303,16 +304,15 @@ impl AuthenticationRunner {
             t::authenticate_nfc_generic_init_card(
                 &self.database_pool,
                 &identity,
-                req.get_card_id(),
-                Uuid::parse_str(req.get_account_id())?,
+                &req.card_id,
+                Uuid::parse_str(&req.account_id)?,
             )
             .await,
         )?;
 
-        let mut response = AuthenticateNfcGenericInitCardResponse::new();
-        response.set_card_id(req.get_card_id().to_owned());
-
-        Ok(response)
+        Ok(AuthenticateNfcGenericInitCardResponse {
+            card_id: req.card_id,
+        })
     }
 
     async fn authenticate_nfc_mifare_desfire_init_card_async(
@@ -325,17 +325,16 @@ impl AuthenticationRunner {
             t::authenticate_nfc_mifare_desfire_init_card(
                 &self.database_pool,
                 &identity,
-                req.get_card_id(),
-                Uuid::parse_str(req.get_account_id())?,
+                &req.card_id,
+                Uuid::parse_str(&req.account_id)?,
             )
             .await,
         )?;
 
-        let mut response = AuthenticateNfcMifareDesfireInitCardResponse::new();
-        response.set_card_id(req.get_card_id().to_owned());
-        response.set_key(key);
-
-        Ok(response)
+        Ok(AuthenticateNfcMifareDesfireInitCardResponse {
+            card_id: req.card_id,
+            key,
+        })
     }
 }
 

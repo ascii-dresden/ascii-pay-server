@@ -54,11 +54,11 @@ impl From<diesel::result::Error> for ServiceError {
     }
 }
 
-impl From<diesel_migrations::RunMigrationsError> for ServiceError {
-    fn from(error: diesel_migrations::RunMigrationsError) -> Self {
-        ServiceError::InternalServerError("Database error", format!("{}", error))
-    }
-}
+// impl From<diesel_migrations::RunMigrationsError> for ServiceError {
+//     fn from(error: diesel_migrations::RunMigrationsError) -> Self {
+//         ServiceError::InternalServerError("Database error", format!("{}", error))
+//     }
+// }
 
 impl From<bb8_redis::redis::RedisError> for ServiceError {
     fn from(error: bb8_redis::redis::RedisError) -> Self {
@@ -138,11 +138,11 @@ impl From<block_modes::BlockModeError> for ServiceError {
     }
 }
 
-impl From<lettre::smtp::error::Error> for ServiceError {
-    fn from(error: lettre::smtp::error::Error) -> Self {
-        ServiceError::MailError(error.to_string())
-    }
-}
+// impl From<lettre::smtp::error::Error> for ServiceError {
+//     fn from(error: lettre::smtp::error::Error) -> Self {
+//         ServiceError::MailError(error.to_string())
+//     }
+// }
 
 impl From<actix_web::http::header::ToStrError> for ServiceError {
     fn from(error: actix_web::http::header::ToStrError) -> Self {

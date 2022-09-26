@@ -29,6 +29,6 @@ pub async fn get_product_image(
 
 /// GET route for `/api/v1/products/update`
 pub async fn update_products(identity: Identity) -> ServiceResult<HttpResponse> {
-    let result = repo::update_products(&identity)?;
-    Ok(HttpResponse::Ok().json(&result))
+    repo::update_products(&identity)?;
+    Ok(HttpResponse::Ok().json(()))
 }

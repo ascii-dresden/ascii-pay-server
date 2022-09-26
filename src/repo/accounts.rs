@@ -93,7 +93,7 @@ fn search_account(entity: AccountJoined, search: &str) -> Option<SearchElement<A
         entity
             .0
             .id
-            .to_hyphenated()
+            .hyphenated()
             .encode_upper(&mut Uuid::encode_buffer())
             .to_owned(),
         entity.0.name.clone(),

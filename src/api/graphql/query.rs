@@ -89,20 +89,16 @@ impl Query {
             database_pool.deref(),
             identity,
             account_id,
-            transaction_filter_from
-                .map(|s| {
-                    NaiveDate::parse_from_str(&s, "%Y-%m-%d")
-                        .ok()
-                        .map(|d| d.and_hms(0, 0, 0))
-                })
-                .flatten(),
-            transaction_filter_to
-                .map(|s| {
-                    NaiveDate::parse_from_str(&s, "%Y-%m-%d")
-                        .ok()
-                        .map(|d| d.and_hms(23, 59, 59))
-                })
-                .flatten(),
+            transaction_filter_from.and_then(|s| {
+                NaiveDate::parse_from_str(&s, "%Y-%m-%d")
+                    .ok()
+                    .map(|d| d.and_hms(0, 0, 0))
+            }),
+            transaction_filter_to.and_then(|s| {
+                NaiveDate::parse_from_str(&s, "%Y-%m-%d")
+                    .ok()
+                    .map(|d| d.and_hms(23, 59, 59))
+            }),
         )
         .await
     }

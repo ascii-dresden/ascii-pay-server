@@ -8,9 +8,9 @@ use super::Account;
 
 /// Represent a nfc tag - nfc authentication for the given account
 #[derive(Debug, Queryable, Insertable, Identifiable, AsChangeset)]
-#[changeset_options(treat_none_as_null = "true")]
-#[table_name = "authentication_nfc"]
-#[primary_key(account_id, card_id)]
+#[diesel(treat_none_as_null = true)]
+#[diesel(table_name = authentication_nfc)]
+#[diesel(primary_key(account_id, card_id))]
 pub struct AuthenticationNfc {
     pub account_id: Uuid,
     pub card_id: String,
@@ -44,7 +44,7 @@ pub async fn register(
 
     diesel::insert_into(dsl::authentication_nfc)
         .values(&a)
-        .execute(&*database_pool.get().await?)?;
+        .execute(&mut *database_pool.get().await?)?;
 
     Ok(())
 }
@@ -64,7 +64,7 @@ pub async fn remove(
                 .and(dsl::card_id.eq(&card_id)),
         ),
     )
-    .execute(&*database_pool.get().await?)?;
+    .execute(&mut *database_pool.get().await?)?;
 
     Ok(())
 }
@@ -77,7 +77,7 @@ pub async fn get_by_account(
 
     let results = dsl::authentication_nfc
         .filter(dsl::account_id.eq(&account.id))
-        .load::<AuthenticationNfc>(&*database_pool.get().await?)?;
+        .load::<AuthenticationNfc>(&mut *database_pool.get().await?)?;
 
     Ok(results)
 }
@@ -90,7 +90,7 @@ pub async fn get_by_card_id(
 
     let mut results = dsl::authentication_nfc
         .filter(dsl::card_id.eq(&card_id))
-        .load::<AuthenticationNfc>(&*database_pool.get().await?)?;
+        .load::<AuthenticationNfc>(&mut *database_pool.get().await?)?;
 
     results.pop().ok_or(ServiceError::NotFound)
 }

@@ -25,7 +25,7 @@ pub fn get_current_time() -> i32 {
 #[derive(
     Debug, Queryable, Insertable, AsChangeset, PartialEq, Eq, Hash, Serialize, Deserialize, Clone,
 )]
-#[table_name = "apple_wallet_pass"]
+#[diesel(table_name = apple_wallet_pass)]
 pub struct AppleWalletPass {
     pub serial_number: Uuid,
     pub authentication_token: Uuid,
@@ -38,7 +38,7 @@ pub struct AppleWalletPass {
 #[derive(
     Debug, Queryable, Insertable, AsChangeset, PartialEq, Eq, Hash, Serialize, Deserialize, Clone,
 )]
-#[table_name = "apple_wallet_registration"]
+#[diesel(table_name = apple_wallet_registration)]
 struct AppleWalletRegistration {
     pub device_id: String,
     pub serial_number: Uuid,
@@ -55,7 +55,7 @@ pub async fn check_pass_authorization(
     let results = dsl::apple_wallet_pass
         .filter(dsl::serial_number.eq(serial_number))
         .filter(dsl::authentication_token.eq(authentication_token))
-        .load::<AppleWalletPass>(&*database_pool.get().await?)?;
+        .load::<AppleWalletPass>(&mut *database_pool.get().await?)?;
 
     Ok(!results.is_empty())
 }
@@ -69,7 +69,7 @@ pub async fn is_pass_registered_on_device(
     let results = dsl::apple_wallet_registration
         .filter(dsl::device_id.eq(device_id))
         .filter(dsl::serial_number.eq(serial_number))
-        .load::<AppleWalletRegistration>(&*database_pool.get().await?)?;
+        .load::<AppleWalletRegistration>(&mut *database_pool.get().await?)?;
 
     Ok(!results.is_empty())
 }
@@ -92,7 +92,7 @@ pub async fn register_pass_on_device(
 
     diesel::insert_into(dsl::apple_wallet_registration)
         .values(&r)
-        .execute(&*database_pool.get().await?)?;
+        .execute(&mut *database_pool.get().await?)?;
     Ok(())
 }
 
@@ -108,7 +108,7 @@ pub async fn unregister_pass_on_device(
             .filter(dsl::device_id.eq(device_id))
             .filter(dsl::serial_number.eq(serial_number)),
     )
-    .execute(&*database_pool.get().await?)?;
+    .execute(&mut *database_pool.get().await?)?;
     Ok(())
 }
 
@@ -120,7 +120,7 @@ pub async fn is_device_registered(
 
     let results = dsl::apple_wallet_registration
         .filter(dsl::device_id.eq(device_id))
-        .load::<AppleWalletRegistration>(&*database_pool.get().await?)?;
+        .load::<AppleWalletRegistration>(&mut *database_pool.get().await?)?;
 
     Ok(!results.is_empty())
 }
@@ -134,7 +134,7 @@ pub async fn list_passes_for_device(
     let results = dsl::apple_wallet_registration
         .filter(dsl::device_id.eq(device_id))
         .filter(dsl::pass_type_id.eq(pass_type_id))
-        .load::<AppleWalletRegistration>(&*database_pool.get().await?)?;
+        .load::<AppleWalletRegistration>(&mut *database_pool.get().await?)?;
 
     Ok(results.into_iter().map(|r| r.serial_number).collect())
 }
@@ -146,7 +146,7 @@ pub async fn get_pass_updated_at(
     use crate::model::schema::apple_wallet_pass::dsl;
     let mut results = dsl::apple_wallet_pass
         .filter(dsl::serial_number.eq(serial_number))
-        .load::<AppleWalletPass>(&*database_pool.get().await?)?;
+        .load::<AppleWalletPass>(&mut *database_pool.get().await?)?;
 
     if results.len() != 1 {
         return Err(ServiceError::NotFound);
@@ -159,7 +159,7 @@ pub async fn get_by_qr_code(database_pool: &DatabasePool, qr_code: &str) -> Serv
     use crate::model::schema::apple_wallet_pass::dsl;
     let mut results = dsl::apple_wallet_pass
         .filter(dsl::qr_code.eq(qr_code))
-        .load::<AppleWalletPass>(&*database_pool.get().await?)?;
+        .load::<AppleWalletPass>(&mut *database_pool.get().await?)?;
 
     if results.len() != 1 {
         return Err(ServiceError::NotFound);
@@ -181,13 +181,13 @@ pub fn create_pass_binary(account: &Account, db_pass: &AppleWalletPass) -> Servi
     pass.serial_number(
         db_pass
             .serial_number
-            .to_hyphenated()
+            .hyphenated()
             .encode_upper(&mut Uuid::encode_buffer()),
     );
     pass.authentication_token(
         db_pass
             .authentication_token
-            .to_hyphenated()
+            .hyphenated()
             .encode_upper(&mut Uuid::encode_buffer()),
     );
 
@@ -244,7 +244,7 @@ pub async fn create_pass(
 
     let mut results = dsl::apple_wallet_pass
         .filter(dsl::serial_number.eq(&account.id))
-        .load::<AppleWalletPass>(&*database_pool.get().await?)?;
+        .load::<AppleWalletPass>(&mut *database_pool.get().await?)?;
 
     let db_pass = match results.len() {
         0 => {
@@ -252,10 +252,10 @@ pub async fn create_pass(
                 "{}-{}",
                 account
                     .id
-                    .to_hyphenated()
+                    .hyphenated()
                     .encode_upper(&mut Uuid::encode_buffer()),
                 generate_uuid()
-                    .to_hyphenated()
+                    .hyphenated()
                     .encode_upper(&mut Uuid::encode_buffer())
             );
 
@@ -269,7 +269,7 @@ pub async fn create_pass(
 
             diesel::insert_into(dsl::apple_wallet_pass)
                 .values(&db_pass)
-                .execute(&*database_pool.get().await?)?;
+                .execute(&mut *database_pool.get().await?)?;
             db_pass
         }
         1 => results.pop().ok_or(ServiceError::NoneError)?,
@@ -289,10 +289,10 @@ pub async fn delete_pass(database_pool: &DatabasePool, account_id: Uuid) -> Serv
         dsl_registration::apple_wallet_registration
             .filter(dsl_registration::serial_number.eq(account_id)),
     )
-    .execute(&*database_pool.get().await?)?;
+    .execute(&mut *database_pool.get().await?)?;
 
     diesel::delete(dsl_pass::apple_wallet_pass.filter(dsl_pass::serial_number.eq(account_id)))
-        .execute(&*database_pool.get().await?)?;
+        .execute(&mut *database_pool.get().await?)?;
 
     Ok(())
 }
@@ -307,7 +307,7 @@ pub async fn set_pass_updated_at(
         dsl::apple_wallet_pass.filter(apple_wallet_pass::serial_number.eq(serial_number)),
     )
     .set(dsl::updated_at.eq(get_current_time()))
-    .execute(&*database_pool.get().await?)?;
+    .execute(&mut *database_pool.get().await?)?;
 
     Ok(())
 }
@@ -322,7 +322,7 @@ pub async fn send_update_notification(
 
     let results = dsl::apple_wallet_registration
         .filter(dsl::serial_number.eq(account_id))
-        .load::<AppleWalletRegistration>(&*database_pool.get().await?)?;
+        .load::<AppleWalletRegistration>(&mut *database_pool.get().await?)?;
 
     info!("Send APNS message for account: {:?}", account_id);
 

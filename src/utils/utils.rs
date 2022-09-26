@@ -43,7 +43,7 @@ pub fn generate_uuid_str() -> String {
 }
 
 pub fn uuid_to_str(uuid: Uuid) -> String {
-    uuid.to_hyphenated()
+    uuid.hyphenated()
         .encode_upper(&mut Uuid::encode_buffer())
         .to_owned()
 }

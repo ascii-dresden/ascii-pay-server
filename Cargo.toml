@@ -8,41 +8,41 @@ build = "build.rs"
 
 [dependencies]
 # data storage
-time = "0.2"
+time = "0.3"
 chrono = {version = "0.4", features = ["serde"]}
-diesel = {version = "1.4", features = ["postgres", "uuidv07", "r2d2", "chrono"]}
-diesel_migrations = "1.4"
+diesel = {version = "2.0", features = ["postgres", "extras", "i-implement-a-third-party-backend-and-opt-into-breaking-changes"]}
+diesel_migrations = "2.0"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
-uuid = {version = "0.8", features = ["serde", "v4"]}
-bb8 = "0.7"
-bb8-postgres = "0.7"
-bb8-redis = "0.10"
+uuid = {version = "1.1", features = ["serde", "v4"]}
+bb8 = "0.8"
+bb8-postgres = "0.8"
+bb8-redis = "0.11"
 
 # security
 openssl = "0.10"
 argon2rs = "0.2"
 rand_core = "0.6"
 rand = "0.8"
-aes = "0.7"
 hex-literal = "0.3"
-block-modes = "0.8"
 byteorder = "1.4"
+block-modes = "0.8"
+aes = "0.7"
 des = "0.7"
 
 # web server
-actix-web = {version = "4.0.0-beta.12", features = ["openssl"]}
-actix-rt = "2.3"
-actix-http = "3.0.0-beta.13"
-actix-files = "0.6.0-beta.9"
-actix-cors = "0.6.0-beta.4"
-awc = {version = "3.0.0-beta.11", features = ["openssl"]}
+actix-web = {version = "4.2", features = ["openssl"]}
+actix-rt = "2.7"
+actix-http = "3.2"
+actix-files = "0.6"
+actix-cors = "0.6"
+awc = {version = "3.0", features = ["openssl"]}
 http = "0.2"
 
 # graphql
-async-graphql = {version = "3.0.7", features = ["uuid", "chrono"]}
-async-graphql-actix-web = "3.0.7"
+async-graphql = {version = "4.0", features = ["uuid", "chrono"]}
+async-graphql-actix-web = "4.0"
 async-stream = "0.3"
 async-std = "1.10"
 
@@ -58,19 +58,20 @@ futures = "0.3"
 futures-util = "0.3"
 async-trait = "0.1.51"
 lazy_static = "1.4"
-clap = "2.33"
+clap = { version = "3.2", features = ["cargo"] }
 sublime_fuzzy = "0.6"
 base64 = "0.13"
 generic-array = "0.14"
 tokio = { version = "1.14", features=["full"] }
 threadpool = "1.8"
-grpcio = { version = "0.9", default-features = false, features=["protobuf-codec", "use-bindgen"] }
-protobuf = "2.25"
-git2 = "0.13"
+grpcio = { version = "0.11", default-features = false, features=["prost-codec", "openssl"] }
+bytes = "1.2"
+prost = "0.10"
+git2 = "0.15"
 
 # sending mails
-lettre = "0.9"
+lettre = "0.10"
 lettre_email = "0.9"
 
 [build-dependencies]
-protoc-grpcio = "3.0"
+grpcio-compiler = { version = "0.11", default-features = false, features=["prost-codec"] }

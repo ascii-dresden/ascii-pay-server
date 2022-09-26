@@ -10,8 +10,7 @@ fn get_authentication_token(request: &HttpRequest) -> Option<Uuid> {
     let header_value = request
         .headers()
         .get("Authorization")
-        .map(|header_value| header_value.to_str().ok())
-        .flatten()
+        .and_then(|header_value| header_value.to_str().ok())
         .unwrap_or("")
         .split(' ')
         .collect::<Vec<&str>>()
@@ -140,7 +139,7 @@ pub async fn update_passes(
         let serial_numbers = updated_passes
             .iter()
             .map(|uuid| {
-                uuid.to_hyphenated()
+                uuid.hyphenated()
                     .encode_upper(&mut Uuid::encode_buffer())
                     .to_owned()
             })

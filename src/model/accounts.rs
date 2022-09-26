@@ -1,5 +1,4 @@
 use diesel::prelude::*;
-use lazy_static::__Deref;
 use uuid::Uuid;
 
 use crate::model::authentication_password::AuthenticationPassword;
@@ -25,8 +24,8 @@ use super::enums::Permission;
     Deserialize,
     Clone,
 )]
-#[changeset_options(treat_none_as_null = "true")]
-#[table_name = "account"]
+#[diesel(treat_none_as_null = true)]
+#[diesel(table_name = account)]
 pub struct Account {
     pub id: Uuid,
     pub credit: Money,
@@ -68,7 +67,7 @@ impl Account {
             bottle_stamps: 0,
         };
 
-        let database_conn = &database_pool.get().await?;
+        let database_conn = &mut *database_pool.get().await?;
         if !a.exist_conflicting_account(database_conn)? {
             return Err(ServiceError::InternalServerError(
                 "Conflicting account settings",
@@ -78,7 +77,7 @@ impl Account {
 
         diesel::insert_into(dsl::account)
             .values(&a)
-            .execute(database_conn.deref())?;
+            .execute(database_conn)?;
 
         Ok(a)
     }
@@ -87,7 +86,7 @@ impl Account {
     pub async fn update(&self, database_pool: &DatabasePool) -> ServiceResult<()> {
         use crate::model::schema::account::dsl;
 
-        let database_conn = &database_pool.get().await?;
+        let database_conn = &mut *database_pool.get().await?;
         if !self.exist_conflicting_account(database_conn)? {
             return Err(ServiceError::InternalServerError(
                 "Conflicting account settings",
@@ -97,13 +96,13 @@ impl Account {
 
         diesel::update(dsl::account.find(&self.id))
             .set(self)
-            .execute(database_conn.deref())?;
+            .execute(database_conn)?;
 
         Ok(())
     }
 
     /// Save the current account data to the database
-    pub fn update_sync(&self, database_conn: &DatabaseConnection) -> ServiceResult<()> {
+    pub fn update_sync(&self, database_conn: &mut DatabaseConnection) -> ServiceResult<()> {
         use crate::model::schema::account::dsl;
 
         if !self.exist_conflicting_account(database_conn)? {
@@ -126,7 +125,7 @@ impl Account {
 
         let results = dsl::account
             .order(dsl::name.asc())
-            .load::<Account>(&*database_pool.get().await?)?;
+            .load::<Account>(&mut *database_pool.get().await?)?;
 
         Ok(results)
     }
@@ -137,7 +136,7 @@ impl Account {
 
         let mut results = dsl::account
             .filter(dsl::id.eq(id))
-            .load::<Account>(&*database_pool.get().await?)?;
+            .load::<Account>(&mut *database_pool.get().await?)?;
 
         results.pop().ok_or(ServiceError::NotFound)
     }
@@ -147,7 +146,7 @@ impl Account {
         use crate::model::schema::authentication_nfc::dsl as dsl3;
         use crate::model::schema::authentication_password::dsl as dsl2;
 
-        let conn = &*database_pool.get().await?;
+        let conn = &mut *database_pool.get().await?;
 
         let results = dsl1::account
             .left_join(dsl2::authentication_password)
@@ -173,7 +172,7 @@ impl Account {
         use crate::model::schema::authentication_nfc::dsl as dsl3;
         use crate::model::schema::authentication_password::dsl as dsl2;
 
-        let conn = &*database_pool.get().await?;
+        let conn = &mut *database_pool.get().await?;
 
         let mut results = dsl1::account
             .left_join(dsl2::authentication_password)
@@ -192,7 +191,7 @@ impl Account {
         use crate::model::schema::authentication_nfc::dsl as dsl3;
         use crate::model::schema::authentication_password::dsl as dsl2;
 
-        let conn = &*database_pool.get().await?;
+        let conn = &mut *database_pool.get().await?;
 
         let passwords = dsl2::authentication_password
             .filter(dsl2::account_id.eq(&self.id))
@@ -205,28 +204,31 @@ impl Account {
         Ok((self, !passwords.is_empty(), nfc_tokens))
     }
 
-    pub fn joined_sync(self, database_conn: &DatabaseConnection) -> ServiceResult<AccountJoined> {
+    pub fn joined_sync(
+        self,
+        database_conn: &mut DatabaseConnection,
+    ) -> ServiceResult<AccountJoined> {
         use crate::model::schema::authentication_nfc::dsl as dsl3;
         use crate::model::schema::authentication_password::dsl as dsl2;
 
         let passwords = dsl2::authentication_password
             .filter(dsl2::account_id.eq(&self.id))
-            .load::<AuthenticationPassword>(database_conn.deref())?;
+            .load::<AuthenticationPassword>(database_conn)?;
 
         let nfc_tokens = dsl3::authentication_nfc
             .filter(dsl3::account_id.eq(&self.id))
-            .load::<AuthenticationNfc>(database_conn.deref())?;
+            .load::<AuthenticationNfc>(database_conn)?;
 
         Ok((self, !passwords.is_empty(), nfc_tokens))
     }
 
     /// Get an account by the `id`
-    pub fn get_sync(database_conn: &DatabaseConnection, id: Uuid) -> ServiceResult<Account> {
+    pub fn get_sync(database_conn: &mut DatabaseConnection, id: Uuid) -> ServiceResult<Account> {
         use crate::model::schema::account::dsl;
 
         let mut results = dsl::account
             .filter(dsl::id.eq(id))
-            .load::<Account>(database_conn.deref())?;
+            .load::<Account>(database_conn)?;
 
         results.pop().ok_or(ServiceError::NotFound)
     }
@@ -241,7 +243,7 @@ impl Account {
         let mut results = match Uuid::parse_str(login) {
             Ok(uuid) => dsl::account
                 .filter(dsl::id.eq(uuid))
-                .load::<Account>(&*database_pool.get().await?)?,
+                .load::<Account>(&mut *database_pool.get().await?)?,
             Err(_) => dsl::account
                 .filter(
                     dsl::mail
@@ -249,7 +251,7 @@ impl Account {
                         .or(dsl::username.eq(login))
                         .or(dsl::account_number.eq(login)),
                 )
-                .load::<Account>(&*database_pool.get().await?)?,
+                .load::<Account>(&mut *database_pool.get().await?)?,
         };
 
         if results.len() > 1 {
@@ -266,7 +268,7 @@ impl Account {
         username: &str,
     ) -> ServiceResult<(Account, bool)> {
         use crate::model::schema::account::dsl;
-        let database_conn = &database_pool.get().await?;
+        let database_conn = &mut *database_pool.get().await?;
 
         let admin_id = Uuid::nil();
         let admin_account = Self::get_sync(database_conn, admin_id).ok();
@@ -277,7 +279,7 @@ impl Account {
 
             diesel::update(dsl::account.find(&admin_account.id))
                 .set(&admin_account)
-                .execute(database_conn.deref())?;
+                .execute(database_conn)?;
 
             Ok((admin_account, false))
         } else {
@@ -298,13 +300,16 @@ impl Account {
 
             diesel::insert_into(dsl::account)
                 .values(&admin_account)
-                .execute(database_conn.deref())?;
+                .execute(database_conn)?;
 
             Ok((admin_account, true))
         }
     }
 
-    fn exist_conflicting_account(&self, database_conn: &DatabaseConnection) -> ServiceResult<bool> {
+    fn exist_conflicting_account(
+        &self,
+        database_conn: &mut DatabaseConnection,
+    ) -> ServiceResult<bool> {
         use crate::model::schema::account::dsl;
 
         if !self.mail.is_empty() {

@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate diesel;
-#[macro_use]
 extern crate diesel_migrations;
 #[macro_use]
 extern crate serde_derive;
@@ -16,7 +15,7 @@ extern crate wallet_pass;
 #[macro_use]
 extern crate async_graphql;
 
-use std::ops::Deref;
+use std::ops::DerefMut;
 
 use clap::{App, Arg, SubCommand};
 use diesel::PgConnection;
@@ -43,7 +42,8 @@ use crate::utils::{bb8_diesel, env, DatabasePool, ServiceResult};
 use grpc_server::start_tcp_server;
 use http_server::start_http_server;
 
-embed_migrations!();
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[tokio::main]
 async fn main() {
@@ -108,8 +108,10 @@ async fn init() -> ServiceResult<()> {
     let redis_pool = bb8::Pool::builder().build(redis_manager).await?;
 
     {
-        let conn = database_pool.get().await?;
-        embedded_migrations::run_with_output(conn.deref(), &mut std::io::stdout())?;
+        let mut conn = database_pool.get().await?;
+        conn.deref_mut()
+            .run_pending_migrations(MIGRATIONS)
+            .expect("Could not run database migrations!");
     }
 
     if let Some(_matches) = matches.subcommand_matches("admin") {

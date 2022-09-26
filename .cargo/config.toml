@@ -1,2 +1,5 @@
 [target.aarch64-apple-darwin]
 rustflags = '-L /opt/homebrew/opt/libpq/lib -L /opt/homebrew/lib'
+
+[env]
+OPENSSL_ROOT_DIR = "/opt/homebrew/opt/openssl/"
