@@ -10,13 +10,15 @@ use crate::{
     utils::{DatabasePool, RedisPool, ServiceError, ServiceResult},
 };
 
-use super::accounts::AccountOutput;
+use super::{accounts::AccountOutput, authenticate_nfc_mifare_desfire_login};
 
 #[derive(Debug, Deserialize, InputObject)]
 pub struct LoginInput {
     pub username: Option<String>,
     pub password: Option<String>,
     pub account_access_token: Option<Session>,
+    pub nfc_card_id: Option<String>,
+    pub nfc_card_secret: Option<String>,
 }
 
 #[derive(Debug, Serialize, SimpleObject)]
@@ -58,6 +60,31 @@ pub async fn login(
             }
             Err(_) => Err(ServiceError::Unauthorized("invalid onetime session")),
         };
+    }
+
+    if let Some(nfc_card_id) = input.nfc_card_id {
+        if let Some(nfc_card_secret) = input.nfc_card_secret {
+            let login_result = authenticate_nfc_mifare_desfire_login(
+                database_pool,
+                &nfc_card_id,
+                &nfc_card_secret,
+            )
+            .await;
+            return match login_result {
+                Ok(account) => {
+                    identity
+                        .store(database_pool, redis_pool, account.id)
+                        .await?;
+
+                    let token = identity.require_auth_token()?;
+                    Ok(LoginOutput {
+                        authorization: format!("Bearer {}", &token),
+                        token,
+                    })
+                }
+                Err(_) => Err(ServiceError::Unauthorized("invalid username/password")),
+            }
+        }
     }
 
     let username = input.username.unwrap_or_default();

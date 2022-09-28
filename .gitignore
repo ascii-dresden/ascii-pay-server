@@ -16,3 +16,4 @@ certificates/*
 ascii.pass
 *.pkpass
 test-certificates/*
+graphql.schema

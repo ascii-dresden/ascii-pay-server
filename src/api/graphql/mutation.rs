@@ -22,6 +22,8 @@ impl Mutation {
         username: Option<String>,
         password: Option<String>,
         account_access_token: Option<Session>,
+        nfc_card_id: Option<String>,
+        nfc_card_secret: Option<String>,
     ) -> ServiceResult<LoginOutput> {
         let database_pool = ctx.data::<Arc<DatabasePool>>()?;
         let redis_pool = ctx.data::<Arc<RedisPool>>()?;
@@ -35,6 +37,8 @@ impl Mutation {
                 username,
                 password,
                 account_access_token,
+                nfc_card_id,
+                nfc_card_secret,
             },
         )
         .await
@@ -73,6 +77,15 @@ impl Mutation {
         let identity = ctx.data::<Identity>()?;
         repo::delete_account(database_pool.deref(), identity, id)?;
         Ok("ok".to_string())
+    }
+
+    async fn create_own_account_nfc_card(
+        &self,
+        ctx: &Context<'_>,
+    ) -> ServiceResult<repo::CreateOwnNfcCardOutput> {
+        let database_pool = ctx.data::<Arc<DatabasePool>>()?;
+        let identity = ctx.data::<Identity>()?;
+        repo::authenticate_nfc_create_own_card(database_pool.deref(), identity).await
     }
 
     async fn delete_account_nfc_card(

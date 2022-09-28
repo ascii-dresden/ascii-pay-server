@@ -1,4 +1,6 @@
-table! {
+// @generated automatically by Diesel CLI.
+
+diesel::table! {
     account (id) {
         id -> Uuid,
         credit -> Int4,
@@ -15,7 +17,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     apple_wallet_pass (serial_number) {
         serial_number -> Uuid,
         authentication_token -> Uuid,
@@ -25,7 +27,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     apple_wallet_registration (device_id, serial_number) {
         device_id -> Varchar,
         serial_number -> Uuid,
@@ -34,7 +36,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     authentication_nfc (card_id) {
         account_id -> Uuid,
         card_id -> Varchar,
@@ -44,14 +46,14 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     authentication_password (account_id) {
         account_id -> Uuid,
         password -> Varchar,
     }
 }
 
-table! {
+diesel::table! {
     authentication_password_invitation (account_id) {
         account_id -> Uuid,
         link -> Varchar,
@@ -59,7 +61,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     transaction (id) {
         id -> Uuid,
         account_id -> Uuid,
@@ -76,7 +78,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     transaction_item (transaction_id, index) {
         transaction_id -> Uuid,
         index -> Int4,
@@ -87,12 +89,12 @@ table! {
     }
 }
 
-joinable!(authentication_nfc -> account (account_id));
-joinable!(authentication_password -> account (account_id));
-joinable!(transaction -> account (account_id));
-joinable!(transaction_item -> transaction (transaction_id));
+diesel::joinable!(authentication_nfc -> account (account_id));
+diesel::joinable!(authentication_password -> account (account_id));
+diesel::joinable!(transaction -> account (account_id));
+diesel::joinable!(transaction_item -> transaction (transaction_id));
 
-allow_tables_to_appear_in_same_query!(
+diesel::allow_tables_to_appear_in_same_query!(
     account,
     apple_wallet_pass,
     apple_wallet_registration,

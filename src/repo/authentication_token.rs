@@ -20,6 +20,13 @@ pub enum NfcCardType {
     MifareDesfire,
 }
 
+#[derive(Debug, Serialize, SimpleObject)]
+pub struct CreateOwnNfcCardOutput {
+    pub card_type: String,
+    pub card_id: String,
+    pub card_secret: String,
+}
+
 const CARD_TYPE_GENERIC: &str = "generic";
 const CARD_TYPE_MIFARE_DESFIRE: &str = "mifare-desfire";
 
@@ -222,6 +229,25 @@ pub async fn authenticate_nfc_mifare_desfire_phase2(
     ))
 }
 
+#[allow(non_snake_case)]
+pub async fn authenticate_nfc_mifare_desfire_login(
+    database_pool: &DatabasePool,
+    id: &str,
+    secret: &str,
+) -> ServiceResult<Account> {
+    let nfc_entry = authentication_nfc::get_by_card_id(database_pool, id).await?;
+    if nfc_entry.card_type != CARD_TYPE_MIFARE_DESFIRE {
+        return Err(ServiceError::Unauthorized("nfc card type does not match!"));
+    }
+
+    if nfc_entry.data.as_str() != secret {
+        return Err(ServiceError::Unauthorized("invalid secret!"));
+    }
+
+    let account = Account::get(database_pool, nfc_entry.account_id).await?;
+    Ok(account)
+}
+
 pub async fn authenticate_nfc_delete_card(
     database_pool: &DatabasePool,
     identity: &Identity,
@@ -233,6 +259,34 @@ pub async fn authenticate_nfc_delete_card(
     let account = Account::get(database_pool, account_id).await?;
 
     authentication_nfc::remove(database_pool, &account, card_id).await
+}
+
+pub async fn authenticate_nfc_create_own_card(
+    database_pool: &DatabasePool,
+    identity: &Identity,
+) -> ServiceResult<CreateOwnNfcCardOutput> {
+    if let Some(account) = identity.get_account()? {
+        let card_id = bytes_to_string(&generate_key_array::<32>());
+        let card_secret = bytes_to_string(&generate_key_array::<16>());
+
+        authentication_nfc::register(
+            database_pool,
+            &account,
+            &card_id,
+            CARD_TYPE_MIFARE_DESFIRE,
+            "Ascii Pay Card - Online",
+            &card_secret,
+        )
+        .await?;
+
+        Ok(CreateOwnNfcCardOutput {
+            card_type: CARD_TYPE_MIFARE_DESFIRE.to_string(),
+            card_id,
+            card_secret,
+        })
+    } else {
+        Err(ServiceError::Unauthorized("Could not find account"))
+    }
 }
 
 pub async fn authenticate_nfc_generic_init_card(
