@@ -1,7 +1,7 @@
-FROM alpine:3.15 as build
+FROM rust:alpine as build
 
 RUN apk update \
-    && apk add ca-certificates gcc g++ rust cargo protoc cmake make binutils clang \
+    && apk add ca-certificates gcc g++ protoc cmake make binutils clang \
     musl-dev openssl-dev libpq-dev linux-headers
 
 WORKDIR /usr/src/ascii-pay-server
@@ -17,7 +17,7 @@ RUN cargo install --path . --locked
 COPY . .
 RUN cargo install --path . --locked
 
-FROM alpine:3.15 as dist
+FROM alpine:3.16 as dist
 
 RUN apk update \
     && apk add ca-certificates libgcc libstdc++ libpq
