@@ -181,11 +181,7 @@ pub async fn create_account(
     identity: &Identity,
     input: AccountCreateInput,
 ) -> ServiceResult<AccountOutput> {
-    if let Permission::Admin = input.permission {
-        identity.require_account(Permission::Admin)?;
-    } else {
-        identity.require_account_or_cert(Permission::Member)?;
-    }
+    identity.require_account(Permission::Admin)?;
 
     let mut entity = Account::create(database_pool, &input.name, input.permission).await?;
 
@@ -220,13 +216,9 @@ pub async fn update_account(
     id: Uuid,
     input: AccountUpdateInput,
 ) -> ServiceResult<AccountOutput> {
-    identity.require_account_or_cert(Permission::Member)?;
+    identity.require_account(Permission::Admin)?;
 
     let mut entity = Account::get(database_pool, id).await?;
-
-    if let Permission::Admin = entity.permission {
-        identity.require_account(Permission::Admin)?;
-    }
 
     if let Some(value) = input.minimum_credit {
         entity.minimum_credit = value;
@@ -268,7 +260,7 @@ pub fn delete_account(
     identity: &Identity,
     _id: Uuid,
 ) -> ServiceResult<()> {
-    identity.require_account_or_cert(Permission::Member)?;
+    identity.require_account(Permission::Admin)?;
 
     warn!("Delete is not supported!");
 
