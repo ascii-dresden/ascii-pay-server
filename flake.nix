@@ -26,7 +26,6 @@
 
       hydraJobs = {
         ascii-pay-server."x86_64-linux" = pkgs.ascii-pay-server;
-        ascii-pay-server."x86_64-linux-static" = pkgs.pkgsStatic.ascii-pay-server;
       };
     };
 }
