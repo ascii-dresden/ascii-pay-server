@@ -145,7 +145,7 @@ pub async fn authenticate_nfc_mifare_desfire_phase1(
     rndBshifted.push(rndB[0]);
 
     let mut rndA_rndBshifted: Vec<u8> = Vec::with_capacity(16);
-    rndA_rndBshifted.extend(&rndA);
+    rndA_rndBshifted.extend(rndA);
     rndA_rndBshifted.extend(rndBshifted);
 
     let dk_rndA_rndBshifted = mifare_utils::tdes_encrypt(&key, &rndA_rndBshifted)?;
@@ -191,7 +191,7 @@ pub async fn authenticate_nfc_mifare_desfire_phase2(
     rndBshifted.push(rndB[0]);
 
     let mut rndA_rndBshifted: Vec<u8> = Vec::with_capacity(16);
-    rndA_rndBshifted.extend(&rndA);
+    rndA_rndBshifted.extend(rndA);
     rndA_rndBshifted.extend(rndBshifted);
 
     let dk_rndA_rndBshifted_ref = mifare_utils::tdes_encrypt(&key, &rndA_rndBshifted)?;

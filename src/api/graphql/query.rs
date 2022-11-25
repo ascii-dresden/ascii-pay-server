@@ -92,12 +92,12 @@ impl Query {
             transaction_filter_from.and_then(|s| {
                 NaiveDate::parse_from_str(&s, "%Y-%m-%d")
                     .ok()
-                    .map(|d| d.and_hms(0, 0, 0))
+                    .map(|d| d.and_hms_opt(0, 0, 0).unwrap())
             }),
             transaction_filter_to.and_then(|s| {
                 NaiveDate::parse_from_str(&s, "%Y-%m-%d")
                     .ok()
-                    .map(|d| d.and_hms(23, 59, 59))
+                    .map(|d| d.and_hms_opt(23, 59, 59).unwrap())
             }),
         )
         .await

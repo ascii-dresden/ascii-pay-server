@@ -83,7 +83,7 @@ pub async fn login(
                     })
                 }
                 Err(_) => Err(ServiceError::Unauthorized("invalid username/password")),
-            }
+            };
         }
     }
 

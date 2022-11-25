@@ -267,7 +267,8 @@ pub async fn pass_delivery(
         let updated_at =
             wallet::get_pass_updated_at(database_pool.deref(), path.serial_number).await?;
 
-        let last_modified = chrono::NaiveDateTime::from_timestamp(updated_at as i64, 0)
+        let last_modified = chrono::NaiveDateTime::from_timestamp_opt(updated_at as i64, 0)
+            .unwrap()
             .format("%a, %d %b %G %T GMT")
             .to_string();
 

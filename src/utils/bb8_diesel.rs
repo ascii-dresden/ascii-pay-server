@@ -23,7 +23,6 @@ use std::{
     ops::{Deref, DerefMut},
     sync::{Arc, Mutex},
 };
-use tokio::task;
 
 /// A connection manager which implements [`bb8::ManageConnection`] to
 /// integrate with bb8.
@@ -73,18 +72,14 @@ impl<T: Send + 'static> DieselConnectionManager<T> {
         R: Send + 'static,
         F: Send + 'static + FnOnce(&r2d2::ConnectionManager<T>) -> R,
     {
-        let cloned = self.inner.clone();
-        tokio::task::spawn_blocking(move || f(&*cloned.lock().unwrap()))
-            .await
-            // Intentionally panic if the inner closure panics.
-            .unwrap()
+        f(&*self.inner.clone().lock().unwrap())
     }
 
     async fn run_blocking_in_place<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&r2d2::ConnectionManager<T>) -> R,
     {
-        task::block_in_place(|| f(&*self.inner.lock().unwrap()))
+        f(&*self.inner.lock().unwrap())
     }
 }
 
@@ -157,7 +152,7 @@ where
     C: SimpleConnection,
 {
     fn batch_execute(&mut self, query: &str) -> QueryResult<()> {
-        task::block_in_place(|| self.0.batch_execute(query))
+        self.0.batch_execute(query)
     }
 }
 
@@ -191,11 +186,11 @@ where
         F: FnOnce(&mut Self) -> Result<T, E>,
         E: From<diesel::result::Error>,
     {
-        task::block_in_place(|| Self::TransactionManager::transaction(self, f))
+        Self::TransactionManager::transaction(self, f)
     }
 
     fn begin_test_transaction(&mut self) -> QueryResult<()> {
-        task::block_in_place(|| self.0.begin_test_transaction())
+        self.0.begin_test_transaction()
     }
 
     fn test_transaction<T, E, F>(&mut self, f: F) -> T
@@ -203,14 +198,13 @@ where
         F: FnOnce(&mut Self) -> Result<T, E>,
         E: Debug,
     {
-        // taken from the default impl of `test_transaction` (with `task::block_in_place` added)
         let mut user_result = None;
-        let _ = task::block_in_place(|| {
+        let _ = {
             self.transaction::<(), _, _>(|conn| {
                 user_result = f(conn).ok();
                 Err(Error::RollbackTransaction)
             })
-        });
+        };
         user_result.expect("Transaction did not succeed")
     }
 
@@ -218,13 +212,13 @@ where
     where
         T: QueryFragment<Self::Backend> + QueryId,
     {
-        task::block_in_place(|| self.0.execute_returning_count(source))
+        self.0.execute_returning_count(source)
     }
 
     fn transaction_state(
         &mut self,
     ) -> &mut <Self::TransactionManager as TransactionManager<Self>>::TransactionStateData {
-        task::block_in_place(move || self.0.transaction_state())
+        self.0.transaction_state()
     }
 }
 
@@ -241,7 +235,7 @@ where
         T: Query + QueryFragment<Self::Backend> + QueryId + 'query,
         Self::Backend: QueryMetadata<T::SqlType>,
     {
-        task::block_in_place(move || self.0.load(source))
+        self.0.load(source)
     }
 }
 
@@ -251,6 +245,6 @@ where
     Conn: UpdateAndFetchResults<Changes, Output>,
 {
     fn update_and_fetch(&mut self, changeset: Changes) -> QueryResult<Output> {
-        task::block_in_place(|| self.0.update_and_fetch(changeset))
+        self.0.update_and_fetch(changeset)
     }
 }

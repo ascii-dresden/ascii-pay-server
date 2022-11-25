@@ -2,7 +2,10 @@ use std::sync::Arc;
 use std::thread;
 
 use futures_util::TryFutureExt;
-use grpcio::{ChannelBuilder, Environment, ResourceQuota, RpcStatus, RpcStatusCode, ServerBuilder};
+use grpcio::{
+    ChannelBuilder, Environment, ResourceQuota, RpcStatus, RpcStatusCode, ServerBuilder,
+    ServerCredentials,
+};
 use log::{error, info};
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -665,17 +668,19 @@ pub fn start_tcp_server(database_pool: DatabasePool, redis_pool: RedisPool) {
         let quota =
             ResourceQuota::new(Some("AuthenticationServerQuota")).resize_memory(1024 * 1024);
         let ch_builder = ChannelBuilder::new(env.clone()).set_resource_quota(quota);
+        let addr = format!("{}:{}", env::HOST.as_str(), *env::GRPC_PORT);
 
         let mut server = ServerBuilder::new(env)
             .register_service(service)
-            .bind(env::HOST.as_str(), *env::GRPC_PORT)
             .channel_args(ch_builder.build_args())
             .build()
             .expect("GRPC server could not be started!");
+        server
+            .add_listening_port(&addr, ServerCredentials::insecure())
+            .unwrap();
         server.start();
-        for (host, port) in server.bind_addrs() {
-            info!("Start grpc server at {}:{}", host, port);
-        }
+
+        info!("Start grpc server at {}", addr);
 
         loop {
             thread::park();
