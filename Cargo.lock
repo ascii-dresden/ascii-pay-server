@@ -444,7 +444,6 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sublime_fuzzy",
- "time 0.3.17",
  "tokio",
  "uuid 1.2.2",
  "wallet-pass",
