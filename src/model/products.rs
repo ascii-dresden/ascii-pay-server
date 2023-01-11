@@ -4,7 +4,7 @@ use std::hash::Hash;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
-use git2::Repository;
+// use git2::Repository;
 use log::error;
 
 use super::StampType;
@@ -87,8 +87,8 @@ impl DatasetPath {
     pub fn update_repo(&self) -> ServiceResult<bool> {
         let repo_path = self.config_file.parent();
 
-        if let Some(repo_path) = repo_path {
-            let _repo = Repository::open(repo_path)?;
+        if let Some(_repo_path) = repo_path {
+            // let _repo = Repository::open(repo_path)?;
 
             error!("TODO: Update of product repo is not supported!");
         }

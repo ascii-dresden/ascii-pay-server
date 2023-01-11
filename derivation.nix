@@ -1,4 +1,4 @@
-{ naersk, src, lib, pkg-config, protobuf, gcc, cmake, openssl, libpqxx, libiconv, postgresql, libgit2 }:
+{ naersk, src, lib, pkg-config, protobuf, gcc, cmake, openssl, libpqxx, libiconv, postgresql }:
 
 naersk.buildPackage {
   pname = "ascii-pay-server";
@@ -7,7 +7,7 @@ naersk.buildPackage {
   inherit src;
 
   nativeBuildInputs = [ pkg-config protobuf gcc cmake ];
-  buildInputs = [ openssl libpqxx libiconv postgresql libgit2 ];
+  buildInputs = [ openssl libpqxx libiconv postgresql ];
 
   meta = with lib; {
     description = "Rust server which handles the transactions of the ascii-pay system.";
