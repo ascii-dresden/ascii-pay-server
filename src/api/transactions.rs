@@ -1,19 +1,19 @@
 use aide::axum::routing::{get_with, post_with};
 use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
-use axum::extract::{Path, State};
+use axum::extract::Path;
 use axum::Json;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::database::Database;
+use crate::database::AppState;
 use crate::error::{ServiceError, ServiceResult};
-use crate::models;
+use crate::{models, RequestState};
 
 use super::accounts::CoinAmountDto;
 use super::products::ProductDto;
 
-pub fn router(database: Database) -> ApiRouter {
+pub fn router(app_state: AppState) -> ApiRouter {
     ApiRouter::new()
         .api_route(
             "/account/:id/payment",
@@ -27,7 +27,7 @@ pub fn router(database: Database) -> ApiRouter {
             "/account/:id/transactions",
             get_with(list_transactions, list_transactions_docs),
         )
-        .with_state(database)
+        .with_state(app_state)
 }
 
 #[derive(Debug, PartialEq, Serialize, JsonSchema)]
@@ -67,10 +67,10 @@ impl From<&models::Transaction> for TransactionDto {
 }
 
 pub async fn list_transactions(
-    State(database): State<Database>,
+    state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<Json<Vec<TransactionDto>>> {
-    let transactions = database.get_transactions_by_account(id).await?;
+    let transactions = state.db.get_transactions_by_account(id).await?;
     Ok(Json(transactions.iter().map(|t| t.into()).collect()))
 }
 
@@ -82,10 +82,10 @@ fn list_transactions_docs(op: TransformOperation) -> TransformOperation {
 }
 
 pub async fn get_transaction(
-    State(database): State<Database>,
+    state: RequestState,
     Path((account_id, transaction_id)): Path<(u64, u64)>,
 ) -> ServiceResult<Json<TransactionDto>> {
-    let transaction = database.get_transaction_by_id(transaction_id).await?;
+    let transaction = state.db.get_transaction_by_id(transaction_id).await?;
 
     if let Some(transaction) = transaction {
         if transaction.account == account_id {
@@ -115,7 +115,7 @@ pub struct PaymentDto {
 }
 
 async fn post_payment(
-    State(database): State<Database>,
+    state: RequestState,
     Path(id): Path<u64>,
     form: Json<PaymentDto>,
 ) -> ServiceResult<Json<TransactionDto>> {
@@ -133,7 +133,7 @@ async fn post_payment(
             .collect(),
     };
 
-    let transaction = database.payment(payment).await?;
+    let transaction = state.db.payment(payment).await?;
     Ok(Json(TransactionDto::from(&transaction)))
 }
 

@@ -3,16 +3,16 @@ use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
 use aide::OperationOutput;
 use axum::body::Bytes;
-use axum::extract::{Multipart, Path, State};
+use axum::extract::{Multipart, Path};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::Json;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::database::Database;
+use crate::database::AppState;
 use crate::error::{ServiceError, ServiceResult};
-use crate::models;
+use crate::{models, RequestState};
 
 use super::accounts::CoinAmountDto;
 
@@ -24,7 +24,7 @@ const SUPPORTED_IMAGE_TYPES: [&str; 5] = [
     "image/svg",
 ];
 
-pub fn router(database: Database) -> ApiRouter {
+pub fn router(app_state: AppState) -> ApiRouter {
     ApiRouter::new()
         .api_route(
             "/product/:id/image",
@@ -43,7 +43,7 @@ pub fn router(database: Database) -> ApiRouter {
             get_with(list_products, list_products_docs)
                 .post_with(create_product, create_product_docs),
         )
-        .with_state(database)
+        .with_state(app_state)
 }
 
 #[derive(Debug, PartialEq, Serialize, JsonSchema)]
@@ -73,10 +73,8 @@ impl From<&models::Product> for ProductDto {
     }
 }
 
-pub async fn list_products(
-    State(database): State<Database>,
-) -> ServiceResult<Json<Vec<ProductDto>>> {
-    let products = database.get_all_products().await?;
+pub async fn list_products(state: RequestState) -> ServiceResult<Json<Vec<ProductDto>>> {
+    let products = state.db.get_all_products().await?;
     Ok(Json(products.iter().map(|p| p.into()).collect()))
 }
 
@@ -86,10 +84,10 @@ fn list_products_docs(op: TransformOperation) -> TransformOperation {
 }
 
 pub async fn get_product(
-    State(database): State<Database>,
+    state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<Json<ProductDto>> {
-    let product = database.get_product_by_id(id).await?;
+    let product = state.db.get_product_by_id(id).await?;
 
     if let Some(product) = product {
         return Ok(Json(ProductDto::from(&product)));
@@ -117,7 +115,7 @@ pub struct SaveProductDto {
 }
 
 async fn create_product(
-    State(database): State<Database>,
+    state: RequestState,
     form: Json<SaveProductDto>,
 ) -> ServiceResult<Json<ProductDto>> {
     let form = form.0;
@@ -134,7 +132,7 @@ async fn create_product(
         image: None,
     };
 
-    let product = database.store_product(product).await?;
+    let product = state.db.store_product(product).await?;
     Ok(Json(ProductDto::from(&product)))
 }
 
@@ -145,12 +143,12 @@ fn create_product_docs(op: TransformOperation) -> TransformOperation {
 }
 
 async fn update_product(
-    State(database): State<Database>,
+    state: RequestState,
     Path(id): Path<u64>,
     form: Json<SaveProductDto>,
 ) -> ServiceResult<Json<ProductDto>> {
     let form = form.0;
-    let product = database.get_product_by_id(id).await?;
+    let product = state.db.get_product_by_id(id).await?;
 
     if let Some(mut product) = product {
         product.name = form.name;
@@ -161,7 +159,7 @@ async fn update_product(
         product.category = form.category;
         product.tags = form.tags;
 
-        let product = database.store_product(product).await?;
+        let product = state.db.store_product(product).await?;
         return Ok(Json(ProductDto::from(&product)));
     }
 
@@ -175,11 +173,8 @@ fn update_product_docs(op: TransformOperation) -> TransformOperation {
         .response::<500, ()>()
 }
 
-async fn delete_product(
-    State(database): State<Database>,
-    Path(id): Path<u64>,
-) -> ServiceResult<()> {
-    database.delete_product(id).await
+async fn delete_product(state: RequestState, Path(id): Path<u64>) -> ServiceResult<()> {
+    state.db.delete_product(id).await
 }
 
 fn delete_product_docs(op: TransformOperation) -> TransformOperation {
@@ -190,10 +185,10 @@ fn delete_product_docs(op: TransformOperation) -> TransformOperation {
 }
 
 pub async fn get_product_image(
-    State(database): State<Database>,
+    state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<ImageResult> {
-    let image = database.get_product_image(id).await?;
+    let image = state.db.get_product_image(id).await?;
 
     if let Some(image) = image {
         if let Ok(content_type) = HeaderValue::from_str(&image.mimetype) {
@@ -215,7 +210,7 @@ fn get_product_image_docs(op: TransformOperation) -> TransformOperation {
 }
 
 async fn upload_product_image(
-    State(database): State<Database>,
+    state: RequestState,
     Path(id): Path<u64>,
     mut multipart: Multipart,
 ) -> ServiceResult<()> {
@@ -227,7 +222,7 @@ async fn upload_product_image(
                     data: data.to_vec(),
                     mimetype: content_type,
                 };
-                return database.store_product_image(id, image).await;
+                return state.db.store_product_image(id, image).await;
             }
         }
     }
@@ -242,11 +237,8 @@ fn upload_product_image_docs(op: TransformOperation) -> TransformOperation {
         .response::<500, ()>()
 }
 
-async fn delete_product_image(
-    State(database): State<Database>,
-    Path(id): Path<u64>,
-) -> ServiceResult<()> {
-    database.delete_product_image(id).await
+async fn delete_product_image(state: RequestState, Path(id): Path<u64>) -> ServiceResult<()> {
+    state.db.delete_product_image(id).await
 }
 
 fn delete_product_image_docs(op: TransformOperation) -> TransformOperation {
