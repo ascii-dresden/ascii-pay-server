@@ -12,12 +12,12 @@ use crate::models;
 mod migration;
 
 #[derive(Clone)]
-pub struct Database {
+pub struct AppState {
     pub pool: Pool<Postgres>,
 }
 
-impl Database {
-    pub async fn connect(url: &str) -> Database {
+impl AppState {
+    pub async fn connect(url: &str) -> Self {
         let pool = PgPoolOptions::new()
             .max_connections(5)
             .connect(url)
@@ -29,9 +29,15 @@ impl Database {
             .expect("load migrations");
         migrator.run(&pool).await.expect("run migrations");
 
-        Database { pool }
+        Self { pool }
     }
+}
 
+pub struct DatabaseConnection {
+    pub connection: sqlx::pool::PoolConnection<sqlx::Postgres>,
+}
+
+impl DatabaseConnection {
     pub async fn get_all_accounts(&self) -> ServiceResult<Vec<models::Account>> {
         panic!("TODO")
     }

@@ -4,18 +4,18 @@ use aide::axum::routing::{get_with, post_with, put_with};
 use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
 use argon2rs::verifier::Encoded;
-use axum::extract::{Path, State};
+use axum::extract::Path;
 use axum::Json;
 use base64::engine::general_purpose;
 use base64::Engine;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::database::Database;
+use crate::database::AppState;
 use crate::error::{ServiceError, ServiceResult};
-use crate::models;
+use crate::{models, RequestState};
 
-pub fn router(database: Database) -> ApiRouter {
+pub fn router(app_state: AppState) -> ApiRouter {
     ApiRouter::new()
         .api_route(
             "/account/:id/password_authentication",
@@ -45,7 +45,7 @@ pub fn router(database: Database) -> ApiRouter {
             get_with(list_accounts, list_accounts_docs)
                 .post_with(create_account, create_account_docs),
         )
-        .with_state(database)
+        .with_state(app_state)
 }
 
 #[derive(Debug, PartialEq, Hash, Eq, Serialize, Deserialize, JsonSchema)]
@@ -202,8 +202,8 @@ impl From<&models::Account> for AccountDto {
     }
 }
 
-async fn list_accounts(State(database): State<Database>) -> ServiceResult<Json<Vec<AccountDto>>> {
-    let accounts = database.get_all_accounts().await?;
+async fn list_accounts(state: RequestState) -> ServiceResult<Json<Vec<AccountDto>>> {
+    let accounts = state.db.get_all_accounts().await?;
     Ok(Json(accounts.iter().map(|a| a.into()).collect()))
 }
 
@@ -214,10 +214,10 @@ fn list_accounts_docs(op: TransformOperation) -> TransformOperation {
 }
 
 pub async fn get_account(
-    State(database): State<Database>,
+    state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<Json<AccountDto>> {
-    let account = database.get_account_by_id(id).await?;
+    let account = state.db.get_account_by_id(id).await?;
 
     if let Some(account) = account {
         return Ok(Json(AccountDto::from(&account)));
@@ -241,7 +241,7 @@ pub struct SaveAccountDto {
 }
 
 async fn create_account(
-    State(database): State<Database>,
+    state: RequestState,
     form: Json<SaveAccountDto>,
 ) -> ServiceResult<Json<AccountDto>> {
     let form = form.0;
@@ -255,7 +255,7 @@ async fn create_account(
         auth_methods: Vec::new(),
     };
 
-    let account = database.store_account(account).await?;
+    let account = state.db.store_account(account).await?;
     Ok(Json(AccountDto::from(&account)))
 }
 
@@ -266,19 +266,19 @@ fn create_account_docs(op: TransformOperation) -> TransformOperation {
 }
 
 async fn update_account(
-    State(database): State<Database>,
+    state: RequestState,
     Path(id): Path<u64>,
     form: Json<SaveAccountDto>,
 ) -> ServiceResult<Json<AccountDto>> {
     let form = form.0;
-    let account = database.get_account_by_id(id).await?;
+    let account = state.db.get_account_by_id(id).await?;
 
     if let Some(mut account) = account {
         account.name = form.name;
         account.email = form.email;
         account.role = form.role.into();
 
-        let account = database.store_account(account).await?;
+        let account = state.db.store_account(account).await?;
         return Ok(Json(AccountDto::from(&account)));
     }
 
@@ -291,11 +291,8 @@ fn update_account_docs(op: TransformOperation) -> TransformOperation {
         .response::<500, ()>()
 }
 
-async fn delete_account(
-    State(database): State<Database>,
-    Path(id): Path<u64>,
-) -> ServiceResult<()> {
-    database.delete_account(id).await
+async fn delete_account(state: RequestState, Path(id): Path<u64>) -> ServiceResult<()> {
+    state.db.delete_account(id).await
 }
 fn delete_account_docs(op: TransformOperation) -> TransformOperation {
     op.description("Delete an existing account.")
@@ -311,12 +308,12 @@ pub struct SaveAuthPasswordDto {
 }
 
 async fn set_password_authentication(
-    State(database): State<Database>,
+    state: RequestState,
     Path(id): Path<u64>,
     form: Json<SaveAuthPasswordDto>,
 ) -> ServiceResult<Json<AccountDto>> {
     let form = form.0;
-    let account = database.get_account_by_id(id).await?;
+    let account = state.db.get_account_by_id(id).await?;
 
     if let Some(mut account) = account {
         account
@@ -329,7 +326,7 @@ async fn set_password_authentication(
                 password_hash: password_hash_create(&form.password)?,
             }));
 
-        let account = database.store_account(account).await?;
+        let account = state.db.store_account(account).await?;
         return Ok(Json(AccountDto::from(&account)));
     }
 
@@ -343,17 +340,17 @@ fn set_password_authentication_docs(op: TransformOperation) -> TransformOperatio
 }
 
 async fn delete_password_authentication(
-    State(database): State<Database>,
+    state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<Json<AccountDto>> {
-    let account = database.get_account_by_id(id).await?;
+    let account = state.db.get_account_by_id(id).await?;
 
     if let Some(mut account) = account {
         account
             .auth_methods
             .retain_mut(|m| !matches!(m, &mut models::AuthMethod::PasswordBased(_)));
 
-        let account = database.store_account(account).await?;
+        let account = state.db.store_account(account).await?;
         return Ok(Json(AccountDto::from(&account)));
     }
 
@@ -386,12 +383,12 @@ pub struct DeleteAuthNfcDto {
 }
 
 async fn create_nfc_authentication(
-    State(database): State<Database>,
+    state: RequestState,
     Path(id): Path<u64>,
     form: Json<CreateAuthNfcDto>,
 ) -> ServiceResult<Json<AccountDto>> {
     let form = form.0;
-    let account = database.get_account_by_id(id).await?;
+    let account = state.db.get_account_by_id(id).await?;
 
     if let Some(mut account) = account {
         let card_id = general_purpose::STANDARD
@@ -416,7 +413,7 @@ async fn create_nfc_authentication(
                 data,
             }));
 
-        let account = database.store_account(account).await?;
+        let account = state.db.store_account(account).await?;
         return Ok(Json(AccountDto::from(&account)));
     }
 
@@ -430,12 +427,12 @@ fn create_nfc_authentication_docs(op: TransformOperation) -> TransformOperation 
 }
 
 async fn update_nfc_authentication(
-    State(database): State<Database>,
+    state: RequestState,
     Path(id): Path<u64>,
     form: Json<UpdateAuthNfcDto>,
 ) -> ServiceResult<Json<AccountDto>> {
     let form = form.0;
-    let account = database.get_account_by_id(id).await?;
+    let account = state.db.get_account_by_id(id).await?;
 
     if let Some(mut account) = account {
         let card_id = general_purpose::STANDARD
@@ -454,7 +451,7 @@ async fn update_nfc_authentication(
             }
         }
 
-        let account = database.store_account(account).await?;
+        let account = state.db.store_account(account).await?;
         return Ok(Json(AccountDto::from(&account)));
     }
 
@@ -468,12 +465,12 @@ fn update_nfc_authentication_docs(op: TransformOperation) -> TransformOperation 
 }
 
 async fn delete_nfc_authentication(
-    State(database): State<Database>,
+    state: RequestState,
     Path(id): Path<u64>,
     form: Json<DeleteAuthNfcDto>,
 ) -> ServiceResult<Json<AccountDto>> {
     let form = form.0;
-    let account = database.get_account_by_id(id).await?;
+    let account = state.db.get_account_by_id(id).await?;
 
     if let Some(mut account) = account {
         let card_id = general_purpose::STANDARD
@@ -492,7 +489,7 @@ async fn delete_nfc_authentication(
             }
         });
 
-        let account = database.store_account(account).await?;
+        let account = state.db.store_account(account).await?;
         return Ok(Json(AccountDto::from(&account)));
     }
 
@@ -509,12 +506,4 @@ fn password_hash_create(password: &str) -> ServiceResult<Vec<u8>> {
     let bytes =
         Encoded::default2i(password.as_bytes(), "SALTSALTSALT".as_bytes(), b"", b"").to_u8();
     Ok(bytes)
-}
-
-fn password_hash_verify(hash: &[u8], password: &str) -> ServiceResult<bool> {
-    if let Ok(enc) = Encoded::from_u8(hash) {
-        return Ok(enc.verify(password.as_bytes()));
-    }
-
-    Ok(false)
 }
