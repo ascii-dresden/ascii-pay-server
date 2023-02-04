@@ -1,7 +1,13 @@
+use aide::axum::routing::get_with;
+use aide::axum::ApiRouter;
+use aide::transform::TransformOperation;
+use aide::OperationOutput;
+use axum::body::Bytes;
 use axum::extract::{Multipart, Path, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
-use axum::routing::get;
-use axum::{Json, Router};
+use axum::response::IntoResponse;
+use axum::Json;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::database::Database;
@@ -18,22 +24,29 @@ const SUPPORTED_IMAGE_TYPES: [&str; 5] = [
     "image/svg",
 ];
 
-pub fn router() -> Router<Database> {
-    Router::new()
-        .route(
+pub fn router(database: Database) -> ApiRouter {
+    ApiRouter::new()
+        .api_route(
             "/product/:id/image",
-            get(get_product_image)
-                .put(upload_product_image)
-                .delete(delete_product_image),
+            get_with(get_product_image, get_product_image_docs)
+                .put_with(upload_product_image, upload_product_image_docs)
+                .delete_with(delete_product_image, delete_product_image_docs),
         )
-        .route(
+        .api_route(
             "/product/:id",
-            get(get_product).put(update_product).delete(delete_product),
+            get_with(get_product, get_product_docs)
+                .put_with(update_product, update_product_docs)
+                .delete_with(delete_product, delete_product_docs),
         )
-        .route("/products", get(list_products).post(create_product))
+        .api_route(
+            "/products",
+            get_with(list_products, list_products_docs)
+                .post_with(create_product, create_product_docs),
+        )
+        .with_state(database)
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize, JsonSchema)]
 pub struct ProductDto {
     pub id: u64,
     pub name: String,
@@ -67,6 +80,11 @@ pub async fn list_products(
     Ok(Json(products.iter().map(|p| p.into()).collect()))
 }
 
+fn list_products_docs(op: TransformOperation) -> TransformOperation {
+    op.description("List all products.")
+        .response::<200, Json<Vec<ProductDto>>>()
+}
+
 pub async fn get_product(
     State(database): State<Database>,
     Path(id): Path<u64>,
@@ -80,7 +98,14 @@ pub async fn get_product(
     Err(ServiceError::NotFound)
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+fn get_product_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Get a product by id.")
+        .response::<200, Json<ProductDto>>()
+        .response::<404, ()>()
+        .response::<500, ()>()
+}
+
+#[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 pub struct SaveProductDto {
     pub name: String,
     pub price: CoinAmountDto,
@@ -113,6 +138,12 @@ async fn create_product(
     Ok(Json(ProductDto::from(&product)))
 }
 
+fn create_product_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Create a new product.")
+        .response::<200, Json<ProductDto>>()
+        .response::<500, ()>()
+}
+
 async fn update_product(
     State(database): State<Database>,
     Path(id): Path<u64>,
@@ -137,6 +168,13 @@ async fn update_product(
     Err(ServiceError::NotFound)
 }
 
+fn update_product_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Update an existing product.")
+        .response::<200, Json<ProductDto>>()
+        .response::<404, ()>()
+        .response::<500, ()>()
+}
+
 async fn delete_product(
     State(database): State<Database>,
     Path(id): Path<u64>,
@@ -144,22 +182,36 @@ async fn delete_product(
     database.delete_product(id).await
 }
 
+fn delete_product_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Delete an existing product.")
+        .response::<200, ()>()
+        .response::<404, ()>()
+        .response::<500, ()>()
+}
+
 pub async fn get_product_image(
     State(database): State<Database>,
     Path(id): Path<u64>,
-) -> ServiceResult<(StatusCode, HeaderMap, Vec<u8>)> {
+) -> ServiceResult<ImageResult> {
     let image = database.get_product_image(id).await?;
 
     if let Some(image) = image {
-        let mut header = HeaderMap::new();
         if let Ok(content_type) = HeaderValue::from_str(&image.mimetype) {
-            header.insert(header::CONTENT_TYPE, content_type);
+            return Ok(ImageResult {
+                content_type,
+                body: image.data,
+            });
         }
-
-        return Ok((StatusCode::OK, header, image.data));
     }
 
     Err(ServiceError::NotFound)
+}
+
+fn get_product_image_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Get the image of the given product.")
+        .response::<200, Bytes>()
+        .response::<404, ()>()
+        .response::<500, ()>()
 }
 
 async fn upload_product_image(
@@ -183,9 +235,39 @@ async fn upload_product_image(
     Ok(())
 }
 
+fn upload_product_image_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Update the image of the given product.")
+        .response::<200, ()>()
+        .response::<404, ()>()
+        .response::<500, ()>()
+}
+
 async fn delete_product_image(
     State(database): State<Database>,
     Path(id): Path<u64>,
 ) -> ServiceResult<()> {
     database.delete_product_image(id).await
+}
+
+fn delete_product_image_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Remove the image from the given product.")
+        .response::<200, ()>()
+        .response::<404, ()>()
+        .response::<500, ()>()
+}
+
+pub struct ImageResult {
+    pub content_type: HeaderValue,
+    pub body: Vec<u8>,
+}
+
+impl OperationOutput for ImageResult {
+    type Inner = Bytes;
+}
+impl IntoResponse for ImageResult {
+    fn into_response(self) -> axum::response::Response {
+        let mut header = HeaderMap::new();
+        header.insert(header::CONTENT_TYPE, self.content_type);
+        (StatusCode::OK, header, self.body).into_response()
+    }
 }

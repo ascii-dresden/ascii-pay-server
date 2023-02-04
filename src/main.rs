@@ -1,8 +1,9 @@
-use axum::extract::DefaultBodyLimit;
+use aide::{axum::ApiRouter, openapi::OpenApi};
 use axum::http::Method;
-use axum::Router;
+use axum::{extract::DefaultBodyLimit, Extension};
 use log::info;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tower_http::{
     compression::CompressionLayer,
     cors::{Any, CorsLayer},
@@ -12,6 +13,7 @@ use crate::database::Database;
 
 mod api;
 mod database;
+mod docs;
 mod error;
 mod models;
 
@@ -20,14 +22,23 @@ async fn main() {
     dotenv::dotenv().ok();
     env_logger::init();
 
+    aide::gen::on_error(|error| {
+        println!("{error}");
+    });
+    aide::gen::extract_schemas(true);
+
     let db_connection_str = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://ascii:ascii@localhost:5432/ascii-pay".to_string());
 
     let database = Database::connect(&db_connection_str).await;
 
-    // build our application with some routes
-    let app = Router::new()
-        .nest("/api/v1", api::init())
+    let mut api = OpenApi::default();
+
+    let app = ApiRouter::new()
+        .nest_api_service("/api/v1", api::init(database.clone()))
+        .nest_api_service("/docs", docs::docs_routes())
+        .finish_api_with(&mut api, docs::api_docs)
+        .layer(Extension(Arc::new(api)))
         .layer(DefaultBodyLimit::disable())
         .layer(
             CorsLayer::new()

@@ -1,37 +1,54 @@
 use std::collections::HashMap;
 
+use aide::axum::routing::{get_with, post_with, put_with};
+use aide::axum::ApiRouter;
+use aide::transform::TransformOperation;
 use argon2rs::verifier::Encoded;
 use axum::extract::{Path, State};
-use axum::routing::{get, post, put};
-use axum::{Json, Router};
+use axum::Json;
 use base64::engine::general_purpose;
 use base64::Engine;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::database::Database;
 use crate::error::{ServiceError, ServiceResult};
 use crate::models;
 
-pub fn router() -> Router<Database> {
-    Router::new()
-        .route(
+pub fn router(database: Database) -> ApiRouter {
+    ApiRouter::new()
+        .api_route(
             "/account/:id/password_authentication",
-            put(set_password_authentication).delete(delete_password_authentication),
+            put_with(
+                set_password_authentication,
+                set_password_authentication_docs,
+            )
+            .delete_with(
+                delete_password_authentication,
+                delete_password_authentication_docs,
+            ),
         )
-        .route(
+        .api_route(
             "/account/:id/nfc_authentication",
-            post(create_nfc_authentication)
-                .put(update_nfc_authentication)
-                .delete(delete_nfc_authentication),
+            post_with(create_nfc_authentication, create_nfc_authentication_docs)
+                .put_with(update_nfc_authentication, update_nfc_authentication_docs)
+                .delete_with(delete_nfc_authentication, delete_nfc_authentication_docs),
         )
-        .route(
+        .api_route(
             "/account/:id",
-            get(get_account).put(update_account).delete(delete_account),
+            get_with(get_account, get_account_docs)
+                .put_with(update_account, update_account_docs)
+                .delete_with(delete_account, delete_account_docs),
         )
-        .route("/accounts", get(list_accounts).post(create_account))
+        .api_route(
+            "/accounts",
+            get_with(list_accounts, list_accounts_docs)
+                .post_with(create_account, create_account_docs),
+        )
+        .with_state(database)
 }
 
-#[derive(Debug, PartialEq, Hash, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Hash, Eq, Serialize, Deserialize, JsonSchema)]
 pub enum CoinTypeDto {
     Cent,
     CoffeeStamp,
@@ -79,7 +96,7 @@ impl From<CoinAmountDto> for models::CoinAmount {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub enum RoleDto {
     Basic,
     Member,
@@ -104,7 +121,7 @@ impl From<RoleDto> for models::Role {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub enum CardTypeDto {
     NfcId,
     AsciiMifare,
@@ -126,19 +143,19 @@ impl From<CardTypeDto> for models::CardType {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize, JsonSchema)]
 pub struct AuthPasswordDto {
     username: String,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize, JsonSchema)]
 pub struct AuthNfcDto {
     name: String,
     card_id: Vec<u8>,
     card_type: CardTypeDto,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize, JsonSchema)]
 pub enum AuthMethodDto {
     PasswordBased(AuthPasswordDto),
     NfcBased(AuthNfcDto),
@@ -162,7 +179,7 @@ impl From<&models::AuthMethod> for AuthMethodDto {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize, JsonSchema)]
 pub struct AccountDto {
     pub id: u64,
     pub balance: CoinAmountDto,
@@ -185,11 +202,15 @@ impl From<&models::Account> for AccountDto {
     }
 }
 
-pub async fn list_accounts(
-    State(database): State<Database>,
-) -> ServiceResult<Json<Vec<AccountDto>>> {
+async fn list_accounts(State(database): State<Database>) -> ServiceResult<Json<Vec<AccountDto>>> {
     let accounts = database.get_all_accounts().await?;
     Ok(Json(accounts.iter().map(|a| a.into()).collect()))
+}
+
+fn list_accounts_docs(op: TransformOperation) -> TransformOperation {
+    op.description("List all accounts.")
+        .response::<200, Json<Vec<AccountDto>>>()
+        .response::<500, ()>()
 }
 
 pub async fn get_account(
@@ -205,7 +226,14 @@ pub async fn get_account(
     Err(ServiceError::NotFound)
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+fn get_account_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Get an account by id.")
+        .response::<200, Json<AccountDto>>()
+        .response::<404, ()>()
+        .response::<500, ()>()
+}
+
+#[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 pub struct SaveAccountDto {
     pub name: String,
     pub email: String,
@@ -231,6 +259,12 @@ async fn create_account(
     Ok(Json(AccountDto::from(&account)))
 }
 
+fn create_account_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Create a new account.")
+        .response::<200, Json<AccountDto>>()
+        .response::<500, ()>()
+}
+
 async fn update_account(
     State(database): State<Database>,
     Path(id): Path<u64>,
@@ -250,6 +284,12 @@ async fn update_account(
 
     Err(ServiceError::NotFound)
 }
+fn update_account_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Update an existing account.")
+        .response::<200, Json<AccountDto>>()
+        .response::<404, ()>()
+        .response::<500, ()>()
+}
 
 async fn delete_account(
     State(database): State<Database>,
@@ -257,8 +297,14 @@ async fn delete_account(
 ) -> ServiceResult<()> {
     database.delete_account(id).await
 }
+fn delete_account_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Delete an existing account.")
+        .response::<200, ()>()
+        .response::<404, ()>()
+        .response::<500, ()>()
+}
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 pub struct SaveAuthPasswordDto {
     pub username: String,
     pub password: String,
@@ -289,6 +335,12 @@ async fn set_password_authentication(
 
     Err(ServiceError::NotFound)
 }
+fn set_password_authentication_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Set username and password for the given account.")
+        .response::<200, Json<AccountDto>>()
+        .response::<404, ()>()
+        .response::<500, ()>()
+}
 
 async fn delete_password_authentication(
     State(database): State<Database>,
@@ -307,8 +359,14 @@ async fn delete_password_authentication(
 
     Err(ServiceError::NotFound)
 }
+fn delete_password_authentication_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Remove password authentication from the given account.")
+        .response::<200, Json<AccountDto>>()
+        .response::<404, ()>()
+        .response::<500, ()>()
+}
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 pub struct CreateAuthNfcDto {
     pub name: String,
     pub card_id: String,
@@ -316,13 +374,13 @@ pub struct CreateAuthNfcDto {
     pub data: String,
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 pub struct UpdateAuthNfcDto {
     pub card_id: String,
     pub name: String,
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 pub struct DeleteAuthNfcDto {
     pub card_id: String,
 }
@@ -364,6 +422,12 @@ async fn create_nfc_authentication(
 
     Err(ServiceError::NotFound)
 }
+fn create_nfc_authentication_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Add a new nfc based authentication method to the given account.")
+        .response::<200, Json<AccountDto>>()
+        .response::<404, ()>()
+        .response::<500, ()>()
+}
 
 async fn update_nfc_authentication(
     State(database): State<Database>,
@@ -396,6 +460,12 @@ async fn update_nfc_authentication(
 
     Err(ServiceError::NotFound)
 }
+fn update_nfc_authentication_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Update an existing nfc based authentication method of the given account.")
+        .response::<200, Json<AccountDto>>()
+        .response::<404, ()>()
+        .response::<500, ()>()
+}
 
 async fn delete_nfc_authentication(
     State(database): State<Database>,
@@ -427,6 +497,12 @@ async fn delete_nfc_authentication(
     }
 
     Err(ServiceError::NotFound)
+}
+fn delete_nfc_authentication_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Remmove an existing nfc based authentication method from the given account.")
+        .response::<200, Json<AccountDto>>()
+        .response::<404, ()>()
+        .response::<500, ()>()
 }
 
 fn password_hash_create(password: &str) -> ServiceResult<Vec<u8>> {
