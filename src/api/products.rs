@@ -10,7 +10,13 @@ use crate::models;
 
 use super::accounts::CoinAmountDto;
 
-const SUPPORTED_IMAGE_TYPES: [&str; 5] = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg"];
+const SUPPORTED_IMAGE_TYPES: [&str; 5] = [
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/webp",
+    "image/svg",
+];
 
 pub fn router() -> Router<Database> {
     Router::new()
@@ -58,13 +64,7 @@ pub async fn list_products(
     State(database): State<Database>,
 ) -> ServiceResult<Json<Vec<ProductDto>>> {
     let products = database.get_all_products().await?;
-    let mut product_list = Vec::<ProductDto>::new();
-
-    for product in products.iter() {
-        product_list.push(product.into());
-    }
-
-    Ok(Json(product_list))
+    Ok(Json(products.iter().map(|p| p.into()).collect()))
 }
 
 pub async fn get_product(

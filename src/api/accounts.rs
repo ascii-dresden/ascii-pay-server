@@ -61,24 +61,21 @@ impl From<CoinTypeDto> for models::CoinType {
 pub type CoinAmountDto = HashMap<CoinTypeDto, i32>;
 impl From<&models::CoinAmount> for CoinAmountDto {
     fn from(value: &models::CoinAmount) -> Self {
-        let mut map = HashMap::<CoinTypeDto, i32>::new();
-
-        for (coin_type, amount) in value.0.iter() {
-            map.insert(coin_type.into(), *amount);
-        }
-
-        map
+        value
+            .0
+            .iter()
+            .map(|(coin_type, amount)| (coin_type.into(), *amount))
+            .collect()
     }
 }
 impl From<CoinAmountDto> for models::CoinAmount {
     fn from(value: CoinAmountDto) -> Self {
-        let mut map = HashMap::<models::CoinType, i32>::new();
-
-        for (coin_type, amount) in value.into_iter() {
-            map.insert(coin_type.into(), amount);
-        }
-
-        models::CoinAmount(map)
+        models::CoinAmount(
+            value
+                .into_iter()
+                .map(|(coin_type, amount)| (coin_type.into(), amount))
+                .collect(),
+        )
     }
 }
 
@@ -177,19 +174,13 @@ pub struct AccountDto {
 
 impl From<&models::Account> for AccountDto {
     fn from(value: &models::Account) -> Self {
-        let mut auth_methods = Vec::<AuthMethodDto>::new();
-
-        for auth_method in value.auth_methods.iter() {
-            auth_methods.push(auth_method.into());
-        }
-
         Self {
             id: value.id.to_owned(),
             balance: (&value.balance).into(),
             name: value.name.to_owned(),
             email: value.email.to_owned(),
             role: (&value.role).into(),
-            auth_methods,
+            auth_methods: value.auth_methods.iter().map(|m| m.into()).collect(),
         }
     }
 }
@@ -198,13 +189,7 @@ pub async fn list_accounts(
     State(database): State<Database>,
 ) -> ServiceResult<Json<Vec<AccountDto>>> {
     let accounts = database.get_all_accounts().await?;
-    let mut account_list = Vec::<AccountDto>::new();
-
-    for account in accounts.iter() {
-        account_list.push(account.into());
-    }
-
-    Ok(Json(account_list))
+    Ok(Json(accounts.iter().map(|a| a.into()).collect()))
 }
 
 pub async fn get_account(
@@ -351,10 +336,18 @@ async fn create_nfc_authentication(
     let account = database.get_account_by_id(id).await?;
 
     if let Some(mut account) = account {
-        let card_id = general_purpose::STANDARD.decode(form.card_id)
-            .map_err(|_| ServiceError::InternalServerError(format!("Could not decode base64 parameter 'card_id'.")))?;
-        let data = general_purpose::STANDARD.decode(form.data)
-            .map_err(|_| ServiceError::InternalServerError(format!("Could not decode base64 parameter 'data'.")))?;
+        let card_id = general_purpose::STANDARD
+            .decode(form.card_id)
+            .map_err(|_| {
+                ServiceError::InternalServerError(
+                    "Could not decode base64 parameter 'card_id'.".to_string(),
+                )
+            })?;
+        let data = general_purpose::STANDARD.decode(form.data).map_err(|_| {
+            ServiceError::InternalServerError(
+                "Could not decode base64 parameter 'data'.".to_string(),
+            )
+        })?;
 
         account
             .auth_methods
@@ -381,8 +374,13 @@ async fn update_nfc_authentication(
     let account = database.get_account_by_id(id).await?;
 
     if let Some(mut account) = account {
-        let card_id = general_purpose::STANDARD.decode(form.card_id)
-            .map_err(|_| ServiceError::InternalServerError(format!("Could not decode base64 parameter 'card_id'.")))?;
+        let card_id = general_purpose::STANDARD
+            .decode(form.card_id)
+            .map_err(|_| {
+                ServiceError::InternalServerError(
+                    "Could not decode base64 parameter 'card_id'.".to_string(),
+                )
+            })?;
 
         for method in account.auth_methods.iter_mut() {
             if let models::AuthMethod::NfcBased(nfc_based) = method {
@@ -408,8 +406,13 @@ async fn delete_nfc_authentication(
     let account = database.get_account_by_id(id).await?;
 
     if let Some(mut account) = account {
-        let card_id = general_purpose::STANDARD.decode(form.card_id)
-            .map_err(|_| ServiceError::InternalServerError(format!("Could not decode base64 parameter 'card_id'.")))?;
+        let card_id = general_purpose::STANDARD
+            .decode(form.card_id)
+            .map_err(|_| {
+                ServiceError::InternalServerError(
+                    "Could not decode base64 parameter 'card_id'.".to_string(),
+                )
+            })?;
 
         account.auth_methods.retain_mut(|m| {
             if let models::AuthMethod::NfcBased(nfc_based) = m {
