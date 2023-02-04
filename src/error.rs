@@ -10,6 +10,7 @@ use serde_json::json;
 pub enum ServiceError {
     InternalServerError(String),
     NotFound,
+    Unauthorized(&'static str),
 }
 
 impl std::fmt::Display for ServiceError {
@@ -22,6 +23,18 @@ impl std::error::Error for ServiceError {}
 
 /// Helper for `ServiceError` result
 pub type ServiceResult<T> = Result<T, ServiceError>;
+
+impl From<block_modes::InvalidKeyIvLength> for ServiceError {
+    fn from(error: block_modes::InvalidKeyIvLength) -> Self {
+        ServiceError::InternalServerError(error.to_string())
+    }
+}
+
+impl From<block_modes::BlockModeError> for ServiceError {
+    fn from(error: block_modes::BlockModeError) -> Self {
+        ServiceError::InternalServerError(error.to_string())
+    }
+}
 
 impl OperationOutput for ServiceError {
     type Inner = String;
@@ -37,6 +50,12 @@ impl IntoResponse for ServiceError {
                 StatusCode::NOT_FOUND,
                 Json(json!({
                     "error": "Not found",
+                })),
+            ),
+            ServiceError::Unauthorized(cause) => (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({
+                    "error": cause,
                 })),
             ),
         }

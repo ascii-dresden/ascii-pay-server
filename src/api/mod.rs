@@ -4,6 +4,7 @@ use crate::database::AppState;
 
 mod accounts;
 mod auth;
+mod mifare;
 mod products;
 mod transactions;
 
