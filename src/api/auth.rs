@@ -1,7 +1,7 @@
 use std::ops::Add;
 use std::time::{Duration, Instant};
 
-use aide::axum::routing::post_with;
+use aide::axum::routing::{get_with, post_with};
 use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
 use argon2rs::verifier::Encoded;
@@ -11,7 +11,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::database::AppState;
 use crate::error::{ServiceError, ServiceResult};
-use crate::{models, RequestState};
+use crate::models;
+use crate::request_state::RequestState;
 
 pub fn router(app_state: AppState) -> ApiRouter {
     ApiRouter::new()
@@ -19,6 +20,7 @@ pub fn router(app_state: AppState) -> ApiRouter {
             "/auth/password",
             post_with(auth_password_based, auth_password_based_docs),
         )
+        .api_route("/auth/logout", get_with(auth_delete, auth_delete_docs))
         .with_state(app_state)
 }
 
@@ -70,6 +72,21 @@ async fn auth_password_based(
 fn auth_password_based_docs(op: TransformOperation) -> TransformOperation {
     op.description("Login with username and password.")
         .response::<200, Json<AuthTokenDto>>()
+        .response::<404, ()>()
+        .response::<500, ()>()
+}
+
+async fn auth_delete(state: RequestState) -> ServiceResult<()> {
+    if let Some(session) = state.session {
+        state.db.delete_session_token(session.token).await?;
+    }
+
+    Ok(())
+}
+
+fn auth_delete_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Logout the current session.")
+        .response::<200, ()>()
         .response::<404, ()>()
         .response::<500, ()>()
 }

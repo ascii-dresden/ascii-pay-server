@@ -13,7 +13,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::database::AppState;
 use crate::error::{ServiceError, ServiceResult};
-use crate::{models, RequestState};
+use crate::models;
+use crate::request_state::RequestState;
 
 pub fn router(app_state: AppState) -> ApiRouter {
     ApiRouter::new()
