@@ -1,8 +1,11 @@
 use std::collections::HashMap;
 
+use argon2rs::verifier::Encoded;
 use axum::extract::{Path, State};
-use axum::routing::get;
+use axum::routing::{get, post, put};
 use axum::{Json, Router};
+use base64::engine::general_purpose;
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 
 use crate::database::Database;
@@ -10,12 +13,21 @@ use crate::error::{ServiceError, ServiceResult};
 use crate::models;
 
 pub fn router() -> Router<Database> {
-    // Router::new()
-    //     .route("/account/:id", get(get_account).put(update_account).delete(delete_account))
-    //     .route("/accounts", get(list_accounts).post(create_account))
-
     Router::new()
-        .route("/account/:id", get(get_account).put(update_account).delete(delete_account))
+        .route(
+            "/account/:id/password_authentication",
+            put(set_password_authentication).delete(delete_password_authentication),
+        )
+        .route(
+            "/account/:id/nfc_authentication",
+            post(create_nfc_authentication)
+                .put(update_nfc_authentication)
+                .delete(delete_nfc_authentication),
+        )
+        .route(
+            "/account/:id",
+            get(get_account).put(update_account).delete(delete_account),
+        )
         .route("/accounts", get(list_accounts).post(create_account))
 }
 
@@ -74,7 +86,7 @@ impl From<RoleDto> for models::Role {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum CardTypeDto {
     NfcId,
     AsciiMifare,
@@ -84,6 +96,14 @@ impl From<&models::CardType> for CardTypeDto {
         match value {
             models::CardType::NfcId => CardTypeDto::NfcId,
             models::CardType::AsciiMifare => CardTypeDto::AsciiMifare,
+        }
+    }
+}
+impl From<CardTypeDto> for models::CardType {
+    fn from(value: CardTypeDto) -> Self {
+        match value {
+            CardTypeDto::NfcId => models::CardType::NfcId,
+            CardTypeDto::AsciiMifare => models::CardType::AsciiMifare,
         }
     }
 }
@@ -230,4 +250,167 @@ async fn delete_account(
     Path(id): Path<u64>,
 ) -> ServiceResult<()> {
     database.delete_account(id).await
+}
+
+#[derive(Debug, PartialEq, Deserialize)]
+pub struct SaveAuthPasswordDto {
+    pub username: String,
+    pub password: String,
+}
+
+async fn set_password_authentication(
+    State(database): State<Database>,
+    Path(id): Path<u64>,
+    form: Json<SaveAuthPasswordDto>,
+) -> ServiceResult<Json<AccountDto>> {
+    let form = form.0;
+    let account = database.get_account_by_id(id).await?;
+
+    if let Some(mut account) = account {
+        account
+            .auth_methods
+            .retain_mut(|m| !matches!(m, &mut models::AuthMethod::PasswordBased(_)));
+        account
+            .auth_methods
+            .push(models::AuthMethod::PasswordBased(models::AuthPassword {
+                username: form.username,
+                password_hash: password_hash_create(&form.password)?,
+            }));
+
+        let account = database.store_account(account).await?;
+        return Ok(Json(AccountDto::from(&account)));
+    }
+
+    Err(ServiceError::NotFound)
+}
+
+async fn delete_password_authentication(
+    State(database): State<Database>,
+    Path(id): Path<u64>,
+) -> ServiceResult<Json<AccountDto>> {
+    let account = database.get_account_by_id(id).await?;
+
+    if let Some(mut account) = account {
+        account
+            .auth_methods
+            .retain_mut(|m| !matches!(m, &mut models::AuthMethod::PasswordBased(_)));
+
+        let account = database.store_account(account).await?;
+        return Ok(Json(AccountDto::from(&account)));
+    }
+
+    Err(ServiceError::NotFound)
+}
+
+#[derive(Debug, PartialEq, Deserialize)]
+pub struct CreateAuthNfcDto {
+    pub name: String,
+    pub card_id: String,
+    pub card_type: CardTypeDto,
+    pub data: String,
+}
+
+#[derive(Debug, PartialEq, Deserialize)]
+pub struct UpdateAuthNfcDto {
+    pub card_id: String,
+    pub name: String,
+}
+
+#[derive(Debug, PartialEq, Deserialize)]
+pub struct DeleteAuthNfcDto {
+    pub card_id: String,
+}
+
+async fn create_nfc_authentication(
+    State(database): State<Database>,
+    Path(id): Path<u64>,
+    form: Json<CreateAuthNfcDto>,
+) -> ServiceResult<Json<AccountDto>> {
+    let form = form.0;
+    let account = database.get_account_by_id(id).await?;
+
+    if let Some(mut account) = account {
+        let card_id = general_purpose::STANDARD.decode(form.card_id).unwrap();
+        let data = general_purpose::STANDARD.decode(form.data).unwrap();
+
+        account
+            .auth_methods
+            .push(models::AuthMethod::NfcBased(models::AuthNfc {
+                name: form.name,
+                card_id,
+                card_type: form.card_type.into(),
+                data,
+            }));
+
+        let account = database.store_account(account).await?;
+        return Ok(Json(AccountDto::from(&account)));
+    }
+
+    Err(ServiceError::NotFound)
+}
+
+async fn update_nfc_authentication(
+    State(database): State<Database>,
+    Path(id): Path<u64>,
+    form: Json<UpdateAuthNfcDto>,
+) -> ServiceResult<Json<AccountDto>> {
+    let form = form.0;
+    let account = database.get_account_by_id(id).await?;
+
+    if let Some(mut account) = account {
+        let card_id = general_purpose::STANDARD.decode(form.card_id).unwrap();
+
+        for method in account.auth_methods.iter_mut() {
+            if let models::AuthMethod::NfcBased(nfc_based) = method {
+                if nfc_based.card_id == card_id {
+                    nfc_based.name = form.name.clone();
+                }
+            }
+        }
+
+        let account = database.store_account(account).await?;
+        return Ok(Json(AccountDto::from(&account)));
+    }
+
+    Err(ServiceError::NotFound)
+}
+
+async fn delete_nfc_authentication(
+    State(database): State<Database>,
+    Path(id): Path<u64>,
+    form: Json<DeleteAuthNfcDto>,
+) -> ServiceResult<Json<AccountDto>> {
+    let form = form.0;
+    let account = database.get_account_by_id(id).await?;
+
+    if let Some(mut account) = account {
+        let card_id = general_purpose::STANDARD.decode(form.card_id).unwrap();
+
+        account.auth_methods.retain_mut(|m| {
+            if let models::AuthMethod::NfcBased(nfc_based) = m {
+                nfc_based.card_id != card_id
+            } else {
+                true
+            }
+        });
+
+        let account = database.store_account(account).await?;
+        return Ok(Json(AccountDto::from(&account)));
+    }
+
+    Err(ServiceError::NotFound)
+}
+
+fn password_hash_create(password: &str) -> ServiceResult<Vec<u8>> {
+    let bytes =
+        Encoded::default2i(password.as_bytes(), "SALTSALTSALT".as_bytes(), b"", b"").to_u8();
+    Ok(bytes)
+}
+
+fn password_hash_verify(hash: &[u8], password: &str) -> ServiceResult<bool> {
+    if let Ok(enc) = Encoded::from_u8(hash) {
+        return Ok(enc.verify(password.as_bytes()));
+    }
+
+    Ok(false)
 }
