@@ -1,3 +1,5 @@
+use std::{collections::HashMap, sync::Arc};
+
 use aide::OperationInput;
 use axum::{
     async_trait,
@@ -6,9 +8,10 @@ use axum::{
     RequestPartsExt, TypedHeader,
 };
 use headers::{authorization::Bearer, Authorization};
+use tokio::sync::Mutex;
 
 use crate::{
-    database::{AppState, DatabaseConnection},
+    database::{AppState, AppStateAsciiMifareChallenge, DatabaseConnection},
     error::ServiceError,
     models::Session,
 };
@@ -18,6 +21,7 @@ use crate::{
 pub struct RequestState {
     pub db: DatabaseConnection,
     pub session: Option<Session>,
+    pub ascii_mifare_challenge: Arc<Mutex<HashMap<u64, AppStateAsciiMifareChallenge>>>,
 }
 
 #[async_trait]
@@ -47,7 +51,11 @@ where
             None
         };
 
-        Ok(Self { db, session })
+        Ok(Self {
+            db,
+            session,
+            ascii_mifare_challenge: state.ascii_mifare_challenge.clone(),
+        })
     }
 }
 

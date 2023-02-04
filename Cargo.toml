@@ -20,6 +20,13 @@ schemars = { version = "0.8.11" }
 headers = "0.3.8"
 jsonwebtoken = "8.2.0"
 
+block-modes = "0.8"
+des = "0.7"
+generic-array = "0.14"
+hex-literal = "0.3"
+rand_core = "0.6"
+rand = "0.8"
+
 dotenv = "0.15.0"
 log = "0.4.17"
 env_logger = "0.10.0"

@@ -1,19 +1,28 @@
 #![allow(unused_variables)]
 
+use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Instant;
 
 use sqlx::migrate::Migrator;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
+use tokio::sync::Mutex;
 
 use crate::error::ServiceResult;
 use crate::models;
 
 mod migration;
 
+pub struct AppStateAsciiMifareChallenge {
+    pub rnd_a: Vec<u8>,
+    pub rnd_b: Vec<u8>,
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub pool: Pool<Postgres>,
+    pub ascii_mifare_challenge: Arc<Mutex<HashMap<u64, AppStateAsciiMifareChallenge>>>,
 }
 
 impl AppState {
@@ -29,7 +38,10 @@ impl AppState {
             .expect("load migrations");
         migrator.run(&pool).await.expect("run migrations");
 
-        Self { pool }
+        Self {
+            pool,
+            ascii_mifare_challenge: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 }
 
