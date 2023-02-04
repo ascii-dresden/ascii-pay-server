@@ -6,7 +6,7 @@ use serde_json::json;
 /// All `ServiceError`s can be transformed to http errors.
 #[derive(Debug, Clone)]
 pub enum ServiceError {
-    InternalServerError(&'static str, String),
+    InternalServerError(String),
     NotFound,
     NoneError,
 }
@@ -25,10 +25,9 @@ pub type ServiceResult<T> = Result<T, ServiceError>;
 impl IntoResponse for ServiceError {
     fn into_response(self) -> axum::response::Response {
         match self {
-            ServiceError::InternalServerError(source, ref cause) => (
+            ServiceError::InternalServerError(ref cause) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({
-                    "error": source,
                     "cause": cause
                 })),
             ),
