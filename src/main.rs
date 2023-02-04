@@ -7,6 +7,8 @@ use sqlx::postgres::{PgPool, PgPoolOptions};
 
 use std::net::SocketAddr;
 
+mod models;
+
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
