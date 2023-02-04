@@ -9,15 +9,22 @@
 //! ```
 //! The comment specifies the version (1) and description (initial schema).
 //! Each following migration should increase the version by one.
-use std::{pin::Pin, future::Future, borrow::Cow};
+use std::{borrow::Cow, future::Future, pin::Pin};
 
-use sqlx::{migrate::{MigrationSource, Migration, MigrationType}, error::BoxDynError};
+use sqlx::{
+    error::BoxDynError,
+    migrate::{Migration, MigrationSource, MigrationType},
+};
 
 #[derive(Debug)]
-pub struct MigrationScript<'s> { data: &'s str }
+pub struct MigrationScript<'s> {
+    data: &'s str,
+}
 
 impl<'s> MigrationSource<'s> for MigrationScript<'s> {
-    fn resolve(self) -> Pin<Box<dyn Future<Output = Result<Vec<Migration>, BoxDynError>> + Send + 's>> {
+    fn resolve(
+        self,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<Migration>, BoxDynError>> + Send + 's>> {
         Box::pin(async move {
             let mut result = Vec::new();
 
@@ -32,9 +39,14 @@ impl<'s> MigrationSource<'s> for MigrationScript<'s> {
                     let description_str = &line[version_end..];
                     let version = match version_str.parse() {
                         Ok(v) => v,
-                        Err(e) => Err(format!("cannot parse version of migration as int, got string '{}', error: {}", version_str, e))?,
+                        Err(e) => Err(format!("cannot parse version of migration as int, got string '{version_str}', error: {e}"))?,
                     };
-                    result.push(Migration::new(version, Cow::Owned(description_str.to_string()), MigrationType::Simple, Cow::Owned(String::new())));
+                    result.push(Migration::new(
+                        version,
+                        Cow::Owned(description_str.to_string()),
+                        MigrationType::Simple,
+                        Cow::Owned(String::new()),
+                    ));
                     continue;
                 }
 
@@ -43,12 +55,14 @@ impl<'s> MigrationSource<'s> for MigrationScript<'s> {
                     None => {
                         // allow comments at beginning of file
                         if line.starts_with("--") {
-                            continue
+                            continue;
                         }
-                        Err(format!("migration script does not start with migration header, got: {}", line))?
+                        Err(format!(
+                            "migration script does not start with migration header, got: {line}"
+                        ))?
                     }
                 };
-                migration.sql.to_mut().push_str(&line);
+                migration.sql.to_mut().push_str(line);
                 migration.sql.to_mut().push('\n');
             }
 
@@ -58,5 +72,7 @@ impl<'s> MigrationSource<'s> for MigrationScript<'s> {
 }
 
 pub fn postgresql_migrations() -> MigrationScript<'static> {
-    MigrationScript { data: include_str!("./sql/migrations.pg.sql")}
+    MigrationScript {
+        data: include_str!("./sql/migrations.pg.sql"),
+    }
 }

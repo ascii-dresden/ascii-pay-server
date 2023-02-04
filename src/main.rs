@@ -1,7 +1,12 @@
 use axum::extract::DefaultBodyLimit;
+use axum::http::Method;
 use axum::Router;
 use log::info;
 use std::net::SocketAddr;
+use tower_http::{
+    compression::CompressionLayer,
+    cors::{Any, CorsLayer},
+};
 
 use crate::database::Database;
 
@@ -24,6 +29,12 @@ async fn main() {
     let app = Router::new()
         .nest("/api/v1", api::init())
         .layer(DefaultBodyLimit::disable())
+        .layer(
+            CorsLayer::new()
+                .allow_methods([Method::GET, Method::POST])
+                .allow_origin(Any),
+        )
+        .layer(CompressionLayer::new())
         .with_state(database);
 
     // run it with hyper

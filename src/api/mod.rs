@@ -6,5 +6,7 @@ mod accounts;
 mod products;
 
 pub fn init() -> Router<Database> {
-    Router::new().merge(accounts::router()).merge(products::router())
+    Router::new()
+        .merge(accounts::router())
+        .merge(products::router())
 }
