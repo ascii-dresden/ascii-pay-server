@@ -152,8 +152,9 @@ pub async fn get_product_image(
 
     if let Some(image) = image {
         let mut header = HeaderMap::new();
-        let content_type = HeaderValue::from_str(&image.mimetype).unwrap();
-        header.insert(header::CONTENT_TYPE, content_type);
+        if let Ok(content_type) = HeaderValue::from_str(&image.mimetype) {
+            header.insert(header::CONTENT_TYPE, content_type);
+        }
 
         return Ok((StatusCode::OK, header, image.data));
     }
@@ -166,16 +167,16 @@ async fn upload_product_image(
     Path(id): Path<u64>,
     mut multipart: Multipart,
 ) -> ServiceResult<()> {
-    if let Some(field) = multipart.next_field().await.unwrap() {
-        let content_type = field.content_type().unwrap().to_lowercase();
+    while let Ok(Some(field)) = multipart.next_field().await {
+        let content_type = field.content_type().unwrap_or("").to_lowercase();
         if SUPPORTED_IMAGE_TYPES.iter().any(|t| *t == content_type) {
-            let data = field.bytes().await.unwrap();
-
-            let image = models::Image {
-                data: data.to_vec(),
-                mimetype: content_type,
-            };
-            return database.store_product_image(id, image).await;
+            if let Ok(data) = field.bytes().await {
+                let image = models::Image {
+                    data: data.to_vec(),
+                    mimetype: content_type,
+                };
+                return database.store_product_image(id, image).await;
+            }
         }
     }
 
