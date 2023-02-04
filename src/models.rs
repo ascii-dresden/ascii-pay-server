@@ -54,8 +54,8 @@ pub struct Account {
 
 #[derive(PartialEq)]
 pub struct Image {
-    data: Vec<u8>,
-    mimetype: String,
+    pub data: Vec<u8>,
+    pub mimetype: String,
 }
 
 impl Debug for Image {

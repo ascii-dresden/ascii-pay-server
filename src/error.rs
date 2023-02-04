@@ -27,9 +27,7 @@ impl IntoResponse for ServiceError {
         match self {
             ServiceError::InternalServerError(ref cause) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({
-                    "cause": cause
-                })),
+                Json(json!({ "cause": cause })),
             ),
             ServiceError::NotFound => (
                 StatusCode::NOT_FOUND,

@@ -1,4 +1,5 @@
-use axum::extract::{Path, State};
+use axum::extract::{Multipart, Path, State};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::routing::get;
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
@@ -9,8 +10,16 @@ use crate::models;
 
 use super::accounts::CoinAmountDto;
 
+const SUPPORTED_IMAGE_TYPES: [&str; 5] = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg"];
+
 pub fn router() -> Router<Database> {
     Router::new()
+        .route(
+            "/product/:id/image",
+            get(get_product_image)
+                .put(upload_product_image)
+                .delete(delete_product_image),
+        )
         .route(
             "/product/:id",
             get(get_product).put(update_product).delete(delete_product),
@@ -133,4 +142,49 @@ async fn delete_product(
     Path(id): Path<u64>,
 ) -> ServiceResult<()> {
     database.delete_product(id).await
+}
+
+pub async fn get_product_image(
+    State(database): State<Database>,
+    Path(id): Path<u64>,
+) -> ServiceResult<(StatusCode, HeaderMap, Vec<u8>)> {
+    let image = database.get_product_image(id).await?;
+
+    if let Some(image) = image {
+        let mut header = HeaderMap::new();
+        let content_type = HeaderValue::from_str(&image.mimetype).unwrap();
+        header.insert(header::CONTENT_TYPE, content_type);
+
+        return Ok((StatusCode::OK, header, image.data));
+    }
+
+    Err(ServiceError::NotFound)
+}
+
+async fn upload_product_image(
+    State(database): State<Database>,
+    Path(id): Path<u64>,
+    mut multipart: Multipart,
+) -> ServiceResult<()> {
+    if let Some(field) = multipart.next_field().await.unwrap() {
+        let content_type = field.content_type().unwrap().to_lowercase();
+        if SUPPORTED_IMAGE_TYPES.iter().any(|t| *t == content_type) {
+            let data = field.bytes().await.unwrap();
+
+            let image = models::Image {
+                data: data.to_vec(),
+                mimetype: content_type,
+            };
+            return database.store_product_image(id, image).await;
+        }
+    }
+
+    Ok(())
+}
+
+async fn delete_product_image(
+    State(database): State<Database>,
+    Path(id): Path<u64>,
+) -> ServiceResult<()> {
+    database.delete_product_image(id).await
 }

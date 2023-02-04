@@ -16,11 +16,13 @@ impl Database {
     pub async fn connect(url: &str) -> Database {
         let pool = PgPoolOptions::new()
             .max_connections(5)
-            .connect(&url)
+            .connect(url)
             .await
             .expect("connect to database");
 
-        let migrator = Migrator::new(migration::postgresql_migrations()).await.expect("load migrations");
+        let migrator = Migrator::new(migration::postgresql_migrations())
+            .await
+            .expect("load migrations");
         migrator.run(&pool).await.expect("run migrations");
 
         Database { pool }
@@ -50,15 +52,23 @@ impl Database {
         panic!("TODO")
     }
 
-    pub async fn get_product_by_id_with_image(&self, id: u64) -> ServiceResult<Option<models::Product>> {
-        panic!("TODO")
-    }
-
     pub async fn store_product(&self, product: models::Product) -> ServiceResult<models::Product> {
         panic!("TODO")
     }
 
     pub async fn delete_product(&self, id: u64) -> ServiceResult<()> {
+        panic!("TODO")
+    }
+
+    pub async fn get_product_image(&self, id: u64) -> ServiceResult<Option<models::Image>> {
+        panic!("TODO")
+    }
+
+    pub async fn store_product_image(&self, id: u64, image: models::Image) -> ServiceResult<()> {
+        panic!("TODO")
+    }
+
+    pub async fn delete_product_image(&self, id: u64) -> ServiceResult<()> {
         panic!("TODO")
     }
 }
