@@ -1,11 +1,6 @@
 #![allow(unused)]
 use std::{collections::HashMap, fmt::Debug, time::Instant};
 
-#[derive(Debug, PartialEq)]
-pub struct Money {
-    cents: i64,
-}
-
 #[derive(Debug, PartialEq, Hash, Eq)]
 pub enum CoinType {
     Cent,
@@ -28,16 +23,16 @@ pub enum CardType {
 
 #[derive(Debug, PartialEq)]
 pub struct AuthPassword {
-    username: String,
-    password_hash: Vec<u8>,
+    pub username: String,
+    pub password_hash: Vec<u8>,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct AuthNfc {
-    name: String,
-    card_id: Vec<u8>,
-    card_type: CardType,
-    data: Vec<u8>,
+    pub name: String,
+    pub card_id: Vec<u8>,
+    pub card_type: CardType,
+    pub data: Vec<u8>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -73,7 +68,7 @@ impl Debug for Image {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct CoinAmount(HashMap<CoinType, i32>);
+pub struct CoinAmount(pub HashMap<CoinType, i32>);
 
 #[derive(Debug, PartialEq)]
 pub struct Product {

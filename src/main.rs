@@ -1,12 +1,15 @@
-use axum::extract::State;
-use axum::http::StatusCode;
-use axum::routing::get;
+use axum::extract::DefaultBodyLimit;
 use axum::Router;
 use log::info;
-use sqlx::postgres::{PgPool, PgPoolOptions};
+use sqlx::postgres::PgPoolOptions;
 
 use std::net::SocketAddr;
 
+use crate::database::Database;
+
+mod api;
+mod database;
+mod error;
 mod models;
 
 #[tokio::main]
@@ -24,13 +27,13 @@ async fn main() {
         .await
         .expect("can't connect to database");
 
+    let database = Database { pool };
+
     // build our application with some routes
     let app = Router::new()
-        .route(
-            "/",
-            get(using_connection_pool_extractor).post(using_connection_extractor),
-        )
-        .with_state(pool);
+        .nest("/api/v1", api::init())
+        .layer(DefaultBodyLimit::disable())
+        .with_state(database);
 
     // run it with hyper
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -39,32 +42,4 @@ async fn main() {
         .serve(app.into_make_service())
         .await
         .unwrap();
-}
-
-// we can extract the connection pool with `State`
-async fn using_connection_pool_extractor(
-    State(pool): State<PgPool>,
-) -> Result<String, (StatusCode, String)> {
-    sqlx::query_scalar("select 'hello world from pg'")
-        .fetch_one(&pool)
-        .await
-        .map_err(internal_error)
-}
-
-async fn using_connection_extractor(
-    State(pool): State<PgPool>,
-) -> Result<String, (StatusCode, String)> {
-    sqlx::query_scalar("select 'hello world from pg'")
-        .fetch_one(&pool)
-        .await
-        .map_err(internal_error)
-}
-
-/// Utility function for mapping any error into a `500 Internal Server Error`
-/// response.
-fn internal_error<E>(err: E) -> (StatusCode, String)
-where
-    E: std::error::Error,
-{
-    (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
 }
