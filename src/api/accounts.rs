@@ -351,8 +351,10 @@ async fn create_nfc_authentication(
     let account = database.get_account_by_id(id).await?;
 
     if let Some(mut account) = account {
-        let card_id = general_purpose::STANDARD.decode(form.card_id).unwrap();
-        let data = general_purpose::STANDARD.decode(form.data).unwrap();
+        let card_id = general_purpose::STANDARD.decode(form.card_id)
+            .map_err(|_| ServiceError::InternalServerError(format!("Could not decode base64 parameter 'card_id'.")))?;
+        let data = general_purpose::STANDARD.decode(form.data)
+            .map_err(|_| ServiceError::InternalServerError(format!("Could not decode base64 parameter 'data'.")))?;
 
         account
             .auth_methods
@@ -379,7 +381,8 @@ async fn update_nfc_authentication(
     let account = database.get_account_by_id(id).await?;
 
     if let Some(mut account) = account {
-        let card_id = general_purpose::STANDARD.decode(form.card_id).unwrap();
+        let card_id = general_purpose::STANDARD.decode(form.card_id)
+            .map_err(|_| ServiceError::InternalServerError(format!("Could not decode base64 parameter 'card_id'.")))?;
 
         for method in account.auth_methods.iter_mut() {
             if let models::AuthMethod::NfcBased(nfc_based) = method {
@@ -405,7 +408,8 @@ async fn delete_nfc_authentication(
     let account = database.get_account_by_id(id).await?;
 
     if let Some(mut account) = account {
-        let card_id = general_purpose::STANDARD.decode(form.card_id).unwrap();
+        let card_id = general_purpose::STANDARD.decode(form.card_id)
+            .map_err(|_| ServiceError::InternalServerError(format!("Could not decode base64 parameter 'card_id'.")))?;
 
         account.auth_methods.retain_mut(|m| {
             if let models::AuthMethod::NfcBased(nfc_based) = m {
