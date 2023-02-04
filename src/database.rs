@@ -41,4 +41,24 @@ impl Database {
     pub async fn delete_account(&self, id: u64) -> ServiceResult<()> {
         panic!("TODO")
     }
+
+    pub async fn get_all_products(&self) -> ServiceResult<Vec<models::Product>> {
+        panic!("TODO")
+    }
+
+    pub async fn get_product_by_id(&self, id: u64) -> ServiceResult<Option<models::Product>> {
+        panic!("TODO")
+    }
+
+    pub async fn get_product_by_id_with_image(&self, id: u64) -> ServiceResult<Option<models::Product>> {
+        panic!("TODO")
+    }
+
+    pub async fn store_product(&self, product: models::Product) -> ServiceResult<models::Product> {
+        panic!("TODO")
+    }
+
+    pub async fn delete_product(&self, id: u64) -> ServiceResult<()> {
+        panic!("TODO")
+    }
 }
