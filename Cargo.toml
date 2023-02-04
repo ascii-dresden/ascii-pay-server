@@ -62,7 +62,7 @@ clap = { version = "3.2", features = ["cargo"] }
 sublime_fuzzy = "0.6"
 base64 = "0.13"
 generic-array = "0.14"
-tokio = { version = "1.14", features=[ "full", "rt-multi-thread" ] }
+tokio = { version = "1.24", features=[ "full", "rt-multi-thread" ] }
 threadpool = "1.8"
 grpcio = { version = "0.12", default-features = false, features=["prost-codec", "openssl"] }
 bytes = "1.2"
