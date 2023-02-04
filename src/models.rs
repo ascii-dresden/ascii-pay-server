@@ -108,3 +108,19 @@ pub struct Payment {
     pub account: u64,
     pub items: Vec<PaymentItem>,
 }
+
+#[derive(Debug, PartialEq)]
+pub enum AuthMethodType {
+    PasswordBased,
+    NfcBased,
+    PublicTab,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Session {
+    pub account: Account,
+    pub token: String,
+    pub auth_method: AuthMethodType,
+    pub valid_until: Instant,
+    pub is_single_use: bool,
+}

@@ -8,7 +8,6 @@ use serde_json::json;
 pub enum ServiceError {
     InternalServerError(String),
     NotFound,
-    NoneError,
 }
 
 impl std::fmt::Display for ServiceError {
@@ -33,12 +32,6 @@ impl IntoResponse for ServiceError {
                 StatusCode::NOT_FOUND,
                 Json(json!({
                     "error": "Not found",
-                })),
-            ),
-            ServiceError::NoneError => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({
-                    "error": "None type error",
                 })),
             ),
         }

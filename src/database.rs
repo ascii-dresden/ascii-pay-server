@@ -1,5 +1,7 @@
 #![allow(unused_variables)]
 
+use std::time::Instant;
+
 use sqlx::migrate::Migrator;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
@@ -35,6 +37,34 @@ impl Database {
     }
 
     pub async fn get_account_by_id(&self, id: u64) -> ServiceResult<Option<models::Account>> {
+        panic!("TODO")
+    }
+
+    pub async fn get_account_by_auth_method(
+        &self,
+        auth_method: Vec<u8>,
+    ) -> ServiceResult<Option<models::Account>> {
+        panic!("TODO")
+    }
+
+    pub async fn create_session_token(
+        &self,
+        account: u64,
+        auth_method: models::AuthMethodType,
+        valid_until: Instant,
+        is_single_use: bool,
+    ) -> ServiceResult<String> {
+        panic!("TODO")
+    }
+
+    pub async fn delete_session_token(&self, session_token: String) -> ServiceResult<()> {
+        panic!("TODO")
+    }
+
+    pub async fn get_session_by_session_token(
+        &self,
+        session_token: String,
+    ) -> ServiceResult<Option<models::Session>> {
         panic!("TODO")
     }
 
