@@ -15,7 +15,7 @@ pub fn router() -> Router<Database> {
     //     .route("/accounts", get(list_accounts).post(create_account))
 
     Router::new()
-        .route("/account/:id", get(get_account))
+        .route("/account/:id", get(get_account).put(update_account).delete(delete_account))
         .route("/accounts", get(list_accounts).post(create_account))
 }
 
@@ -203,4 +203,31 @@ async fn create_account(
 
     let account = database.store_account(account).await?;
     Ok(Json(AccountDto::from(&account)))
+}
+
+async fn update_account(
+    State(database): State<Database>,
+    Path(id): Path<u64>,
+    form: Json<SaveAccountDto>,
+) -> ServiceResult<Json<AccountDto>> {
+    let form = form.0;
+    let account = database.get_account_by_id(id).await?;
+
+    if let Some(mut account) = account {
+        account.name = form.name;
+        account.email = form.email;
+        account.role = form.role.into();
+
+        let account = database.store_account(account).await?;
+        return Ok(Json(AccountDto::from(&account)));
+    }
+
+    Err(ServiceError::NotFound)
+}
+
+async fn delete_account(
+    State(database): State<Database>,
+    Path(id): Path<u64>,
+) -> ServiceResult<()> {
+    database.delete_account(id).await
 }
