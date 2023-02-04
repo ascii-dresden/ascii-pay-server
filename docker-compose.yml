@@ -1,0 +1,16 @@
+version: "3"
+services:
+  postgres:
+    image: postgres:13-alpine
+    container_name: "ascii-pay-postgres"
+    restart: always
+    environment:
+      - POSTGRES_USER=ascii
+      - POSTGRES_PASSWORD=ascii
+      - POSTGRES_DB=ascii-pay
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./dist/postgres:/var/lib/postgresql/data
+    networks:
+      - default
