@@ -48,6 +48,16 @@ impl From<&models::CoinType> for CoinTypeDto {
     }
 }
 
+impl From<CoinTypeDto> for models::CoinType {
+    fn from(value: CoinTypeDto) -> Self {
+        match value {
+            CoinTypeDto::Cent => models::CoinType::Cent,
+            CoinTypeDto::CoffeeStamp => models::CoinType::CoffeeStamp,
+            CoinTypeDto::BottleStamp => models::CoinType::BottleStamp,
+        }
+    }
+}
+
 pub type CoinAmountDto = HashMap<CoinTypeDto, i32>;
 impl From<&models::CoinAmount> for CoinAmountDto {
     fn from(value: &models::CoinAmount) -> Self {
@@ -58,6 +68,17 @@ impl From<&models::CoinAmount> for CoinAmountDto {
         }
 
         map
+    }
+}
+impl From<CoinAmountDto> for models::CoinAmount {
+    fn from(value: CoinAmountDto) -> Self {
+        let mut map = HashMap::<models::CoinType, i32>::new();
+
+        for (coin_type, amount) in value.into_iter() {
+            map.insert(coin_type.into(), amount);
+        }
+
+        models::CoinAmount(map)
     }
 }
 
