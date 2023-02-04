@@ -1,6 +1,9 @@
+use aide::axum::routing::{get_with, post_with};
+use aide::axum::ApiRouter;
+use aide::transform::TransformOperation;
 use axum::extract::{Path, State};
-use axum::routing::{get, post};
-use axum::{Json, Router};
+use axum::Json;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::database::Database;
@@ -10,17 +13,24 @@ use crate::models;
 use super::accounts::CoinAmountDto;
 use super::products::ProductDto;
 
-pub fn router() -> Router<Database> {
-    Router::new()
-        .route("/account/:id/payment", post(post_payment))
-        .route(
-            "/account/:id/transaction/:transaction",
-            get(get_transaction),
+pub fn router(database: Database) -> ApiRouter {
+    ApiRouter::new()
+        .api_route(
+            "/account/:id/payment",
+            post_with(post_payment, post_payment_docs),
         )
-        .route("/account/:id/transactions", get(list_transactions))
+        .api_route(
+            "/account/:id/transaction/:transaction",
+            get_with(get_transaction, get_transaction_docs),
+        )
+        .api_route(
+            "/account/:id/transactions",
+            get_with(list_transactions, list_transactions_docs),
+        )
+        .with_state(database)
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize, JsonSchema)]
 pub struct TransactionItemDto {
     pub effective_price: CoinAmountDto,
     pub product: Option<ProductDto>,
@@ -37,7 +47,7 @@ impl From<&models::TransactionItem> for TransactionItemDto {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize, JsonSchema)]
 pub struct TransactionDto {
     pub id: u64,
     pub timestamp: String,
@@ -64,6 +74,13 @@ pub async fn list_transactions(
     Ok(Json(transactions.iter().map(|t| t.into()).collect()))
 }
 
+fn list_transactions_docs(op: TransformOperation) -> TransformOperation {
+    op.description("List all transactions for the given account.")
+        .response::<200, Json<Vec<TransactionDto>>>()
+        .response::<404, ()>()
+        .response::<500, ()>()
+}
+
 pub async fn get_transaction(
     State(database): State<Database>,
     Path((account_id, transaction_id)): Path<(u64, u64)>,
@@ -79,13 +96,20 @@ pub async fn get_transaction(
     Err(ServiceError::NotFound)
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+fn get_transaction_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Get a transactions from the given account.")
+        .response::<200, Json<TransactionDto>>()
+        .response::<404, ()>()
+        .response::<500, ()>()
+}
+
+#[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 pub struct PaymentItemDto {
     pub effective_price: CoinAmountDto,
     pub product_id: Option<u64>,
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 pub struct PaymentDto {
     pub items: Vec<PaymentItemDto>,
 }
@@ -111,4 +135,11 @@ async fn post_payment(
 
     let transaction = database.payment(payment).await?;
     Ok(Json(TransactionDto::from(&transaction)))
+}
+
+fn post_payment_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Execute a payment from the given account.")
+        .response::<200, Json<TransactionDto>>()
+        .response::<404, ()>()
+        .response::<500, ()>()
 }

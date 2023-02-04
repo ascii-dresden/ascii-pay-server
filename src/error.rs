@@ -1,10 +1,12 @@
+use aide::OperationOutput;
 use axum::{http::StatusCode, response::IntoResponse, Json};
+use schemars::JsonSchema;
 use serde_json::json;
 
 /// Represent errors in the application
 ///
 /// All `ServiceError`s can be transformed to http errors.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, JsonSchema)]
 pub enum ServiceError {
     InternalServerError(String),
     NotFound,
@@ -21,6 +23,9 @@ impl std::error::Error for ServiceError {}
 /// Helper for `ServiceError` result
 pub type ServiceResult<T> = Result<T, ServiceError>;
 
+impl OperationOutput for ServiceError {
+    type Inner = String;
+}
 impl IntoResponse for ServiceError {
     fn into_response(self) -> axum::response::Response {
         match self {
