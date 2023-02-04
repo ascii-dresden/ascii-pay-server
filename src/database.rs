@@ -1,3 +1,5 @@
+#![allow(unused_variables)]
+
 use sqlx::migrate::Migrator;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
@@ -69,6 +71,24 @@ impl Database {
     }
 
     pub async fn delete_product_image(&self, id: u64) -> ServiceResult<()> {
+        panic!("TODO")
+    }
+
+    pub async fn get_transactions_by_account(
+        &self,
+        account_id: u64,
+    ) -> ServiceResult<Vec<models::Transaction>> {
+        panic!("TODO")
+    }
+
+    pub async fn get_transaction_by_id(
+        &self,
+        id: u64,
+    ) -> ServiceResult<Option<models::Transaction>> {
+        panic!("TODO")
+    }
+
+    pub async fn payment(&self, payment: models::Payment) -> ServiceResult<models::Transaction> {
         panic!("TODO")
     }
 }

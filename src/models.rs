@@ -86,13 +86,25 @@ pub struct Product {
 #[derive(Debug, PartialEq)]
 pub struct TransactionItem {
     pub effective_price: CoinAmount,
-    pub product: Product,
+    pub product: Option<Product>,
 }
 
 #[derive(Debug, PartialEq)]
-struct Transaction {
+pub struct Transaction {
     pub id: u64,
     pub timestamp: Instant,
     pub account: u64,
     pub items: Vec<TransactionItem>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct PaymentItem {
+    pub effective_price: CoinAmount,
+    pub product_id: Option<u64>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Payment {
+    pub account: u64,
+    pub items: Vec<PaymentItem>,
 }
