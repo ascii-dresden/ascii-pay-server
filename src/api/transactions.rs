@@ -77,6 +77,7 @@ pub async fn list_transactions(
 
 fn list_transactions_docs(op: TransformOperation) -> TransformOperation {
     op.description("List all transactions for the given account.")
+        .tag("transactions")
         .response::<200, Json<Vec<TransactionDto>>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
 }
@@ -98,8 +99,11 @@ pub async fn get_transaction(
 
 fn get_transaction_docs(op: TransformOperation) -> TransformOperation {
     op.description("Get a transactions from the given account.")
+        .tag("transactions")
         .response::<200, Json<TransactionDto>>()
-        .response_with::<404, (), _>(|res| res.description("The requested account or transaction does not exist!"))
+        .response_with::<404, (), _>(|res| {
+            res.description("The requested account or transaction does not exist!")
+        })
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
@@ -138,6 +142,7 @@ async fn post_payment(
 
 fn post_payment_docs(op: TransformOperation) -> TransformOperation {
     op.description("Execute a payment from the given account.")
+        .tag("transactions")
         .response::<200, Json<TransactionDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
 }

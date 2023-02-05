@@ -88,13 +88,3 @@ async fn test_account_crud(pool: PgPool) {
         Some(acc1.clone())
     );
 }
-
-#[sqlx::test]
-async fn test_execute_many(pool: PgPool) {
-    let q = sqlx::query(r#"SELECT 1; SELECT 2"#);
-    let mut r = q.execute_many(&pool).await;
-    while let Some(row) = r.next().await {
-        let row = row.unwrap();
-        dbg!(row);
-    }
-}

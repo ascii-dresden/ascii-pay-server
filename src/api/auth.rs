@@ -5,8 +5,8 @@ use aide::axum::routing::{get_with, post_with};
 use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
 use argon2rs::verifier::Encoded;
-use axum::Json;
 use axum::http::StatusCode;
+use axum::Json;
 use base64::engine::general_purpose;
 use base64::Engine;
 use schemars::JsonSchema;
@@ -92,6 +92,7 @@ async fn auth_password_based(
 
 fn auth_password_based_docs(op: TransformOperation) -> TransformOperation {
     op.description("Login with username and password.")
+        .tag("auth")
         .response::<200, Json<AuthTokenDto>>()
         .response_with::<403, (), _>(|res| res.description("Invalid username or password!"))
 }
@@ -141,6 +142,7 @@ async fn auth_nfc_based_nfc_id(
 
 fn auth_nfc_based_nfc_id_docs(op: TransformOperation) -> TransformOperation {
     op.description("Login with nfc card id.")
+        .tag("auth")
         .response::<200, Json<AuthTokenDto>>()
         .response_with::<403, (), _>(|res| res.description("Invalid card_id!"))
 }
@@ -207,6 +209,7 @@ async fn auth_nfc_based_ascii_mifare_challenge(
 
 fn auth_nfc_based_ascii_mifare_challenge_docs(op: TransformOperation) -> TransformOperation {
     op.description("Request challenge.")
+        .tag("auth")
         .response::<200, Json<AuthNfcBasedAsciiMifareChallengeResponseDto>>()
         .response_with::<403, (), _>(|res| res.description("Invalid challenge!"))
 }
@@ -294,6 +297,7 @@ async fn auth_nfc_based_ascii_mifare_response(
 
 fn auth_nfc_based_ascii_mifare_response_docs(op: TransformOperation) -> TransformOperation {
     op.description("Respond to challenge.")
+        .tag("auth")
         .response::<200, Json<AuthNfcBasedAsciiMifareResponseResponseDto>>()
         .response_with::<403, (), _>(|res| res.description("Invalid response!"))
 }
@@ -308,6 +312,7 @@ async fn auth_delete(mut state: RequestState) -> ServiceResult<StatusCode> {
 
 fn auth_delete_docs(op: TransformOperation) -> TransformOperation {
     op.description("Logout the current session.")
+        .tag("auth")
         .response_with::<204, (), _>(|res| res.description("Logout was successfull!"))
 }
 

@@ -74,8 +74,12 @@ impl AuthRequest {
 impl AuthMethod {
     pub fn to_request(&self, account_id: u64) -> AuthRequest {
         match self {
-            AuthMethod::PasswordBased(auth) => AuthRequest::PasswordBased { username: auth.username.clone() },
-            AuthMethod::NfcBased(auth) => AuthRequest::NfcBased { card_id: auth.card_id.clone() },
+            AuthMethod::PasswordBased(auth) => AuthRequest::PasswordBased {
+                username: auth.username.clone(),
+            },
+            AuthMethod::NfcBased(auth) => AuthRequest::NfcBased {
+                card_id: auth.card_id.clone(),
+            },
             AuthMethod::PublicTab => AuthRequest::PublicTab { account_id },
         }
     }
@@ -110,11 +114,15 @@ impl Debug for Image {
 pub struct CoinAmount(pub HashMap<CoinType, i32>);
 impl CoinAmount {
     pub fn zero() -> Self {
-        CoinAmount([
-            (CoinType::Cent, 0),
-            (CoinType::CoffeeStamp, 0),
-            (CoinType::BottleStamp, 0),
-        ].into_iter().collect())
+        CoinAmount(
+            [
+                (CoinType::Cent, 0),
+                (CoinType::CoffeeStamp, 0),
+                (CoinType::BottleStamp, 0),
+            ]
+            .into_iter()
+            .collect(),
+        )
     }
 }
 

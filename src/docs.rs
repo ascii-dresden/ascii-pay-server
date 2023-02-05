@@ -16,8 +16,33 @@ pub fn api_docs(api: TransformOpenApi) -> TransformOpenApi {
         .summary("An example Todo application")
         .description(include_str!("../README.md"))
         .tag(Tag {
-            name: "todo".into(),
-            description: Some("Todo Management".into()),
+            name: "accounts".into(),
+            description: Some("Account management".into()),
+            ..Default::default()
+        })
+        .tag(Tag {
+            name: "account_authentication".into(),
+            description: Some("Account authentication methods".into()),
+            ..Default::default()
+        })
+        .tag(Tag {
+            name: "products".into(),
+            description: Some("Product management".into()),
+            ..Default::default()
+        })
+        .tag(Tag {
+            name: "product_image".into(),
+            description: Some("Product images".into()),
+            ..Default::default()
+        })
+        .tag(Tag {
+            name: "auth".into(),
+            description: Some("Session management".into()),
+            ..Default::default()
+        })
+        .tag(Tag {
+            name: "transactions".into(),
+            description: Some("Transaction management".into()),
             ..Default::default()
         })
         .security_scheme(

@@ -5,8 +5,8 @@ use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
 use argon2rs::verifier::Encoded;
 use axum::extract::Path;
-use axum::Json;
 use axum::http::StatusCode;
+use axum::Json;
 use base64::engine::general_purpose;
 use base64::Engine;
 use schemars::JsonSchema;
@@ -211,6 +211,7 @@ async fn list_accounts(mut state: RequestState) -> ServiceResult<Json<Vec<Accoun
 
 fn list_accounts_docs(op: TransformOperation) -> TransformOperation {
     op.description("List all accounts.")
+        .tag("accounts")
         .response::<200, Json<Vec<AccountDto>>>()
 }
 
@@ -229,6 +230,7 @@ pub async fn get_account(
 
 fn get_account_docs(op: TransformOperation) -> TransformOperation {
     op.description("Get an account by id.")
+        .tag("accounts")
         .response::<200, Json<AccountDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
 }
@@ -261,6 +263,7 @@ async fn create_account(
 
 fn create_account_docs(op: TransformOperation) -> TransformOperation {
     op.description("Create a new account.")
+        .tag("accounts")
         .response::<200, Json<AccountDto>>()
 }
 
@@ -285,6 +288,7 @@ async fn update_account(
 }
 fn update_account_docs(op: TransformOperation) -> TransformOperation {
     op.description("Update an existing account.")
+        .tag("accounts")
         .response::<200, Json<AccountDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
 }
@@ -295,6 +299,7 @@ async fn delete_account(mut state: RequestState, Path(id): Path<u64>) -> Service
 }
 fn delete_account_docs(op: TransformOperation) -> TransformOperation {
     op.description("Delete an existing account.")
+        .tag("accounts")
         .response_with::<204, (), _>(|res| res.description("The account was successfully deleted!"))
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
 }
@@ -332,6 +337,7 @@ async fn set_password_authentication(
 }
 fn set_password_authentication_docs(op: TransformOperation) -> TransformOperation {
     op.description("Set username and password for the given account.")
+        .tag("account_authentication")
         .response::<200, Json<AccountDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
 }
@@ -355,6 +361,7 @@ async fn delete_password_authentication(
 }
 fn delete_password_authentication_docs(op: TransformOperation) -> TransformOperation {
     op.description("Remove password authentication from the given account.")
+        .tag("account_authentication")
         .response::<200, Json<AccountDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
 }
@@ -417,6 +424,7 @@ async fn create_nfc_authentication(
 }
 fn create_nfc_authentication_docs(op: TransformOperation) -> TransformOperation {
     op.description("Add a new nfc based authentication method to the given account.")
+        .tag("account_authentication")
         .response::<200, Json<AccountDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
 }
@@ -454,6 +462,7 @@ async fn update_nfc_authentication(
 }
 fn update_nfc_authentication_docs(op: TransformOperation) -> TransformOperation {
     op.description("Update an existing nfc based authentication method of the given account.")
+        .tag("account_authentication")
         .response::<200, Json<AccountDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
 }
@@ -491,6 +500,7 @@ async fn delete_nfc_authentication(
 }
 fn delete_nfc_authentication_docs(op: TransformOperation) -> TransformOperation {
     op.description("Remmove an existing nfc based authentication method from the given account.")
+        .tag("account_authentication")
         .response::<200, Json<AccountDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
 }
