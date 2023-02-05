@@ -58,7 +58,7 @@ pub struct AuthPasswordBasedDto {
 }
 
 async fn auth_password_based(
-    state: RequestState,
+    mut state: RequestState,
     form: Json<AuthPasswordBasedDto>,
 ) -> ServiceResult<Json<AuthTokenDto>> {
     let form = form.0;
@@ -104,7 +104,7 @@ pub struct AuthNfcBasedNfcIdDto {
 }
 
 async fn auth_nfc_based_nfc_id(
-    state: RequestState,
+    mut state: RequestState,
     form: Json<AuthNfcBasedNfcIdDto>,
 ) -> ServiceResult<Json<AuthTokenDto>> {
     let form = form.0;
@@ -163,7 +163,7 @@ pub struct AuthNfcBasedAsciiMifareChallengeResponseDto {
 
 #[allow(non_snake_case)]
 async fn auth_nfc_based_ascii_mifare_challenge(
-    state: RequestState,
+    mut state: RequestState,
     form: Json<AuthNfcBasedAsciiMifareChallengeDto>,
 ) -> ServiceResult<Json<AuthNfcBasedAsciiMifareChallengeResponseDto>> {
     let form = form.0;
@@ -232,7 +232,7 @@ pub struct AuthNfcBasedAsciiMifareResponseResponseDto {
 
 #[allow(non_snake_case)]
 async fn auth_nfc_based_ascii_mifare_response(
-    state: RequestState,
+    mut state: RequestState,
     form: Json<AuthNfcBasedAsciiMifareResponseDto>,
 ) -> ServiceResult<Json<AuthNfcBasedAsciiMifareResponseResponseDto>> {
     let form = form.0;
@@ -303,7 +303,7 @@ fn auth_nfc_based_ascii_mifare_response_docs(op: TransformOperation) -> Transfor
         .response::<500, ()>()
 }
 
-async fn auth_delete(state: RequestState) -> ServiceResult<()> {
+async fn auth_delete(mut state: RequestState) -> ServiceResult<()> {
     if let Some(session) = state.session {
         state.db.delete_session_token(session.token).await?;
     }
