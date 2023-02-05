@@ -1,7 +1,6 @@
 use std::{collections::HashMap, ops::Add};
 
 use chrono::{Duration, Utc};
-use futures::StreamExt;
 use sqlx::PgPool;
 
 use crate::models::{
@@ -12,7 +11,6 @@ use super::{AppState, DatabaseConnection};
 
 #[sqlx::test]
 async fn test_session_crud(pool: PgPool) {
-    env_logger::init();
     let app_state = AppState::from_pool(pool).await;
     let mut db = DatabaseConnection {
         connection: app_state.pool.acquire().await.unwrap(),
@@ -70,7 +68,6 @@ async fn test_session_crud(pool: PgPool) {
 
 #[sqlx::test]
 async fn test_account_crud(pool: PgPool) {
-    env_logger::init();
     let app_state = AppState::from_pool(pool).await;
     let mut db = DatabaseConnection {
         connection: app_state.pool.acquire().await.unwrap(),
