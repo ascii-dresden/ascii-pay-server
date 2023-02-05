@@ -1,10 +1,12 @@
 use std::{collections::HashMap, ops::Add};
 
-use chrono::{Utc, Duration};
+use chrono::{Duration, Utc};
 use futures::StreamExt;
 use sqlx::PgPool;
 
-use crate::models::{Account, AuthMethod, AuthNfc, AuthPassword, CardType, CoinAmount, Role, AuthMethodType};
+use crate::models::{
+    Account, AuthMethod, AuthMethodType, AuthNfc, AuthPassword, CardType, CoinAmount, Role,
+};
 
 use super::{AppState, DatabaseConnection};
 
@@ -30,8 +32,19 @@ async fn test_session_crud(pool: PgPool) {
     };
     let acc1 = db.store_account(acc1).await.unwrap();
 
-    let token = db.create_session_token(acc1.id, AuthMethodType::PasswordBased, Utc::now().add(Duration::minutes(30)), false).await.unwrap();
-    let session = db.get_session_by_session_token(token.clone()).await.unwrap();
+    let token = db
+        .create_session_token(
+            acc1.id,
+            AuthMethodType::PasswordBased,
+            Utc::now().add(Duration::minutes(30)),
+            false,
+        )
+        .await
+        .unwrap();
+    let session = db
+        .get_session_by_session_token(token.clone())
+        .await
+        .unwrap();
     let session = session.expect("there is a session for the token");
 
     assert_eq!(session.account, acc1);
@@ -42,10 +55,17 @@ async fn test_session_crud(pool: PgPool) {
     db.delete_session_token(token.clone()).await.unwrap();
     assert_eq!(db.get_session_by_session_token(token).await.unwrap(), None);
 
-    let token = db.create_session_token(acc1.id, AuthMethodType::PasswordBased, Utc::now().add(Duration::minutes(30)), false).await.unwrap();
+    let token = db
+        .create_session_token(
+            acc1.id,
+            AuthMethodType::PasswordBased,
+            Utc::now().add(Duration::minutes(30)),
+            false,
+        )
+        .await
+        .unwrap();
     db.delete_account(acc1.id).await.unwrap();
     assert_eq!(db.get_session_by_session_token(token).await.unwrap(), None);
-
 }
 
 #[sqlx::test]

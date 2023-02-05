@@ -68,7 +68,7 @@ impl From<&models::Transaction> for TransactionDto {
 }
 
 pub async fn list_transactions(
-    state: RequestState,
+    mut state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<Json<Vec<TransactionDto>>> {
     state.session_require_admin_or_self(id)?;
@@ -88,7 +88,7 @@ fn list_transactions_docs(op: TransformOperation) -> TransformOperation {
 }
 
 pub async fn get_transaction(
-    state: RequestState,
+    mut state: RequestState,
     Path((account_id, transaction_id)): Path<(u64, u64)>,
 ) -> ServiceResult<Json<TransactionDto>> {
     state.session_require_admin_or_self(account_id)?;
@@ -128,7 +128,7 @@ pub struct PaymentDto {
 }
 
 async fn post_payment(
-    state: RequestState,
+    mut state: RequestState,
     Path(id): Path<u64>,
     form: Json<PaymentDto>,
 ) -> ServiceResult<Json<TransactionDto>> {

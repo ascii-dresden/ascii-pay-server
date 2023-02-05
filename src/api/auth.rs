@@ -8,7 +8,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use base64::engine::general_purpose;
 use base64::Engine;
-use chrono::{Utc, Duration};
+use chrono::{Duration, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
