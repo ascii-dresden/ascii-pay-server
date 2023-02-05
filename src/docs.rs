@@ -66,15 +66,11 @@ pub fn docs_routes() -> ApiRouter {
     aide::gen::infer_responses(true);
 
     let router = ApiRouter::new()
-        .api_route_with(
+        .route(
             "/",
-            get_with(
-                Redoc::new("/docs/api.json")
-                    .with_title("ascii-pay")
-                    .axum_handler(),
-                |op| op.description("This documentation page."),
-            ),
-            |p| p.security_requirement("ApiKey"),
+            get(Redoc::new("/docs/api.json")
+                .with_title("ascii-pay")
+                .axum_handler()),
         )
         .route("/api.json", get(serve_docs));
 

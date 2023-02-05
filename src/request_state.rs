@@ -13,7 +13,7 @@ use tokio::sync::Mutex;
 use crate::{
     database::{AppState, AppStateAsciiMifareChallenge, DatabaseConnection},
     error::{ServiceError, ServiceResult},
-    models::{Session, self},
+    models::{self, Session},
 };
 
 // we can also write a custom extractor that grabs a connection from the pool
