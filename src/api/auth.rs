@@ -1,6 +1,6 @@
 use std::ops::Add;
 
-use aide::axum::routing::{get_with, post_with};
+use aide::axum::routing::{delete_with, get_with, post_with};
 use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
 use axum::http::StatusCode;
@@ -16,6 +16,7 @@ use crate::error::{ServiceError, ServiceResult};
 use crate::models;
 use crate::request_state::RequestState;
 
+use super::accounts::AccountDto;
 use super::{mifare, password_hash_verify};
 
 pub fn router(app_state: AppState) -> ApiRouter {
@@ -42,7 +43,11 @@ pub fn router(app_state: AppState) -> ApiRouter {
                 auth_nfc_based_ascii_mifare_response_docs,
             ),
         )
-        .api_route("/auth/logout", get_with(auth_delete, auth_delete_docs))
+        .api_route(
+            "/auth/account",
+            get_with(auth_get_account, auth_get_account_docs),
+        )
+        .api_route("/auth", delete_with(auth_delete, auth_delete_docs))
         .with_state(app_state)
 }
 
@@ -62,7 +67,12 @@ async fn auth_password_based(
     form: Json<AuthPasswordBasedDto>,
 ) -> ServiceResult<Json<AuthTokenDto>> {
     let form = form.0;
-    let account = state.db.get_account_by_auth_method(Vec::new()).await?;
+    let account = state
+        .db
+        .get_account_by_auth_method(models::AuthRequest::PasswordBased {
+            username: form.username.clone(),
+        })
+        .await?;
 
     if let Some(account) = account {
         for auth_method in account.auth_methods.iter() {
@@ -106,17 +116,23 @@ async fn auth_nfc_based_nfc_id(
     form: Json<AuthNfcBasedNfcIdDto>,
 ) -> ServiceResult<Json<AuthTokenDto>> {
     let form = form.0;
-    let account = state.db.get_account_by_auth_method(Vec::new()).await?;
+
+    let card_id = general_purpose::STANDARD
+        .decode(form.card_id)
+        .map_err(|_| {
+            ServiceError::InternalServerError(
+                "Could not decode base64 parameter 'card_id'.".to_string(),
+            )
+        })?;
+
+    let account = state
+        .db
+        .get_account_by_auth_method(models::AuthRequest::NfcBased {
+            card_id: card_id.clone(),
+        })
+        .await?;
 
     if let Some(account) = account {
-        let card_id = general_purpose::STANDARD
-            .decode(form.card_id)
-            .map_err(|_| {
-                ServiceError::InternalServerError(
-                    "Could not decode base64 parameter 'card_id'.".to_string(),
-                )
-            })?;
-
         for auth_method in account.auth_methods.iter() {
             if let models::AuthMethod::NfcBased(auth_nfc) = auth_method {
                 if auth_nfc.card_id == card_id {
@@ -165,16 +181,23 @@ async fn auth_nfc_based_ascii_mifare_challenge(
     form: Json<AuthNfcBasedAsciiMifareChallengeDto>,
 ) -> ServiceResult<Json<AuthNfcBasedAsciiMifareChallengeResponseDto>> {
     let form = form.0;
-    let account = state.db.get_account_by_auth_method(Vec::new()).await?;
+
+    let card_id = general_purpose::STANDARD
+        .decode(form.card_id)
+        .map_err(|_| {
+            ServiceError::InternalServerError(
+                "Could not decode base64 parameter 'card_id'.".to_string(),
+            )
+        })?;
+
+    let account = state
+        .db
+        .get_account_by_auth_method(models::AuthRequest::NfcBased {
+            card_id: card_id.clone(),
+        })
+        .await?;
 
     if let Some(account) = account {
-        let card_id = general_purpose::STANDARD
-            .decode(form.card_id)
-            .map_err(|_| {
-                ServiceError::InternalServerError(
-                    "Could not decode base64 parameter 'card_id'.".to_string(),
-                )
-            })?;
         let ek_rndB = general_purpose::STANDARD
             .decode(form.ek_rndB)
             .map_err(|_| {
@@ -234,16 +257,23 @@ async fn auth_nfc_based_ascii_mifare_response(
     form: Json<AuthNfcBasedAsciiMifareResponseDto>,
 ) -> ServiceResult<Json<AuthNfcBasedAsciiMifareResponseResponseDto>> {
     let form = form.0;
-    let account = state.db.get_account_by_auth_method(Vec::new()).await?;
+
+    let card_id = general_purpose::STANDARD
+        .decode(form.card_id)
+        .map_err(|_| {
+            ServiceError::InternalServerError(
+                "Could not decode base64 parameter 'card_id'.".to_string(),
+            )
+        })?;
+
+    let account = state
+        .db
+        .get_account_by_auth_method(models::AuthRequest::NfcBased {
+            card_id: card_id.clone(),
+        })
+        .await?;
 
     if let Some(account) = account {
-        let card_id = general_purpose::STANDARD
-            .decode(form.card_id)
-            .map_err(|_| {
-                ServiceError::InternalServerError(
-                    "Could not decode base64 parameter 'card_id'.".to_string(),
-                )
-            })?;
         let dk_rndA_rndBshifted = general_purpose::STANDARD
             .decode(form.dk_rndA_rndBshifted)
             .map_err(|_| {
@@ -313,4 +343,19 @@ fn auth_delete_docs(op: TransformOperation) -> TransformOperation {
     op.description("Logout the current session.")
         .tag("auth")
         .response_with::<204, (), _>(|res| res.description("Logout was successfull!"))
+}
+
+pub async fn auth_get_account(state: RequestState) -> ServiceResult<Json<AccountDto>> {
+    let account = state.session_require_self()?;
+    Ok(Json(AccountDto::from(&account)))
+}
+
+fn auth_get_account_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Get an account by id.")
+        .tag("accounts")
+        .response::<200, Json<AccountDto>>()
+        .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
 }

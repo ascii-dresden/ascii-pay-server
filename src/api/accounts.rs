@@ -151,6 +151,7 @@ pub struct AuthNfcDto {
 }
 
 #[derive(Debug, PartialEq, Serialize, JsonSchema)]
+#[serde(tag = "type")]
 pub enum AuthMethodDto {
     PasswordBased(AuthPasswordDto),
     NfcBased(AuthNfcDto),
