@@ -134,13 +134,13 @@ async fn test_account_crud(pool: PgPool) {
     assert_eq!(db.get_account_by_id(123213).await.unwrap(), None);
 
     assert_eq!(
-        db.get_account_by_auth_method(john_pw.to_request(acc1.id).login_key())
+        db.get_account_by_auth_method(john_pw.to_request(acc1.id))
             .await
             .unwrap(),
         Some(acc1.clone())
     );
     assert_eq!(
-        db.get_account_by_auth_method(john_nfc.to_request(acc1.id).login_key())
+        db.get_account_by_auth_method(john_nfc.to_request(acc1.id))
             .await
             .unwrap(),
         Some(acc1.clone())

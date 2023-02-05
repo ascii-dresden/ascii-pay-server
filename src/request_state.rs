@@ -63,13 +63,7 @@ impl OperationInput for RequestState {}
 
 impl RequestState {
     pub fn session_is_present(&self) -> bool {
-        if let Some(ref session) = self.session {
-            if matches!(session.account.role, models::Role::Admin) {
-                return true;
-            }
-        }
-
-        false
+        self.session.is_some()
     }
 
     pub fn session_is_admin(&self) -> bool {
@@ -114,6 +108,17 @@ impl RequestState {
 
         if self.session_is_self(account_id) {
             return Ok(());
+        }
+
+        Err(ServiceError::Forbidden)
+    }
+    pub fn session_require_self(&self) -> ServiceResult<models::Account> {
+        if !self.session_is_present() {
+            return Err(ServiceError::Unauthorized("Missing login!"));
+        }
+
+        if let Some(ref session) = self.session {
+            return Ok(session.account.clone());
         }
 
         Err(ServiceError::Forbidden)

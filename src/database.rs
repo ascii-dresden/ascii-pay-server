@@ -16,8 +16,8 @@ use tokio::sync::Mutex;
 
 use crate::error::{ServiceError, ServiceResult};
 use crate::models::{
-    self, Account, AuthMethod, AuthMethodType, AuthNfc, AuthPassword, CardType, CoinAmount,
-    CoinType, Role, Session,
+    self, Account, AuthMethod, AuthMethodType, AuthNfc, AuthPassword, AuthRequest, CardType,
+    CoinAmount, CoinType, Role, Session,
 };
 
 mod migration;
@@ -325,7 +325,7 @@ impl DatabaseConnection {
 
     pub async fn get_account_by_auth_method(
         &mut self,
-        auth_method: Vec<u8>,
+        auth_method: AuthRequest,
     ) -> ServiceResult<Option<models::Account>> {
         let r = sqlx::query_as::<_, AccountRow>(
             r#"
@@ -339,7 +339,7 @@ impl DatabaseConnection {
             LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
             GROUP BY a.id
         "#)
-        .bind(auth_method)
+        .bind(auth_method.login_key())
         .fetch_optional(&mut self.connection)
         .await;
         let r = to_service_result(r)?;
@@ -407,8 +407,12 @@ impl DatabaseConnection {
         .bind(session_token)
         .fetch_optional(&mut self.connection)
         .await;
-        let r = to_service_result(r)?;
-        Ok(r.map(Session::from))
+
+        if let Ok(r) = r {
+            Ok(r.map(Session::from))
+        } else {
+            Ok(None)
+        }
     }
 
     pub async fn store_account(
