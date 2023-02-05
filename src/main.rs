@@ -3,6 +3,7 @@ use axum::http::Method;
 use axum::{extract::DefaultBodyLimit, Extension};
 use log::info;
 use std::net::SocketAddr;
+use std::str::FromStr;
 use std::sync::Arc;
 use tower_http::{
     compression::CompressionLayer,
@@ -31,6 +32,10 @@ async fn main() {
     let db_connection_str = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://ascii:ascii@localhost:5432/ascii-pay".to_string());
 
+    let api_host = std::env::var("API_HOST").unwrap_or_else(|_| "localhost".to_string());
+
+    let api_port = std::env::var("API_PORT").unwrap_or_else(|_| "3000".to_string());
+
     let app_state = AppState::connect(&db_connection_str).await;
 
     let mut api = OpenApi::default();
@@ -50,7 +55,9 @@ async fn main() {
         .with_state(app_state);
 
     // run it with hyper
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+
+    let addr = format!("{api_host}:{api_port}");
+    let addr = SocketAddr::from_str(&addr).unwrap();
     info!("listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())

@@ -1,0 +1,32 @@
+version: "3"
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: asciipay/server:latest
+    restart: always
+    container_name: "ascii-pay-server"
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=3000
+      - DATABASE_URL=postgres://ascii:ascii@postgres:5432/ascii-pay
+      - RUST_LOG=info,sqlx::query=warn
+    depends_on:
+      - postgres
+    ports:
+      - "3000:3000"
+    networks:
+      - default
+  postgres:
+    image: postgres:13-alpine
+    container_name: "ascii-pay-postgres"
+    restart: always
+    environment:
+      - POSTGRES_USER=ascii
+      - POSTGRES_PASSWORD=ascii
+      - POSTGRES_DB=ascii-pay
+    ports:
+      - "5432:5432"
+    networks:
+      - default
