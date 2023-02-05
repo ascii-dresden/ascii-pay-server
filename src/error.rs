@@ -11,6 +11,7 @@ pub enum ServiceError {
     InternalServerError(String),
     NotFound,
     Unauthorized(&'static str),
+    Forbidden,
 }
 
 impl std::fmt::Display for ServiceError {
@@ -56,6 +57,12 @@ impl IntoResponse for ServiceError {
                 StatusCode::UNAUTHORIZED,
                 Json(json!({
                     "error": cause,
+                })),
+            ),
+            ServiceError::Forbidden => (
+                StatusCode::FORBIDDEN,
+                Json(json!({
+                    "error": "Forbidden",
                 })),
             ),
         }

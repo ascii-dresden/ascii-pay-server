@@ -12,8 +12,8 @@ use tokio::sync::Mutex;
 
 use crate::{
     database::{AppState, AppStateAsciiMifareChallenge, DatabaseConnection},
-    error::ServiceError,
-    models::Session,
+    error::{ServiceError, ServiceResult},
+    models::{Session, self},
 };
 
 // we can also write a custom extractor that grabs a connection from the pool
@@ -60,3 +60,62 @@ where
 }
 
 impl OperationInput for RequestState {}
+
+impl RequestState {
+    pub fn session_is_present(&self) -> bool {
+        if let Some(ref session) = self.session {
+            if matches!(session.account.role, models::Role::Admin) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub fn session_is_admin(&self) -> bool {
+        if let Some(ref session) = self.session {
+            if matches!(session.account.role, models::Role::Admin) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub fn session_is_self(&self, account_id: u64) -> bool {
+        if let Some(ref session) = self.session {
+            if session.account.id == account_id {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub fn session_require_admin(&self) -> ServiceResult<()> {
+        if !self.session_is_present() {
+            return Err(ServiceError::Unauthorized("Missing login!"));
+        }
+
+        if self.session_is_admin() {
+            return Ok(());
+        }
+
+        Err(ServiceError::Forbidden)
+    }
+    pub fn session_require_admin_or_self(&self, account_id: u64) -> ServiceResult<()> {
+        if !self.session_is_present() {
+            return Err(ServiceError::Unauthorized("Missing login!"));
+        }
+
+        if self.session_is_admin() {
+            return Ok(());
+        }
+
+        if self.session_is_self(account_id) {
+            return Ok(());
+        }
+
+        Err(ServiceError::Forbidden)
+    }
+}

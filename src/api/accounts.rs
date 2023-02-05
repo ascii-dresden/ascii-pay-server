@@ -212,6 +212,8 @@ impl From<&models::Account> for AccountDto {
 }
 
 async fn list_accounts(mut state: RequestState) -> ServiceResult<Json<Vec<AccountDto>>> {
+    state.session_require_admin()?;
+
     let accounts = state.db.get_all_accounts().await?;
     Ok(Json(accounts.iter().map(|a| a.into()).collect()))
 }
@@ -220,6 +222,9 @@ fn list_accounts_docs(op: TransformOperation) -> TransformOperation {
     op.description("List all accounts.")
         .tag("accounts")
         .response::<200, Json<Vec<AccountDto>>>()
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin"])
 }
 
 async fn list_accounts_for_public_tab_board(
@@ -248,6 +253,8 @@ pub async fn get_account(
     mut state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<Json<AccountDto>> {
+    state.session_require_admin_or_self(id)?;
+
     let account = state.db.get_account_by_id(id).await?;
 
     if let Some(account) = account {
@@ -262,6 +269,9 @@ fn get_account_docs(op: TransformOperation) -> TransformOperation {
         .tag("accounts")
         .response::<200, Json<AccountDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
@@ -275,6 +285,8 @@ async fn create_account(
     mut state: RequestState,
     form: Json<SaveAccountDto>,
 ) -> ServiceResult<Json<AccountDto>> {
+    state.session_require_admin()?;
+
     let form = form.0;
 
     let account = models::Account {
@@ -294,6 +306,9 @@ fn create_account_docs(op: TransformOperation) -> TransformOperation {
     op.description("Create a new account.")
         .tag("accounts")
         .response::<200, Json<AccountDto>>()
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin"])
 }
 
 async fn update_account(
@@ -301,13 +316,21 @@ async fn update_account(
     Path(id): Path<u64>,
     form: Json<SaveAccountDto>,
 ) -> ServiceResult<Json<AccountDto>> {
+    state.session_require_admin_or_self(id)?;
+
     let form = form.0;
     let account = state.db.get_account_by_id(id).await?;
 
     if let Some(mut account) = account {
         account.name = form.name;
         account.email = form.email;
-        account.role = form.role.into();
+
+        let new_role = form.role.into();
+        if account.role != new_role {
+            // Only admins are allowed to change account roles
+            state.session_require_admin()?;
+            account.role = new_role;
+        }
 
         let account = state.db.store_account(account).await?;
         return Ok(Json(AccountDto::from(&account)));
@@ -315,22 +338,32 @@ async fn update_account(
 
     Err(ServiceError::NotFound)
 }
+
 fn update_account_docs(op: TransformOperation) -> TransformOperation {
     op.description("Update an existing account.")
         .tag("accounts")
         .response::<200, Json<AccountDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
 }
 
 async fn delete_account(mut state: RequestState, Path(id): Path<u64>) -> ServiceResult<StatusCode> {
+    state.session_require_admin_or_self(id)?;
+
     state.db.delete_account(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
+
 fn delete_account_docs(op: TransformOperation) -> TransformOperation {
     op.description("Delete an existing account.")
         .tag("accounts")
         .response_with::<204, (), _>(|res| res.description("The account was successfully deleted!"))
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
@@ -344,6 +377,8 @@ async fn set_password_authentication(
     Path(id): Path<u64>,
     form: Json<SaveAuthPasswordDto>,
 ) -> ServiceResult<Json<AccountDto>> {
+    state.session_require_admin_or_self(id)?;
+
     let form = form.0;
     let account = state.db.get_account_by_id(id).await?;
 
@@ -364,17 +399,23 @@ async fn set_password_authentication(
 
     Err(ServiceError::NotFound)
 }
+
 fn set_password_authentication_docs(op: TransformOperation) -> TransformOperation {
     op.description("Set username and password for the given account.")
         .tag("account_authentication")
         .response::<200, Json<AccountDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
 }
 
 async fn delete_password_authentication(
     mut state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<Json<AccountDto>> {
+    state.session_require_admin_or_self(id)?;
+
     let account = state.db.get_account_by_id(id).await?;
 
     if let Some(mut account) = account {
@@ -388,11 +429,15 @@ async fn delete_password_authentication(
 
     Err(ServiceError::NotFound)
 }
+
 fn delete_password_authentication_docs(op: TransformOperation) -> TransformOperation {
     op.description("Remove password authentication from the given account.")
         .tag("account_authentication")
         .response::<200, Json<AccountDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
@@ -419,6 +464,8 @@ async fn create_nfc_authentication(
     Path(id): Path<u64>,
     form: Json<CreateAuthNfcDto>,
 ) -> ServiceResult<Json<AccountDto>> {
+    state.session_require_admin_or_self(id)?;
+
     let form = form.0;
     let account = state.db.get_account_by_id(id).await?;
 
@@ -451,11 +498,15 @@ async fn create_nfc_authentication(
 
     Err(ServiceError::NotFound)
 }
+
 fn create_nfc_authentication_docs(op: TransformOperation) -> TransformOperation {
     op.description("Add a new nfc based authentication method to the given account.")
         .tag("account_authentication")
         .response::<200, Json<AccountDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
 }
 
 async fn update_nfc_authentication(
@@ -463,6 +514,8 @@ async fn update_nfc_authentication(
     Path(id): Path<u64>,
     form: Json<UpdateAuthNfcDto>,
 ) -> ServiceResult<Json<AccountDto>> {
+    state.session_require_admin_or_self(id)?;
+
     let form = form.0;
     let account = state.db.get_account_by_id(id).await?;
 
@@ -489,11 +542,15 @@ async fn update_nfc_authentication(
 
     Err(ServiceError::NotFound)
 }
+
 fn update_nfc_authentication_docs(op: TransformOperation) -> TransformOperation {
     op.description("Update an existing nfc based authentication method of the given account.")
         .tag("account_authentication")
         .response::<200, Json<AccountDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
 }
 
 async fn delete_nfc_authentication(
@@ -501,6 +558,8 @@ async fn delete_nfc_authentication(
     Path(id): Path<u64>,
     form: Json<DeleteAuthNfcDto>,
 ) -> ServiceResult<Json<AccountDto>> {
+    state.session_require_admin_or_self(id)?;
+
     let form = form.0;
     let account = state.db.get_account_by_id(id).await?;
 
@@ -527,11 +586,15 @@ async fn delete_nfc_authentication(
 
     Err(ServiceError::NotFound)
 }
+
 fn delete_nfc_authentication_docs(op: TransformOperation) -> TransformOperation {
     op.description("Remmove an existing nfc based authentication method from the given account.")
         .tag("account_authentication")
         .response::<200, Json<AccountDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
 }
 
 fn password_hash_create(password: &str) -> ServiceResult<Vec<u8>> {

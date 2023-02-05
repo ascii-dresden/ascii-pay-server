@@ -46,10 +46,10 @@ pub fn api_docs(api: TransformOpenApi) -> TransformOpenApi {
             ..Default::default()
         })
         .security_scheme(
-            "ApiKey",
-            aide::openapi::SecurityScheme::ApiKey {
-                location: aide::openapi::ApiKeyLocation::Header,
-                name: "X-Auth-Key".into(),
+            "SessionToken",
+            aide::openapi::SecurityScheme::Http {
+                scheme: "bearer".into(),
+                bearer_format: None,
                 description: Some("A key that is ignored.".into()),
                 extensions: Default::default(),
             },

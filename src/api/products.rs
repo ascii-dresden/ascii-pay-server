@@ -120,6 +120,8 @@ async fn create_product(
     state: RequestState,
     form: Json<SaveProductDto>,
 ) -> ServiceResult<Json<ProductDto>> {
+    state.session_require_admin()?;
+
     let form = form.0;
 
     let product = models::Product {
@@ -142,6 +144,9 @@ fn create_product_docs(op: TransformOperation) -> TransformOperation {
     op.description("Create a new product.")
         .tag("products")
         .response::<200, Json<ProductDto>>()
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin"])
 }
 
 async fn update_product(
@@ -149,6 +154,8 @@ async fn update_product(
     Path(id): Path<u64>,
     form: Json<SaveProductDto>,
 ) -> ServiceResult<Json<ProductDto>> {
+    state.session_require_admin()?;
+
     let form = form.0;
     let product = state.db.get_product_by_id(id).await?;
 
@@ -173,9 +180,14 @@ fn update_product_docs(op: TransformOperation) -> TransformOperation {
         .tag("products")
         .response::<200, Json<ProductDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested product does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin"])
 }
 
 async fn delete_product(state: RequestState, Path(id): Path<u64>) -> ServiceResult<StatusCode> {
+    state.session_require_admin()?;
+
     state.db.delete_product(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -185,6 +197,9 @@ fn delete_product_docs(op: TransformOperation) -> TransformOperation {
         .tag("products")
         .response_with::<204, (), _>(|res| res.description("The product was successfully deleted!"))
         .response_with::<404, (), _>(|res| res.description("The requested product does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin"])
 }
 
 pub async fn get_product_image(
@@ -219,6 +234,8 @@ async fn upload_product_image(
     Path(id): Path<u64>,
     mut multipart: Multipart,
 ) -> ServiceResult<StatusCode> {
+    state.session_require_admin()?;
+
     while let Ok(Some(field)) = multipart.next_field().await {
         let content_type = field.content_type().unwrap_or("").to_lowercase();
         if SUPPORTED_IMAGE_TYPES.iter().any(|t| *t == content_type) {
@@ -243,12 +260,17 @@ fn upload_product_image_docs(op: TransformOperation) -> TransformOperation {
             res.description("The product image was successfully updated!")
         })
         .response_with::<404, (), _>(|res| res.description("The requested product does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin"])
 }
 
 async fn delete_product_image(
     state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<StatusCode> {
+    state.session_require_admin()?;
+
     state.db.delete_product_image(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -260,6 +282,9 @@ fn delete_product_image_docs(op: TransformOperation) -> TransformOperation {
             res.description("The product image was successfully deleted!")
         })
         .response_with::<404, (), _>(|res| res.description("The requested product does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin"])
 }
 
 pub struct ImageResult {
