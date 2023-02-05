@@ -94,7 +94,7 @@ fn auth_password_based_docs(op: TransformOperation) -> TransformOperation {
     op.description("Login with username and password.")
         .tag("auth")
         .response::<200, Json<AuthTokenDto>>()
-        .response_with::<403, (), _>(|res| res.description("Invalid username or password!"))
+        .response_with::<401, (), _>(|res| res.description("Invalid username or password!"))
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
@@ -144,7 +144,7 @@ fn auth_nfc_based_nfc_id_docs(op: TransformOperation) -> TransformOperation {
     op.description("Login with nfc card id.")
         .tag("auth")
         .response::<200, Json<AuthTokenDto>>()
-        .response_with::<403, (), _>(|res| res.description("Invalid card_id!"))
+        .response_with::<401, (), _>(|res| res.description("Invalid card_id!"))
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
@@ -211,7 +211,7 @@ fn auth_nfc_based_ascii_mifare_challenge_docs(op: TransformOperation) -> Transfo
     op.description("Request challenge.")
         .tag("auth")
         .response::<200, Json<AuthNfcBasedAsciiMifareChallengeResponseDto>>()
-        .response_with::<403, (), _>(|res| res.description("Invalid challenge!"))
+        .response_with::<401, (), _>(|res| res.description("Invalid challenge!"))
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
@@ -299,7 +299,7 @@ fn auth_nfc_based_ascii_mifare_response_docs(op: TransformOperation) -> Transfor
     op.description("Respond to challenge.")
         .tag("auth")
         .response::<200, Json<AuthNfcBasedAsciiMifareResponseResponseDto>>()
-        .response_with::<403, (), _>(|res| res.description("Invalid response!"))
+        .response_with::<401, (), _>(|res| res.description("Invalid response!"))
 }
 
 async fn auth_delete(mut state: RequestState) -> ServiceResult<StatusCode> {

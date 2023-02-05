@@ -47,6 +47,13 @@ pub fn router(app_state: AppState) -> ApiRouter {
             get_with(list_accounts, list_accounts_docs)
                 .post_with(create_account, create_account_docs),
         )
+        .api_route(
+            "/public-tab-board",
+            get_with(
+                list_accounts_for_public_tab_board,
+                list_accounts_for_public_tab_board_docs,
+            ),
+        )
         .with_state(app_state)
 }
 
@@ -211,6 +218,28 @@ async fn list_accounts(mut state: RequestState) -> ServiceResult<Json<Vec<Accoun
 
 fn list_accounts_docs(op: TransformOperation) -> TransformOperation {
     op.description("List all accounts.")
+        .tag("accounts")
+        .response::<200, Json<Vec<AccountDto>>>()
+}
+
+async fn list_accounts_for_public_tab_board(
+    mut state: RequestState,
+) -> ServiceResult<Json<Vec<AccountDto>>> {
+    let accounts = state.db.get_all_accounts().await?;
+    let accounts = accounts
+        .into_iter()
+        .filter(|a| {
+            a.auth_methods
+                .iter()
+                .any(|m| matches!(m, models::AuthMethod::PublicTab))
+        })
+        .map(|ref a| a.into())
+        .collect();
+    Ok(Json(accounts))
+}
+
+fn list_accounts_for_public_tab_board_docs(op: TransformOperation) -> TransformOperation {
+    op.description("List all accounts that participate at the public tab board.")
         .tag("accounts")
         .response::<200, Json<Vec<AccountDto>>>()
 }

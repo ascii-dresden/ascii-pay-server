@@ -222,7 +222,7 @@ fn to_service_result<V>(r: Result<V, sqlx::Error>) -> ServiceResult<V> {
 fn to_coin_amount(amounts: &[(CoinType, Option<i32>)]) -> CoinAmount {
     CoinAmount(
         amounts
-            .into_iter()
+            .iter()
             .filter_map(|(tp, amount)| Some((*tp, (*amount)?)))
             .collect(),
     )
@@ -373,7 +373,7 @@ impl DatabaseConnection {
                 .auth_methods
                 .iter()
                 .map(|m| {
-                    serde_json::to_value(&AccountAuthMethodData::from(m.clone()))
+                    serde_json::to_value(AccountAuthMethodData::from(m.clone()))
                         .expect("to json cannot fail")
                 })
                 .collect::<Vec<_>>(),
