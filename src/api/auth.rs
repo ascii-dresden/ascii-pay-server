@@ -6,6 +6,7 @@ use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
 use argon2rs::verifier::Encoded;
 use axum::Json;
+use axum::http::StatusCode;
 use base64::engine::general_purpose;
 use base64::Engine;
 use schemars::JsonSchema;
@@ -84,18 +85,15 @@ async fn auth_password_based(
                 }
             }
         }
-
-        return Err(ServiceError::NotFound);
     }
 
-    Err(ServiceError::NotFound)
+    Err(ServiceError::Unauthorized("Invalid username or password"))
 }
 
 fn auth_password_based_docs(op: TransformOperation) -> TransformOperation {
     op.description("Login with username and password.")
         .response::<200, Json<AuthTokenDto>>()
-        .response::<404, ()>()
-        .response::<500, ()>()
+        .response_with::<403, (), _>(|res| res.description("Invalid username or password!"))
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
@@ -138,14 +136,13 @@ async fn auth_nfc_based_nfc_id(
         }
     }
 
-    Err(ServiceError::NotFound)
+    Err(ServiceError::Unauthorized("Invalid card_id"))
 }
 
 fn auth_nfc_based_nfc_id_docs(op: TransformOperation) -> TransformOperation {
     op.description("Login with nfc card id.")
         .response::<200, Json<AuthTokenDto>>()
-        .response::<404, ()>()
-        .response::<500, ()>()
+        .response_with::<403, (), _>(|res| res.description("Invalid card_id!"))
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
@@ -205,14 +202,13 @@ async fn auth_nfc_based_ascii_mifare_challenge(
         }
     }
 
-    Err(ServiceError::NotFound)
+    Err(ServiceError::Unauthorized("Invalid challenge!"))
 }
 
 fn auth_nfc_based_ascii_mifare_challenge_docs(op: TransformOperation) -> TransformOperation {
     op.description("Request challenge.")
         .response::<200, Json<AuthNfcBasedAsciiMifareChallengeResponseDto>>()
-        .response::<404, ()>()
-        .response::<500, ()>()
+        .response_with::<403, (), _>(|res| res.description("Invalid challenge!"))
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
@@ -293,29 +289,26 @@ async fn auth_nfc_based_ascii_mifare_response(
         }
     }
 
-    Err(ServiceError::NotFound)
+    Err(ServiceError::Unauthorized("Invalid response!"))
 }
 
 fn auth_nfc_based_ascii_mifare_response_docs(op: TransformOperation) -> TransformOperation {
     op.description("Respond to challenge.")
         .response::<200, Json<AuthNfcBasedAsciiMifareResponseResponseDto>>()
-        .response::<404, ()>()
-        .response::<500, ()>()
+        .response_with::<403, (), _>(|res| res.description("Invalid response!"))
 }
 
-async fn auth_delete(mut state: RequestState) -> ServiceResult<()> {
+async fn auth_delete(mut state: RequestState) -> ServiceResult<StatusCode> {
     if let Some(session) = state.session {
         state.db.delete_session_token(session.token).await?;
     }
 
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 fn auth_delete_docs(op: TransformOperation) -> TransformOperation {
     op.description("Logout the current session.")
-        .response::<200, ()>()
-        .response::<404, ()>()
-        .response::<500, ()>()
+        .response_with::<204, (), _>(|res| res.description("Logout was successfull!"))
 }
 
 fn password_hash_verify(hash: &[u8], password: &str) -> ServiceResult<bool> {

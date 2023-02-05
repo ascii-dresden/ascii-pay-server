@@ -100,8 +100,7 @@ pub async fn get_product(
 fn get_product_docs(op: TransformOperation) -> TransformOperation {
     op.description("Get a product by id.")
         .response::<200, Json<ProductDto>>()
-        .response::<404, ()>()
-        .response::<500, ()>()
+        .response_with::<404, (), _>(|res| res.description("The requested product does not exist!"))
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
@@ -140,7 +139,6 @@ async fn create_product(
 fn create_product_docs(op: TransformOperation) -> TransformOperation {
     op.description("Create a new product.")
         .response::<200, Json<ProductDto>>()
-        .response::<500, ()>()
 }
 
 async fn update_product(
@@ -170,19 +168,18 @@ async fn update_product(
 fn update_product_docs(op: TransformOperation) -> TransformOperation {
     op.description("Update an existing product.")
         .response::<200, Json<ProductDto>>()
-        .response::<404, ()>()
-        .response::<500, ()>()
+        .response_with::<404, (), _>(|res| res.description("The requested product does not exist!"))
 }
 
-async fn delete_product(state: RequestState, Path(id): Path<u64>) -> ServiceResult<()> {
-    state.db.delete_product(id).await
+async fn delete_product(state: RequestState, Path(id): Path<u64>) -> ServiceResult<StatusCode> {
+    state.db.delete_product(id).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 fn delete_product_docs(op: TransformOperation) -> TransformOperation {
     op.description("Delete an existing product.")
-        .response::<200, ()>()
-        .response::<404, ()>()
-        .response::<500, ()>()
+        .response_with::<204, (), _>(|res| res.description("The product was successfully deleted!"))
+        .response_with::<404, (), _>(|res| res.description("The requested product does not exist!"))
 }
 
 pub async fn get_product_image(
@@ -206,15 +203,14 @@ pub async fn get_product_image(
 fn get_product_image_docs(op: TransformOperation) -> TransformOperation {
     op.description("Get the image of the given product.")
         .response::<200, Bytes>()
-        .response::<404, ()>()
-        .response::<500, ()>()
+        .response_with::<404, (), _>(|res| res.description("The requested product image does not exist!"))
 }
 
 async fn upload_product_image(
     state: RequestState,
     Path(id): Path<u64>,
     mut multipart: Multipart,
-) -> ServiceResult<()> {
+) -> ServiceResult<StatusCode> {
     while let Ok(Some(field)) = multipart.next_field().await {
         let content_type = field.content_type().unwrap_or("").to_lowercase();
         if SUPPORTED_IMAGE_TYPES.iter().any(|t| *t == content_type) {
@@ -223,30 +219,30 @@ async fn upload_product_image(
                     data: data.to_vec(),
                     mimetype: content_type,
                 };
-                return state.db.store_product_image(id, image).await;
+                state.db.store_product_image(id, image).await?;
+                return Ok(StatusCode::NO_CONTENT);
             }
         }
     }
 
-    Ok(())
+    Err(ServiceError::NotFound)
 }
 
 fn upload_product_image_docs(op: TransformOperation) -> TransformOperation {
     op.description("Update the image of the given product.")
-        .response::<200, ()>()
-        .response::<404, ()>()
-        .response::<500, ()>()
+        .response_with::<204, (), _>(|res| res.description("The product image was successfully updated!"))
+        .response_with::<404, (), _>(|res| res.description("The requested product does not exist!"))
 }
 
-async fn delete_product_image(state: RequestState, Path(id): Path<u64>) -> ServiceResult<()> {
-    state.db.delete_product_image(id).await
+async fn delete_product_image(state: RequestState, Path(id): Path<u64>) -> ServiceResult<StatusCode> {
+    state.db.delete_product_image(id).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 fn delete_product_image_docs(op: TransformOperation) -> TransformOperation {
     op.description("Remove the image from the given product.")
-        .response::<200, ()>()
-        .response::<404, ()>()
-        .response::<500, ()>()
+        .response_with::<204, (), _>(|res| res.description("The product image was successfully deleted!"))
+        .response_with::<404, (), _>(|res| res.description("The requested product does not exist!"))
 }
 
 pub struct ImageResult {
