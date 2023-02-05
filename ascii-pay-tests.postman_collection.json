@@ -16,6 +16,9 @@
 							"listen": "test",
 							"script": {
 								"exec": [
+									"const jsonResponse = pm.response.json();",
+									"pm.globals.set(\"admin_account_id\", jsonResponse.id);",
+									"",
 									"pm.test(\"Status test\", function () {",
 									"    pm.response.to.have.status(200);",
 									"});"
@@ -148,6 +151,9 @@
 							"listen": "test",
 							"script": {
 								"exec": [
+									"const jsonResponse = pm.response.json();",
+									"pm.globals.set(\"member_account_id\", jsonResponse.id);",
+									"",
 									"pm.test(\"Status test\", function () {",
 									"    pm.response.to.have.status(200);",
 									"});"
@@ -210,7 +216,7 @@
 							}
 						},
 						"url": {
-							"raw": "{{base_url}}/api/v1/account/2",
+							"raw": "{{base_url}}/api/v1/account/{{member_account_id}}",
 							"host": [
 								"{{base_url}}"
 							],
@@ -218,7 +224,7 @@
 								"api",
 								"v1",
 								"account",
-								"2"
+								"{{member_account_id}}"
 							]
 						}
 					},
@@ -246,7 +252,7 @@
 						"method": "POST",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/api/v1/account/2/password-reset-token",
+							"raw": "{{base_url}}/api/v1/account/{{member_account_id}}/password-reset-token",
 							"host": [
 								"{{base_url}}"
 							],
@@ -254,7 +260,7 @@
 								"api",
 								"v1",
 								"account",
-								"2",
+								"{{member_account_id}}",
 								"password-reset-token"
 							]
 						}
@@ -546,7 +552,7 @@
 							}
 						},
 						"url": {
-							"raw": "{{base_url}}/api/v1/account/2/password-authentication",
+							"raw": "{{base_url}}/api/v1/account/{{member_account_id}}/password-authentication",
 							"host": [
 								"{{base_url}}"
 							],
@@ -554,7 +560,7 @@
 								"api",
 								"v1",
 								"account",
-								"2",
+								"{{member_account_id}}",
 								"password-authentication"
 							]
 						}
@@ -601,6 +607,8 @@
 							"listen": "test",
 							"script": {
 								"exec": [
+									"pm.globals.unset(\"member_account_id\");",
+									"",
 									"pm.test(\"Status test\", function () {",
 									"    pm.response.to.have.status(204);",
 									"});"
@@ -613,7 +621,7 @@
 						"method": "DELETE",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/api/v1/account/2",
+							"raw": "{{base_url}}/api/v1/account/{{member_account_id}}",
 							"host": [
 								"{{base_url}}"
 							],
@@ -621,7 +629,7 @@
 								"api",
 								"v1",
 								"account",
-								"2"
+								"{{member_account_id}}"
 							]
 						}
 					},
@@ -655,6 +663,91 @@
 								"v1",
 								"auth",
 								"account"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Teardown",
+			"item": [
+				{
+					"name": "Login admin account",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const jsonResponse = pm.response.json();",
+									"pm.globals.set(\"auth_token\", jsonResponse.token);",
+									"",
+									"pm.test(\"Status test\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password\"\n}\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/auth/password",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"password"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete admin account",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.globals.unset(\"admin_account_id\");",
+									"",
+									"pm.test(\"Status test\", function () {",
+									"    pm.response.to.have.status(204);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/account/{{admin_account_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"account",
+								"{{admin_account_id}}"
 							]
 						}
 					},
