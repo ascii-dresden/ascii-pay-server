@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use aide::axum::routing::get_with;
+use aide::axum::routing::{get_with, post_with};
 use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
 use axum::extract::Path;
@@ -13,6 +13,8 @@ use crate::database::AppState;
 use crate::error::{ServiceError, ServiceResult};
 use crate::models;
 use crate::request_state::RequestState;
+
+use super::password_hash_create;
 
 pub fn router(app_state: AppState) -> ApiRouter {
     ApiRouter::new()
@@ -33,6 +35,10 @@ pub fn router(app_state: AppState) -> ApiRouter {
                 list_accounts_for_public_tab_board,
                 list_accounts_for_public_tab_board_docs,
             ),
+        )
+        .api_route(
+            "/create-admin-account",
+            post_with(create_admin_account, create_admin_account_docs),
         )
         .with_state(app_state)
 }
@@ -344,4 +350,55 @@ fn delete_account_docs(op: TransformOperation) -> TransformOperation {
         .response_with::<401, (), _>(|res| res.description("Missing login!"))
         .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
         .security_requirement_scopes("SessionToken", ["admin", "self"])
+}
+
+#[derive(Debug, PartialEq, Deserialize, JsonSchema)]
+pub struct CreateAdminAccountDto {
+    pub name: String,
+    pub email: String,
+    pub username: String,
+    pub password: String,
+}
+
+async fn create_admin_account(
+    mut state: RequestState,
+    form: Json<CreateAdminAccountDto>,
+) -> ServiceResult<Json<AccountDto>> {
+    let accounts = state.db.get_all_accounts().await?;
+    let admin_account_found = accounts
+        .iter()
+        .any(|a| matches!(a.role, models::Role::Admin));
+    if admin_account_found {
+        return Err(ServiceError::NotFound);
+    }
+
+    let form = form.0;
+
+    let mut account = models::Account {
+        id: 0,
+        balance: models::CoinAmount(HashMap::new()),
+        name: form.name,
+        email: form.email,
+        role: models::Role::Admin,
+        auth_methods: Vec::new(),
+    };
+
+    account
+        .auth_methods
+        .push(models::AuthMethod::PasswordBased(models::AuthPassword {
+            username: form.username,
+            password_hash: password_hash_create(&form.password)?,
+        }));
+
+    let account = state.db.store_account(account).await?;
+    Ok(Json(AccountDto::from(&account)))
+}
+
+fn create_admin_account_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Create an initial admin account.")
+        .tag("accounts")
+        .response::<200, Json<AccountDto>>()
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin"])
 }

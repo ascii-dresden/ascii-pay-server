@@ -3,7 +3,6 @@ use std::ops::Add;
 use aide::axum::routing::{get_with, post_with};
 use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
-use argon2rs::verifier::Encoded;
 use axum::http::StatusCode;
 use axum::Json;
 use base64::engine::general_purpose;
@@ -17,7 +16,7 @@ use crate::error::{ServiceError, ServiceResult};
 use crate::models;
 use crate::request_state::RequestState;
 
-use super::mifare;
+use super::{mifare, password_hash_verify};
 
 pub fn router(app_state: AppState) -> ApiRouter {
     ApiRouter::new()
@@ -314,12 +313,4 @@ fn auth_delete_docs(op: TransformOperation) -> TransformOperation {
     op.description("Logout the current session.")
         .tag("auth")
         .response_with::<204, (), _>(|res| res.description("Logout was successfull!"))
-}
-
-fn password_hash_verify(hash: &[u8], password: &str) -> ServiceResult<bool> {
-    if let Ok(enc) = Encoded::from_u8(hash) {
-        return Ok(enc.verify(password.as_bytes()));
-    }
-
-    Ok(false)
 }
