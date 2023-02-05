@@ -9,10 +9,10 @@ use log::error;
 use serde::{Deserialize, Serialize};
 use sqlx::migrate::Migrator;
 use sqlx::postgres::PgPoolOptions;
-use sqlx::{Pool, Postgres};
-use tokio::sync::Mutex;
 use sqlx::types::Json;
 use sqlx::{PgPool, Row};
+use sqlx::{Pool, Postgres};
+use tokio::sync::Mutex;
 
 use crate::error::{ServiceError, ServiceResult};
 use crate::models::{
@@ -35,7 +35,7 @@ pub struct AppState {
 }
 
 #[derive(sqlx::Type)]
-#[sqlx(type_name = "tp_account_role", rename_all="lowercase")]
+#[sqlx(type_name = "tp_account_role", rename_all = "lowercase")]
 enum AccountRoleDto {
     Basic,
     Member,
