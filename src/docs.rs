@@ -1,10 +1,7 @@
 use std::sync::Arc;
 
 use aide::{
-    axum::{
-        routing::{get, get_with},
-        ApiRouter, IntoApiResponse,
-    },
+    axum::{routing::get, ApiRouter, IntoApiResponse},
     openapi::{OpenApi, Tag},
     redoc::Redoc,
     transform::TransformOpenApi,

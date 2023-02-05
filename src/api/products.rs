@@ -74,7 +74,7 @@ impl From<&models::Product> for ProductDto {
     }
 }
 
-pub async fn list_products(state: RequestState) -> ServiceResult<Json<Vec<ProductDto>>> {
+pub async fn list_products(mut state: RequestState) -> ServiceResult<Json<Vec<ProductDto>>> {
     let products = state.db.get_all_products().await?;
     Ok(Json(products.iter().map(|p| p.into()).collect()))
 }
@@ -86,7 +86,7 @@ fn list_products_docs(op: TransformOperation) -> TransformOperation {
 }
 
 pub async fn get_product(
-    state: RequestState,
+    mut state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<Json<ProductDto>> {
     let product = state.db.get_product_by_id(id).await?;
@@ -117,7 +117,7 @@ pub struct SaveProductDto {
 }
 
 async fn create_product(
-    state: RequestState,
+    mut state: RequestState,
     form: Json<SaveProductDto>,
 ) -> ServiceResult<Json<ProductDto>> {
     state.session_require_admin()?;
@@ -150,7 +150,7 @@ fn create_product_docs(op: TransformOperation) -> TransformOperation {
 }
 
 async fn update_product(
-    state: RequestState,
+    mut state: RequestState,
     Path(id): Path<u64>,
     form: Json<SaveProductDto>,
 ) -> ServiceResult<Json<ProductDto>> {
@@ -185,7 +185,7 @@ fn update_product_docs(op: TransformOperation) -> TransformOperation {
         .security_requirement_scopes("SessionToken", ["admin"])
 }
 
-async fn delete_product(state: RequestState, Path(id): Path<u64>) -> ServiceResult<StatusCode> {
+async fn delete_product(mut state: RequestState, Path(id): Path<u64>) -> ServiceResult<StatusCode> {
     state.session_require_admin()?;
 
     state.db.delete_product(id).await?;
@@ -203,7 +203,7 @@ fn delete_product_docs(op: TransformOperation) -> TransformOperation {
 }
 
 pub async fn get_product_image(
-    state: RequestState,
+    mut state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<ImageResult> {
     let image = state.db.get_product_image(id).await?;
@@ -230,7 +230,7 @@ fn get_product_image_docs(op: TransformOperation) -> TransformOperation {
 }
 
 async fn upload_product_image(
-    state: RequestState,
+    mut state: RequestState,
     Path(id): Path<u64>,
     mut multipart: Multipart,
 ) -> ServiceResult<StatusCode> {
@@ -266,7 +266,7 @@ fn upload_product_image_docs(op: TransformOperation) -> TransformOperation {
 }
 
 async fn delete_product_image(
-    state: RequestState,
+    mut state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<StatusCode> {
     state.session_require_admin()?;

@@ -16,7 +16,8 @@ use tokio::sync::Mutex;
 
 use crate::error::{ServiceError, ServiceResult};
 use crate::models::{
-    self, Account, AuthMethod, AuthNfc, AuthPassword, CardType, CoinAmount, CoinType, Role, AuthMethodType, Session,
+    self, Account, AuthMethod, AuthMethodType, AuthNfc, AuthPassword, CardType, CoinAmount,
+    CoinType, Role, Session,
 };
 
 mod migration;
@@ -179,7 +180,7 @@ impl From<AuthMethod> for AccountAuthMethodData {
 }
 
 #[derive(sqlx::Type)]
-#[sqlx(type_name = "tp_auth_method_kind", rename_all="snake_case")]
+#[sqlx(type_name = "tp_auth_method_kind", rename_all = "snake_case")]
 enum AuthMethodTypeDto {
     Password,
     Nfc,
@@ -202,7 +203,6 @@ impl From<AuthMethodType> for AuthMethodTypeDto {
             AuthMethodType::PasswordBased => AuthMethodTypeDto::Password,
             AuthMethodType::NfcBased => AuthMethodTypeDto::Nfc,
             AuthMethodType::PublicTab => AuthMethodTypeDto::PublicTab,
-
         }
     }
 }
@@ -354,11 +354,13 @@ impl DatabaseConnection {
         valid_until: DateTime<Utc>,
         is_single_use: bool,
     ) -> ServiceResult<String> {
-        let r = sqlx::query(r#"
+        let r = sqlx::query(
+            r#"
             INSERT INTO session (account_id, auth_method, valid_until, is_single_use) VALUES
                 ($1, $2, $3, $4)
             RETURNING CAST(uuid AS TEXT)
-        "#)
+        "#,
+        )
         .bind(i64::try_from(account).expect("account id is less than 2**63"))
         .bind(AuthMethodTypeDto::from(auth_method))
         .bind(valid_until)
@@ -371,9 +373,14 @@ impl DatabaseConnection {
     }
 
     pub async fn delete_session_token(&mut self, session_token: String) -> ServiceResult<()> {
-        let r = sqlx::query(r#"
+        let r = sqlx::query(
+            r#"
             DELETE FROM session WHERE uuid = CAST($1 as UUID)
-        "#).bind(session_token).execute(&mut self.connection).await;
+        "#,
+        )
+        .bind(session_token)
+        .execute(&mut self.connection)
+        .await;
         to_service_result(r)?;
         Ok(())
     }
@@ -473,9 +480,11 @@ impl DatabaseConnection {
     }
 
     pub async fn delete_account(&mut self, id: u64) -> ServiceResult<()> {
-        let r = sqlx::query(r#"
+        let r = sqlx::query(
+            r#"
             DELETE FROM account WHERE id = $1
-        "#)
+        "#,
+        )
         .bind(i64::try_from(id).expect("account id is less than 2**63"))
         .execute(&mut self.connection)
         .await;
@@ -483,49 +492,59 @@ impl DatabaseConnection {
         Ok(())
     }
 
-    pub async fn get_all_products(&self) -> ServiceResult<Vec<models::Product>> {
+    pub async fn get_all_products(&mut self) -> ServiceResult<Vec<models::Product>> {
         panic!("TODO")
     }
 
-    pub async fn get_product_by_id(&self, id: u64) -> ServiceResult<Option<models::Product>> {
+    pub async fn get_product_by_id(&mut self, id: u64) -> ServiceResult<Option<models::Product>> {
         panic!("TODO")
     }
 
-    pub async fn store_product(&self, product: models::Product) -> ServiceResult<models::Product> {
+    pub async fn store_product(
+        &mut self,
+        product: models::Product,
+    ) -> ServiceResult<models::Product> {
         panic!("TODO")
     }
 
-    pub async fn delete_product(&self, id: u64) -> ServiceResult<()> {
+    pub async fn delete_product(&mut self, id: u64) -> ServiceResult<()> {
         panic!("TODO")
     }
 
-    pub async fn get_product_image(&self, id: u64) -> ServiceResult<Option<models::Image>> {
+    pub async fn get_product_image(&mut self, id: u64) -> ServiceResult<Option<models::Image>> {
         panic!("TODO")
     }
 
-    pub async fn store_product_image(&self, id: u64, image: models::Image) -> ServiceResult<()> {
+    pub async fn store_product_image(
+        &mut self,
+        id: u64,
+        image: models::Image,
+    ) -> ServiceResult<()> {
         panic!("TODO")
     }
 
-    pub async fn delete_product_image(&self, id: u64) -> ServiceResult<()> {
+    pub async fn delete_product_image(&mut self, id: u64) -> ServiceResult<()> {
         panic!("TODO")
     }
 
     pub async fn get_transactions_by_account(
-        &self,
+        &mut self,
         account_id: u64,
     ) -> ServiceResult<Vec<models::Transaction>> {
         panic!("TODO")
     }
 
     pub async fn get_transaction_by_id(
-        &self,
+        &mut self,
         id: u64,
     ) -> ServiceResult<Option<models::Transaction>> {
         panic!("TODO")
     }
 
-    pub async fn payment(&self, payment: models::Payment) -> ServiceResult<models::Transaction> {
+    pub async fn payment(
+        &mut self,
+        payment: models::Payment,
+    ) -> ServiceResult<models::Transaction> {
         panic!("TODO")
     }
 }
