@@ -8,23 +8,21 @@ edition = "2021"
 [dependencies]
 
 axum = { version="0.6.4", features=["multipart", "headers"] }
-tower-http = { version = "0.3", features = ["limit","cors","compression-br"] }
+tower-http = { version = "0.3", features = ["cors", "compression-br"] }
 tokio = { version = "1.25.0", features = ["full"] }
-sqlx = { version = "0.6.2", features = ["runtime-tokio-rustls", "any", "postgres"] }
+sqlx = { version = "0.6.2", features = ["runtime-tokio-rustls", "postgres"] }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version="1.0.91" }
 argon2rs = { version="0.2.5", default-features = false }
 base64 = { version="0.21.0" }
-aide = { version="0.10.0", features=["redoc", "axum", "axum-extra", "macros", "axum-multipart"] }
+aide = { version="0.10.0", features=["redoc", "axum", "axum-multipart"] }
 schemars = { version = "0.8.11" }
 headers = "0.3.8"
-jsonwebtoken = "8.2.0"
 
 block-modes = "0.8"
 des = "0.7"
 generic-array = "0.14"
 hex-literal = "0.3"
-rand_core = "0.6"
 rand = "0.8"
 
 dotenv = "0.15.0"
