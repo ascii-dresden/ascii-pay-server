@@ -185,6 +185,7 @@ enum AuthMethodTypeDto {
     Password,
     Nfc,
     PublicTab,
+    PasswordResetToken,
 }
 
 impl From<AuthMethodTypeDto> for AuthMethodType {
@@ -193,6 +194,7 @@ impl From<AuthMethodTypeDto> for AuthMethodType {
             AuthMethodTypeDto::Password => AuthMethodType::PasswordBased,
             AuthMethodTypeDto::Nfc => AuthMethodType::NfcBased,
             AuthMethodTypeDto::PublicTab => AuthMethodType::PublicTab,
+            AuthMethodTypeDto::PasswordResetToken => AuthMethodType::PasswordResetToken,
         }
     }
 }
@@ -203,6 +205,7 @@ impl From<AuthMethodType> for AuthMethodTypeDto {
             AuthMethodType::PasswordBased => AuthMethodTypeDto::Password,
             AuthMethodType::NfcBased => AuthMethodTypeDto::Nfc,
             AuthMethodType::PublicTab => AuthMethodTypeDto::PublicTab,
+            AuthMethodType::PasswordResetToken => AuthMethodTypeDto::PasswordResetToken,
         }
     }
 }

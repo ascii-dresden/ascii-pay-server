@@ -49,6 +49,7 @@ pub enum AuthRequest {
     PasswordBased { username: String },
     NfcBased { card_id: Vec<u8> },
     PublicTab { account_id: u64 },
+    PasswordResetToken { token: String },
 }
 
 impl AuthRequest {
@@ -67,6 +68,11 @@ impl AuthRequest {
             AuthRequest::PublicTab { account_id } => {
                 let mut out = vec![3u8];
                 out.extend_from_slice(&account_id.to_le_bytes());
+                out
+            }
+            AuthRequest::PasswordResetToken { token } => {
+                let mut out = vec![4u8];
+                out.extend_from_slice(token.as_bytes());
                 out
             }
         }
@@ -172,6 +178,7 @@ pub enum AuthMethodType {
     PasswordBased,
     NfcBased,
     PublicTab,
+    PasswordResetToken,
 }
 
 #[derive(Debug, PartialEq)]

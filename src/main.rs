@@ -32,7 +32,7 @@ async fn main() {
     let db_connection_str = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://ascii:ascii@localhost:5432/ascii-pay".to_string());
 
-    let api_host = std::env::var("API_HOST").unwrap_or_else(|_| "localhost".to_string());
+    let api_host = std::env::var("API_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
 
     let api_port = std::env::var("API_PORT").unwrap_or_else(|_| "3000".to_string());
 

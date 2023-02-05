@@ -2,10 +2,10 @@
 --##1 initial schema
 CREATE TYPE tp_account_role AS ENUM ('basic', 'member', 'admin');
 CREATE TABLE account (
-    id BIGINT 
+    id BIGINT
         -- the id zero is reserved (for "unset")
-        GENERATED ALWAYS AS IDENTITY (START WITH 1) 
-        PRIMARY KEY 
+        GENERATED ALWAYS AS IDENTITY (START WITH 1)
+        PRIMARY KEY
         CHECK (id > 0),
     balance_cents INT NOT NULL,
     balance_coffee_stamps INT NOT NULL,
@@ -34,10 +34,10 @@ CREATE TABLE account_auth_method (
 CREATE INDEX idx_account_auth_method_login_key ON account_auth_method(login_key);
 
 CREATE TABLE product (
-    id BIGINT 
+    id BIGINT
         -- the id zero is reserved (for "unset")
-        GENERATED ALWAYS AS IDENTITY (START WITH 1) 
-        PRIMARY KEY 
+        GENERATED ALWAYS AS IDENTITY (START WITH 1)
+        PRIMARY KEY
         CHECK (id > 0),
     name TEXT NOT NULL,
     price_cents INT,
@@ -67,10 +67,10 @@ CREATE TABLE transaction_item (
 );
 
 CREATE TABLE transaction (
-    id BIGINT 
+    id BIGINT
       -- the id zero is reserved (for "unset")
-        GENERATED ALWAYS AS IDENTITY (START WITH 1) 
-        PRIMARY KEY 
+        GENERATED ALWAYS AS IDENTITY (START WITH 1)
+        PRIMARY KEY
         CHECK (id > 0),
     timestamp TIMESTAMP WITH TIME ZONE,
     account_id BIGINT,
@@ -101,4 +101,7 @@ CREATE TABLE session (
         FOREIGN KEY(account_id)
             REFERENCES account(id)
             ON DELETE CASCADE
-);          
+);
+
+--##5 Add password reset link
+ALTER TYPE tp_auth_method_kind ADD VALUE 'password_reset_token';

@@ -97,6 +97,7 @@ impl RequestState {
 
         Err(ServiceError::Forbidden)
     }
+
     pub fn session_require_admin_or_self(&self, account_id: u64) -> ServiceResult<()> {
         if !self.session_is_present() {
             return Err(ServiceError::Unauthorized("Missing login!"));
@@ -112,6 +113,7 @@ impl RequestState {
 
         Err(ServiceError::Forbidden)
     }
+
     pub fn session_require_self(&self) -> ServiceResult<models::Account> {
         if !self.session_is_present() {
             return Err(ServiceError::Unauthorized("Missing login!"));
@@ -122,5 +124,22 @@ impl RequestState {
         }
 
         Err(ServiceError::Forbidden)
+    }
+
+    pub fn session_require_password_reset_token(&self) -> ServiceResult<models::Account> {
+        if !self.session_is_present() {
+            return Err(ServiceError::Unauthorized("Missing login!"));
+        }
+
+        if let Some(ref session) = self.session {
+            if matches!(
+                session.auth_method,
+                models::AuthMethodType::PasswordResetToken
+            ) {
+                return Ok(session.account.clone());
+            }
+        }
+
+        Err(ServiceError::NotFound)
     }
 }
