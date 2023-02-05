@@ -10,7 +10,7 @@ edition = "2021"
 axum = { version="0.6.4", features=["multipart", "headers"] }
 tower-http = { version = "0.3", features = ["cors", "compression-br"] }
 tokio = { version = "1.25.0", features = ["full"] }
-sqlx = { version = "0.6.2", features = ["runtime-tokio-rustls", "postgres"] }
+sqlx = { version = "0.6.2", features = ["runtime-tokio-rustls", "postgres", "json"] }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version="1.0.91" }
 argon2rs = { version="0.2.5", default-features = false }
@@ -24,6 +24,7 @@ des = "0.7"
 generic-array = "0.14"
 hex-literal = "0.3"
 rand = "0.8"
+futures = { version = "0.3.26" }
 
 dotenv = "0.15.0"
 log = "0.4.17"

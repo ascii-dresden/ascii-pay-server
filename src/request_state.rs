@@ -40,7 +40,7 @@ where
             .acquire()
             .await
             .map_err(|err| ServiceError::InternalServerError(err.to_string()))?;
-        let db = DatabaseConnection { connection };
+        let mut db = DatabaseConnection { connection };
 
         let session = if let Ok(TypedHeader(Authorization(bearer))) =
             parts.extract::<TypedHeader<Authorization<Bearer>>>().await

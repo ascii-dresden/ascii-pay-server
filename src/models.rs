@@ -1,33 +1,33 @@
 #![allow(unused)]
 use std::{collections::HashMap, fmt::Debug, time::Instant};
 
-#[derive(Debug, PartialEq, Hash, Eq)]
+#[derive(Debug, PartialEq, Hash, Eq, Clone, Copy)]
 pub enum CoinType {
     Cent,
     CoffeeStamp,
     BottleStamp,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Role {
     Basic,
     Member,
     Admin,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum CardType {
     NfcId,
     AsciiMifare,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct AuthPassword {
     pub username: String,
     pub password_hash: Vec<u8>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct AuthNfc {
     pub name: String,
     pub card_id: Vec<u8>,
@@ -35,7 +35,7 @@ pub struct AuthNfc {
     pub data: Vec<u8>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AuthMethod {
     PasswordBased(AuthPassword),
     NfcBased(AuthNfc),
@@ -43,6 +43,45 @@ pub enum AuthMethod {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum AuthRequest {
+    PasswordBased { username: String },
+    NfcBased { card_id: Vec<u8> },
+    PublicTab { account_id: u64 },
+}
+
+impl AuthRequest {
+    pub fn login_key(&self) -> Vec<u8> {
+        match self {
+            AuthRequest::PasswordBased { username } => {
+                let mut out = vec![1u8];
+                out.extend_from_slice(username.as_bytes());
+                out
+            }
+            AuthRequest::NfcBased { card_id } => {
+                let mut out = vec![2u8];
+                out.extend_from_slice(card_id);
+                out
+            }
+            AuthRequest::PublicTab { account_id } => {
+                let mut out = vec![3u8];
+                out.extend_from_slice(&account_id.to_le_bytes());
+                out
+            }
+        }
+    }
+}
+
+impl AuthMethod {
+    pub fn to_request(&self, account_id: u64) -> AuthRequest {
+        match self {
+            AuthMethod::PasswordBased(auth) => AuthRequest::PasswordBased { username: auth.username.clone() },
+            AuthMethod::NfcBased(auth) => AuthRequest::NfcBased { card_id: auth.card_id.clone() },
+            AuthMethod::PublicTab => AuthRequest::PublicTab { account_id },
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct Account {
     pub id: u64,
     pub balance: CoinAmount,
@@ -67,8 +106,17 @@ impl Debug for Image {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct CoinAmount(pub HashMap<CoinType, i32>);
+impl CoinAmount {
+    pub fn zero() -> Self {
+        CoinAmount([
+            (CoinType::Cent, 0),
+            (CoinType::CoffeeStamp, 0),
+            (CoinType::BottleStamp, 0),
+        ].into_iter().collect())
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub struct Product {

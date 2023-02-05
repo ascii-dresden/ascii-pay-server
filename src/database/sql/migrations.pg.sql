@@ -79,9 +79,12 @@ CREATE TABLE transaction (
         FOREIGN KEY(account_id)
             REFERENCES account(id)
             ON DELETE SET NULL
-)
+);
 --##2 Unique constraint on login key
 ALTER INDEX idx_account_auth_method_login_key RENAME TO idx_account_auth_method_login_key_old;
 CREATE UNIQUE INDEX idx_account_auth_method_login_key ON account_auth_method(login_key);
-ALTER TABLE account_auth_method ADD CONSTRAINT unique_login_key UNIQUE USING INDEX idx_account_auth_method_login_key;
+ALTER TABLE account_auth_method ADD CONSTRAINT unique_account_auth_login_key UNIQUE USING INDEX idx_account_auth_method_login_key;
 DROP INDEX idx_account_auth_method_login_key_old;
+
+--##3 Remove kind column from auth method table
+ALTER TABLE account_auth_method DROP COLUMN kind;

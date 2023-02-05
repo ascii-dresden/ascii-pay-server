@@ -203,7 +203,7 @@ impl From<&models::Account> for AccountDto {
     }
 }
 
-async fn list_accounts(state: RequestState) -> ServiceResult<Json<Vec<AccountDto>>> {
+async fn list_accounts(mut state: RequestState) -> ServiceResult<Json<Vec<AccountDto>>> {
     let accounts = state.db.get_all_accounts().await?;
     Ok(Json(accounts.iter().map(|a| a.into()).collect()))
 }
@@ -215,7 +215,7 @@ fn list_accounts_docs(op: TransformOperation) -> TransformOperation {
 }
 
 pub async fn get_account(
-    state: RequestState,
+    mut state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<Json<AccountDto>> {
     let account = state.db.get_account_by_id(id).await?;
@@ -242,7 +242,7 @@ pub struct SaveAccountDto {
 }
 
 async fn create_account(
-    state: RequestState,
+    mut state: RequestState,
     form: Json<SaveAccountDto>,
 ) -> ServiceResult<Json<AccountDto>> {
     let form = form.0;
@@ -267,7 +267,7 @@ fn create_account_docs(op: TransformOperation) -> TransformOperation {
 }
 
 async fn update_account(
-    state: RequestState,
+    mut state: RequestState,
     Path(id): Path<u64>,
     form: Json<SaveAccountDto>,
 ) -> ServiceResult<Json<AccountDto>> {
@@ -292,7 +292,7 @@ fn update_account_docs(op: TransformOperation) -> TransformOperation {
         .response::<500, ()>()
 }
 
-async fn delete_account(state: RequestState, Path(id): Path<u64>) -> ServiceResult<()> {
+async fn delete_account(mut state: RequestState, Path(id): Path<u64>) -> ServiceResult<()> {
     state.db.delete_account(id).await
 }
 fn delete_account_docs(op: TransformOperation) -> TransformOperation {
@@ -309,7 +309,7 @@ pub struct SaveAuthPasswordDto {
 }
 
 async fn set_password_authentication(
-    state: RequestState,
+    mut state: RequestState,
     Path(id): Path<u64>,
     form: Json<SaveAuthPasswordDto>,
 ) -> ServiceResult<Json<AccountDto>> {
@@ -341,7 +341,7 @@ fn set_password_authentication_docs(op: TransformOperation) -> TransformOperatio
 }
 
 async fn delete_password_authentication(
-    state: RequestState,
+    mut state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<Json<AccountDto>> {
     let account = state.db.get_account_by_id(id).await?;
@@ -384,7 +384,7 @@ pub struct DeleteAuthNfcDto {
 }
 
 async fn create_nfc_authentication(
-    state: RequestState,
+    mut state: RequestState,
     Path(id): Path<u64>,
     form: Json<CreateAuthNfcDto>,
 ) -> ServiceResult<Json<AccountDto>> {
@@ -428,7 +428,7 @@ fn create_nfc_authentication_docs(op: TransformOperation) -> TransformOperation 
 }
 
 async fn update_nfc_authentication(
-    state: RequestState,
+    mut state: RequestState,
     Path(id): Path<u64>,
     form: Json<UpdateAuthNfcDto>,
 ) -> ServiceResult<Json<AccountDto>> {
@@ -466,7 +466,7 @@ fn update_nfc_authentication_docs(op: TransformOperation) -> TransformOperation 
 }
 
 async fn delete_nfc_authentication(
-    state: RequestState,
+    mut state: RequestState,
     Path(id): Path<u64>,
     form: Json<DeleteAuthNfcDto>,
 ) -> ServiceResult<Json<AccountDto>> {
