@@ -74,6 +74,26 @@ struct AccountRow {
     auth_methods: Vec<Json<AccountAuthMethodData>>,
 }
 
+impl From<AccountRow> for Account {
+    fn from(row: AccountRow) -> Self {
+        Account {
+            id: row
+                .id
+                .try_into()
+                .expect("id in database is always positive"),
+            balance: to_coin_amount(&[
+                (CoinType::Cent, Some(row.balance_cents)),
+                (CoinType::CoffeeStamp, Some(row.balance_coffee_stamps)),
+                (CoinType::BottleStamp, Some(row.balance_bottle_stamps)),
+            ]),
+            name: row.name,
+            email: row.email,
+            role: row.role.into(),
+            auth_methods: row.auth_methods.into_iter().map(|j| j.0.into()).collect(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum CardTypeDto {
@@ -227,34 +247,53 @@ impl DatabaseConnection {
         while let Some(row) = r.next().await {
             let row = to_service_result(row)?;
 
-            out.push(Account {
-                id: row
-                    .id
-                    .try_into()
-                    .expect("id in database is always positive"),
-                balance: to_coin_amount(&[
-                    (CoinType::Cent, Some(row.balance_cents)),
-                    (CoinType::CoffeeStamp, Some(row.balance_coffee_stamps)),
-                    (CoinType::BottleStamp, Some(row.balance_bottle_stamps)),
-                ]),
-                name: row.name,
-                email: row.email,
-                role: row.role.into(),
-                auth_methods: row.auth_methods.into_iter().map(|j| j.0.into()).collect(),
-            })
+            out.push(row.into());
         }
         Ok(out)
     }
 
     pub async fn get_account_by_id(&mut self, id: u64) -> ServiceResult<Option<models::Account>> {
-        panic!("TODO")
+        let r = sqlx::query_as::<_, AccountRow>(
+            r#"
+            SELECT
+                a.id, a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps,
+                a.name, a.email, a.role,
+                coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods
+            FROM account AS a
+            LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
+            WHERE a.id = $1
+            GROUP BY a.id
+        "#)
+        .bind(i64::try_from(id).expect("account id is less than 2**63"))
+        .fetch_optional(&mut self.connection)
+        .await;
+        let r = to_service_result(r)?;
+
+        Ok(r.map(Account::from))
     }
 
     pub async fn get_account_by_auth_method(
         &mut self,
         auth_method: Vec<u8>,
     ) -> ServiceResult<Option<models::Account>> {
-        panic!("TODO")
+        let r = sqlx::query_as::<_, AccountRow>(
+            r#"
+            WITH
+                matching AS (SELECT account_id FROM account_auth_method WHERE login_key = $1)
+            SELECT
+                a.id, a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps,
+                a.name, a.email, a.role,
+                coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods
+            FROM account AS a INNER JOIN matching ON matching.account_id = a.id
+            LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
+            GROUP BY a.id
+        "#)
+        .bind(auth_method)
+        .fetch_optional(&mut self.connection)
+        .await;
+        let r = to_service_result(r)?;
+
+        Ok(r.map(Account::from))
     }
 
     pub async fn create_session_token(
@@ -295,7 +334,8 @@ impl DatabaseConnection {
                 WITH
                     delete AS (DELETE FROM account_auth_method WHERE account_id = $1)
                 UPDATE account
-                WHERE id = $1 SET balance_cents = $2, balance_coffee_stamps = $3, balance_bottle_stamps = $4, name = $5, email = $6, role = $7
+                SET balance_cents = $2, balance_coffee_stamps = $3, balance_bottle_stamps = $4, name = $5, email = $6, role = $7
+                WHERE id = $1
                 RETURNING id
 
             "#).bind(i64::try_from(account.id).expect("account id is less than 2**63"))
