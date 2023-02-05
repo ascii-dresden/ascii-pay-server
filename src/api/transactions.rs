@@ -71,6 +71,8 @@ pub async fn list_transactions(
     state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<Json<Vec<TransactionDto>>> {
+    state.session_require_admin_or_self(id)?;
+
     let transactions = state.db.get_transactions_by_account(id).await?;
     Ok(Json(transactions.iter().map(|t| t.into()).collect()))
 }
@@ -80,12 +82,17 @@ fn list_transactions_docs(op: TransformOperation) -> TransformOperation {
         .tag("transactions")
         .response::<200, Json<Vec<TransactionDto>>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
 }
 
 pub async fn get_transaction(
     state: RequestState,
     Path((account_id, transaction_id)): Path<(u64, u64)>,
 ) -> ServiceResult<Json<TransactionDto>> {
+    state.session_require_admin_or_self(account_id)?;
+
     let transaction = state.db.get_transaction_by_id(transaction_id).await?;
 
     if let Some(transaction) = transaction {
@@ -104,6 +111,9 @@ fn get_transaction_docs(op: TransformOperation) -> TransformOperation {
         .response_with::<404, (), _>(|res| {
             res.description("The requested account or transaction does not exist!")
         })
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
@@ -122,6 +132,8 @@ async fn post_payment(
     Path(id): Path<u64>,
     form: Json<PaymentDto>,
 ) -> ServiceResult<Json<TransactionDto>> {
+    state.session_require_admin_or_self(id)?;
+
     let form = form.0;
 
     let payment = models::Payment {
@@ -145,4 +157,7 @@ fn post_payment_docs(op: TransformOperation) -> TransformOperation {
         .tag("transactions")
         .response::<200, Json<TransactionDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
 }
