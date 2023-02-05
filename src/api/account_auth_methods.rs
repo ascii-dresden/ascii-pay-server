@@ -1,7 +1,6 @@
 use aide::axum::routing::{post_with, put_with};
 use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
-use argon2rs::verifier::Encoded;
 use axum::extract::Path;
 use axum::Json;
 use base64::engine::general_purpose;
@@ -15,6 +14,7 @@ use crate::models;
 use crate::request_state::RequestState;
 
 use super::accounts::{AccountDto, CardTypeDto};
+use super::password_hash_create;
 
 pub fn router(app_state: AppState) -> ApiRouter {
     ApiRouter::new()
@@ -269,10 +269,4 @@ fn delete_nfc_authentication_docs(op: TransformOperation) -> TransformOperation 
         .response_with::<401, (), _>(|res| res.description("Missing login!"))
         .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
         .security_requirement_scopes("SessionToken", ["admin", "self"])
-}
-
-fn password_hash_create(password: &str) -> ServiceResult<Vec<u8>> {
-    let bytes =
-        Encoded::default2i(password.as_bytes(), "SALTSALTSALT".as_bytes(), b"", b"").to_u8();
-    Ok(bytes)
 }
