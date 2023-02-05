@@ -1,11 +1,52 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Add};
 
+use chrono::{Utc, Duration};
 use futures::StreamExt;
 use sqlx::PgPool;
 
-use crate::models::{Account, AuthMethod, AuthNfc, AuthPassword, CardType, CoinAmount, Role};
+use crate::models::{Account, AuthMethod, AuthNfc, AuthPassword, CardType, CoinAmount, Role, AuthMethodType};
 
 use super::{AppState, DatabaseConnection};
+
+#[sqlx::test]
+async fn test_session_crud(pool: PgPool) {
+    env_logger::init();
+    let app_state = AppState::from_pool(pool).await;
+    let mut db = DatabaseConnection {
+        connection: app_state.pool.acquire().await.unwrap(),
+    };
+
+    let john_pw = AuthMethod::PasswordBased(AuthPassword {
+        username: "johndoe".to_string(),
+        password_hash: vec![13u8; 32],
+    });
+    let acc1 = Account {
+        name: "John Doe".to_string(),
+        email: "john.doe@example.org".to_string(),
+        id: 0,
+        balance: CoinAmount(HashMap::new()),
+        role: Role::Basic,
+        auth_methods: vec![john_pw.clone()],
+    };
+    let acc1 = db.store_account(acc1).await.unwrap();
+
+    let token = db.create_session_token(acc1.id, AuthMethodType::PasswordBased, Utc::now().add(Duration::minutes(30)), false).await.unwrap();
+    let session = db.get_session_by_session_token(token.clone()).await.unwrap();
+    let session = session.expect("there is a session for the token");
+
+    assert_eq!(session.account, acc1);
+    assert_eq!(session.auth_method, AuthMethodType::PasswordBased);
+    assert_eq!(session.is_single_use, false);
+    assert_eq!(session.token, token.clone());
+
+    db.delete_session_token(token.clone()).await.unwrap();
+    assert_eq!(db.get_session_by_session_token(token).await.unwrap(), None);
+
+    let token = db.create_session_token(acc1.id, AuthMethodType::PasswordBased, Utc::now().add(Duration::minutes(30)), false).await.unwrap();
+    db.delete_account(acc1.id).await.unwrap();
+    assert_eq!(db.get_session_by_session_token(token).await.unwrap(), None);
+
+}
 
 #[sqlx::test]
 async fn test_account_crud(pool: PgPool) {

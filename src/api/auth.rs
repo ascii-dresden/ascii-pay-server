@@ -1,5 +1,4 @@
 use std::ops::Add;
-use std::time::{Duration, Instant};
 
 use aide::axum::routing::{get_with, post_with};
 use aide::axum::ApiRouter;
@@ -9,6 +8,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use base64::engine::general_purpose;
 use base64::Engine;
+use chrono::{Utc, Duration};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -76,7 +76,7 @@ async fn auth_password_based(
                         .create_session_token(
                             account.id,
                             models::AuthMethodType::PasswordBased,
-                            Instant::now().add(Duration::from_secs(30 * 60)),
+                            Utc::now().add(Duration::minutes(30)),
                             false,
                         )
                         .await?;
@@ -126,7 +126,7 @@ async fn auth_nfc_based_nfc_id(
                         .create_session_token(
                             account.id,
                             models::AuthMethodType::PasswordBased,
-                            Instant::now().add(Duration::from_secs(30 * 60)),
+                            Utc::now().add(Duration::minutes(30)),
                             false,
                         )
                         .await?;
@@ -277,7 +277,7 @@ async fn auth_nfc_based_ascii_mifare_response(
                         .create_session_token(
                             account.id,
                             models::AuthMethodType::PasswordBased,
-                            Instant::now().add(Duration::from_secs(30 * 60)),
+                            Utc::now().add(Duration::minutes(30)),
                             false,
                         )
                         .await?;

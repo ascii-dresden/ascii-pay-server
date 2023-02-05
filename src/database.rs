@@ -2,8 +2,8 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
 
+use chrono::{DateTime, Utc};
 use futures::StreamExt;
 use log::error;
 use serde::{Deserialize, Serialize};
@@ -16,7 +16,7 @@ use tokio::sync::Mutex;
 
 use crate::error::{ServiceError, ServiceResult};
 use crate::models::{
-    self, Account, AuthMethod, AuthNfc, AuthPassword, CardType, CoinAmount, CoinType, Role,
+    self, Account, AuthMethod, AuthNfc, AuthPassword, CardType, CoinAmount, CoinType, Role, AuthMethodType, Session,
 };
 
 mod migration;
@@ -178,6 +178,57 @@ impl From<AuthMethod> for AccountAuthMethodData {
     }
 }
 
+#[derive(sqlx::Type)]
+#[sqlx(type_name = "tp_auth_method_kind", rename_all="snake_case")]
+enum AuthMethodTypeDto {
+    Password,
+    Nfc,
+    PublicTab,
+}
+
+impl From<AuthMethodTypeDto> for AuthMethodType {
+    fn from(value: AuthMethodTypeDto) -> Self {
+        match value {
+            AuthMethodTypeDto::Password => AuthMethodType::PasswordBased,
+            AuthMethodTypeDto::Nfc => AuthMethodType::NfcBased,
+            AuthMethodTypeDto::PublicTab => AuthMethodType::PublicTab,
+        }
+    }
+}
+
+impl From<AuthMethodType> for AuthMethodTypeDto {
+    fn from(value: AuthMethodType) -> Self {
+        match value {
+            AuthMethodType::PasswordBased => AuthMethodTypeDto::Password,
+            AuthMethodType::NfcBased => AuthMethodTypeDto::Nfc,
+            AuthMethodType::PublicTab => AuthMethodTypeDto::PublicTab,
+
+        }
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct SessionRow {
+    uuid: String,
+    #[sqlx(flatten)]
+    account: AccountRow,
+    auth_method: AuthMethodTypeDto,
+    valid_until: DateTime<Utc>,
+    is_single_use: bool,
+}
+
+impl From<SessionRow> for Session {
+    fn from(value: SessionRow) -> Self {
+        Session {
+            account: value.account.into(),
+            token: value.uuid,
+            auth_method: value.auth_method.into(),
+            valid_until: value.valid_until,
+            is_single_use: value.is_single_use,
+        }
+    }
+}
+
 impl AppState {
     pub async fn connect(url: &str) -> Self {
         let pool = PgPoolOptions::new()
@@ -300,21 +351,57 @@ impl DatabaseConnection {
         &mut self,
         account: u64,
         auth_method: models::AuthMethodType,
-        valid_until: Instant,
+        valid_until: DateTime<Utc>,
         is_single_use: bool,
     ) -> ServiceResult<String> {
-        panic!("TODO")
+        let r = sqlx::query(r#"
+            INSERT INTO session (account_id, auth_method, valid_until, is_single_use) VALUES
+                ($1, $2, $3, $4)
+            RETURNING CAST(uuid AS TEXT)
+        "#)
+        .bind(i64::try_from(account).expect("account id is less than 2**63"))
+        .bind(AuthMethodTypeDto::from(auth_method))
+        .bind(valid_until)
+        .bind(is_single_use)
+        .fetch_one(&mut self.connection)
+        .await;
+        let r = to_service_result(r)?;
+
+        Ok(r.get(0))
     }
 
     pub async fn delete_session_token(&mut self, session_token: String) -> ServiceResult<()> {
-        panic!("TODO")
+        let r = sqlx::query(r#"
+            DELETE FROM session WHERE uuid = CAST($1 as UUID)
+        "#).bind(session_token).execute(&mut self.connection).await;
+        to_service_result(r)?;
+        Ok(())
     }
 
     pub async fn get_session_by_session_token(
         &mut self,
         session_token: String,
     ) -> ServiceResult<Option<models::Session>> {
-        panic!("TODO")
+        let r = sqlx::query_as::<_, SessionRow>(r#"
+            WITH
+                fulL_account AS (
+                    SELECT
+                    a.id, a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps,
+                    a.name, a.email, a.role,
+                    coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods
+                    FROM account AS a
+                    LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
+                    GROUP BY a.id
+                )
+            SELECT CAST(session.uuid as TEXT) as uuid, session.auth_method, session.valid_until, session.is_single_use, full_account.*
+            FROM full_account INNER JOIN session on full_account.id = session.account_id
+            WHERE session.valid_until > now() AND session.uuid = CAST($1 as UUID)
+        "#)
+        .bind(session_token)
+        .fetch_optional(&mut self.connection)
+        .await;
+        let r = to_service_result(r)?;
+        Ok(r.map(Session::from))
     }
 
     pub async fn store_account(
@@ -385,8 +472,15 @@ impl DatabaseConnection {
         Ok(account)
     }
 
-    pub async fn delete_account(&self, id: u64) -> ServiceResult<()> {
-        panic!("TODO")
+    pub async fn delete_account(&mut self, id: u64) -> ServiceResult<()> {
+        let r = sqlx::query(r#"
+            DELETE FROM account WHERE id = $1
+        "#)
+        .bind(i64::try_from(id).expect("account id is less than 2**63"))
+        .execute(&mut self.connection)
+        .await;
+        to_service_result(r)?;
+        Ok(())
     }
 
     pub async fn get_all_products(&self) -> ServiceResult<Vec<models::Product>> {
