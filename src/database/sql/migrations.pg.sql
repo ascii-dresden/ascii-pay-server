@@ -88,3 +88,17 @@ DROP INDEX idx_account_auth_method_login_key_old;
 
 --##3 Remove kind column from auth method table
 ALTER TABLE account_auth_method DROP COLUMN kind;
+
+--##4 Add session storage
+CREATE TABLE session (
+    uuid UUID NOT NULL PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id BIGINT NOT NULL,
+    auth_method tp_auth_method_kind NOT NULL,
+    valid_until TIMESTAMPTZ NOT NULL,
+    is_single_use BOOLEAN NOT NULL,
+
+    CONSTRAINT fk_account_id
+        FOREIGN KEY(account_id)
+            REFERENCES account(id)
+            ON DELETE CASCADE
+);          

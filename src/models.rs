@@ -1,6 +1,8 @@
 #![allow(unused)]
 use std::{collections::HashMap, fmt::Debug, time::Instant};
 
+use chrono::{DateTime, Utc};
+
 #[derive(Debug, PartialEq, Hash, Eq, Clone, Copy)]
 pub enum CoinType {
     Cent,
@@ -177,6 +179,6 @@ pub struct Session {
     pub account: Account,
     pub token: String,
     pub auth_method: AuthMethodType,
-    pub valid_until: Instant,
+    pub valid_until: DateTime<Utc>,
     pub is_single_use: bool,
 }
