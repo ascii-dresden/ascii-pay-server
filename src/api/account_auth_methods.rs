@@ -1,3 +1,5 @@
+use std::ops::Add;
+
 use aide::axum::routing::{post_with, put_with};
 use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
@@ -5,8 +7,9 @@ use axum::extract::Path;
 use axum::Json;
 use base64::engine::general_purpose;
 use base64::Engine;
+use chrono::{Duration, Utc};
 use schemars::JsonSchema;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::database::AppState;
 use crate::error::{ServiceError, ServiceResult};
@@ -19,7 +22,7 @@ use super::password_hash_create;
 pub fn router(app_state: AppState) -> ApiRouter {
     ApiRouter::new()
         .api_route(
-            "/account/:id/password_authentication",
+            "/account/:id/password-authentication",
             put_with(
                 set_password_authentication,
                 set_password_authentication_docs,
@@ -30,7 +33,21 @@ pub fn router(app_state: AppState) -> ApiRouter {
             ),
         )
         .api_route(
-            "/account/:id/nfc_authentication",
+            "/account/:id/password-reset-token",
+            post_with(
+                create_password_reset_token,
+                create_password_reset_token_docs,
+            ),
+        )
+        .api_route(
+            "/account-password-reset",
+            post_with(
+                reset_token_password_authentication,
+                reset_token_password_authentication_docs,
+            ),
+        )
+        .api_route(
+            "/account/:id/nfc-authentication",
             post_with(create_nfc_authentication, create_nfc_authentication_docs)
                 .put_with(update_nfc_authentication, update_nfc_authentication_docs)
                 .delete_with(delete_nfc_authentication, delete_nfc_authentication_docs),
@@ -79,6 +96,86 @@ fn set_password_authentication_docs(op: TransformOperation) -> TransformOperatio
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
         .response_with::<401, (), _>(|res| res.description("Missing login!"))
         .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
+}
+
+#[derive(Debug, PartialEq, Serialize, JsonSchema)]
+pub struct PasswordResetTokenDto {
+    pub token: String,
+}
+
+async fn create_password_reset_token(
+    mut state: RequestState,
+    Path(id): Path<u64>,
+) -> ServiceResult<Json<PasswordResetTokenDto>> {
+    state.session_require_admin()?;
+
+    let account = state.db.get_account_by_id(id).await?;
+    if let Some(account) = account {
+        let token = state
+            .db
+            .create_session_token(
+                account.id,
+                models::AuthMethodType::PasswordResetToken,
+                Utc::now().add(Duration::minutes(30)),
+                false,
+            )
+            .await?;
+
+        return Ok(Json(PasswordResetTokenDto { token }));
+    }
+
+    Err(ServiceError::NotFound)
+}
+
+fn create_password_reset_token_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Create a password reset token for the given account.")
+        .tag("account_authentication")
+        .response::<200, Json<AccountDto>>()
+        .response_with::<404, (), _>(|res| {
+            res.description("The requested reset link does not exist!")
+        })
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
+}
+
+async fn reset_token_password_authentication(
+    mut state: RequestState,
+    form: Json<SaveAuthPasswordDto>,
+) -> ServiceResult<Json<AccountDto>> {
+    let mut account = state.session_require_password_reset_token()?;
+
+    if let Some(ref session) = state.session {
+        state
+            .db
+            .delete_session_token(session.token.to_owned())
+            .await?;
+    }
+
+    let form = form.0;
+
+    account
+        .auth_methods
+        .retain_mut(|m| !matches!(m, &mut models::AuthMethod::PasswordBased(_)));
+    account
+        .auth_methods
+        .push(models::AuthMethod::PasswordBased(models::AuthPassword {
+            username: form.username,
+            password_hash: password_hash_create(&form.password)?,
+        }));
+
+    let account = state.db.store_account(account).await?;
+    Ok(Json(AccountDto::from(&account)))
+}
+
+fn reset_token_password_authentication_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Reset username and password for the given reset link.")
+        .tag("account_authentication")
+        .response::<200, Json<AccountDto>>()
+        .response_with::<404, (), _>(|res| {
+            res.description("The requested reset link does not exist!")
+        })
         .security_requirement_scopes("SessionToken", ["admin", "self"])
 }
 
