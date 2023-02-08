@@ -3,7 +3,7 @@ services:
   server:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/server.Dockerfile
     image: asciipay/server:latest
     restart: always
     container_name: "ascii-pay-server"
