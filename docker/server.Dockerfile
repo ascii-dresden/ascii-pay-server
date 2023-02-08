@@ -7,8 +7,14 @@ RUN apk update \
 WORKDIR /usr/src/ascii-pay-server
 ENV CARGO_TERM_COLOR always
 
+RUN echo "fn main() {}" > dummy.rs
+COPY Cargo.toml .
+COPY Cargo.lock .
+RUN sed -i 's#src/main.rs#dummy.rs#' Cargo.toml
+RUN cargo build --release
+RUN sed -i 's#dummy.rs#src/main.rs#' Cargo.toml
 COPY . .
-RUN cargo install --path . --locked
+RUN cargo build --release
 
 FROM alpine:3.16 as dist
 
@@ -18,4 +24,4 @@ RUN apk update \
 WORKDIR /opt/ascii-pay-server
 ENTRYPOINT /opt/ascii-pay-server/ascii-pay-server
 
-COPY --from=build /usr/local/cargo/bin/ascii-pay-server /opt/ascii-pay-server/
+COPY --from=build /usr/src/ascii-pay-server/target/release/ascii-pay-server /opt/ascii-pay-server/

@@ -3,7 +3,7 @@ services:
   server:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/server.Dockerfile
     image: asciipay/server:latest
     restart: always
     container_name: "ascii-pay-server"
@@ -17,7 +17,7 @@ services:
     ports:
       - "3000:3000"
     networks:
-      - default
+      - ascii-pay-server-newman-test-network
   postgres:
     image: postgres:13-alpine
     container_name: "ascii-pay-postgres"
@@ -26,7 +26,9 @@ services:
       - POSTGRES_USER=ascii
       - POSTGRES_PASSWORD=ascii
       - POSTGRES_DB=ascii-pay
-    ports:
-      - "5432:5432"
     networks:
-      - default
+      - ascii-pay-server-newman-test-network
+networks:
+  ascii-pay-server-newman-test-network:
+    name: ascii-pay-server-newman-test-network
+    driver: bridge
