@@ -3,8 +3,12 @@ use std::{collections::HashMap, ops::Add};
 use chrono::{Duration, Utc};
 use sqlx::PgPool;
 
-use crate::models::{
-    Account, AuthMethod, AuthMethodType, AuthNfc, AuthPassword, CardType, CoinAmount, Role,
+use crate::{
+    error::ServiceError,
+    models::{
+        Account, AuthMethod, AuthMethodType, AuthNfc, AuthPassword, CardType, CoinAmount, CoinType,
+        Image, Product, Role,
+    },
 };
 
 use super::{AppState, DatabaseConnection};
@@ -88,7 +92,7 @@ async fn test_account_crud(pool: PgPool) {
     let mut acc1_clone = acc1.clone();
     let mut acc1 = db.store_account(acc1).await.unwrap();
     assert!(acc1.id != 0);
-    acc1_clone.balance = CoinAmount::zero();
+    acc1_clone.balance = CoinAmount(HashMap::new());
     acc1_clone.id = acc1.id;
     assert_eq!(acc1, acc1_clone);
 
@@ -96,7 +100,7 @@ async fn test_account_crud(pool: PgPool) {
         name: "Rich Don".to_string(),
         email: "rich,don@example.com".to_string(),
         id: 0,
-        balance: CoinAmount::zero(),
+        balance: CoinAmount(HashMap::new()),
         role: Role::Member,
         auth_methods: vec![],
     };
@@ -145,4 +149,133 @@ async fn test_account_crud(pool: PgPool) {
             .unwrap(),
         Some(acc1.clone())
     );
+}
+
+#[sqlx::test]
+pub fn test_product_crud(pool: PgPool) {
+    env_logger::builder()
+        .parse_filters("info")
+        .parse_default_env()
+        .init();
+
+    let product1 = Product {
+        id: 0,
+        price: CoinAmount([(CoinType::Cent, 150)].into_iter().collect()),
+        bonus: CoinAmount(HashMap::new()),
+        barcode: Some("barcode".to_string()),
+        category: "category".to_string(),
+        name: "Product 1".to_string(),
+        nickname: Some("nick's test".to_string()),
+        image: Some(Image {
+            data: vec![0x1, 0x2, 0x3],
+            mimetype: "image/png".to_string(),
+        }),
+        tags: vec![],
+    };
+
+    let product2 = Product {
+        id: 0,
+        price: CoinAmount(
+            [(CoinType::Cent, 150), (CoinType::BottleStamp, 10)]
+                .into_iter()
+                .collect(),
+        ),
+        bonus: CoinAmount([(CoinType::BottleStamp, 1)].into_iter().collect()),
+        barcode: Some("123891".to_string()),
+        category: "kaltgetränk".to_string(),
+        nickname: None,
+        name: "testMate".to_string(),
+        image: None,
+        tags: vec!["koffein".to_string()],
+    };
+
+    let product3 = Product {
+        id: 0,
+        name: "Kaffee Crema".to_string(),
+        price: CoinAmount(
+            [(CoinType::Cent, 110), (CoinType::CoffeeStamp, 7)]
+                .into_iter()
+                .collect(),
+        ),
+        bonus: CoinAmount([(CoinType::CoffeeStamp, 1)].into_iter().collect()),
+        barcode: None,
+        category: "heißgetränk".to_string(),
+        nickname: None,
+        image: None,
+        tags: vec![],
+    };
+
+    let app_state = AppState::from_pool(pool).await;
+    let mut db = DatabaseConnection {
+        connection: app_state.pool.acquire().await.unwrap(),
+    };
+
+    let mut product1_clone = product1.clone();
+    let product1 = db.store_product(product1).await.unwrap();
+    product1_clone.id = product1.id;
+    assert_eq!(product1_clone, product1);
+    assert!(product1.id != 0);
+
+    let product2 = db.store_product(product2).await.unwrap();
+    let product3 = db.store_product(product3).await.unwrap();
+
+    let mut product1_no_image = product1.clone();
+    product1_no_image.image = None;
+
+    let mut products = db.get_all_products().await.unwrap();
+    products.sort_by_key(|p| p.id);
+    assert_eq!(
+        products.as_slice(),
+        &[
+            product1_no_image.clone(),
+            product2.clone(),
+            product3.clone(),
+        ]
+    );
+
+    let image2 = Image {
+        data: vec![2, 2, 2, 2, 2, 2, 2, 2],
+        mimetype: "image/jpeg".to_string(),
+    };
+    db.store_product_image(product2.id, image2.clone())
+        .await
+        .unwrap();
+    assert_eq!(
+        db.get_product_image(product1.id).await.unwrap(),
+        product1.image
+    );
+    assert_eq!(
+        db.get_product_image(product2.id).await.unwrap(),
+        Some(image2.clone())
+    );
+    assert_eq!(db.get_product_image(product3.id).await.unwrap(), None);
+
+    // images are not fetched by default
+    assert_eq!(
+        db.get_product_by_id(product2.id).await.unwrap(),
+        Some(product2.clone())
+    );
+
+    db.delete_product_image(product2.id).await.unwrap();
+    assert_eq!(
+        db.get_product_image(product1.id).await.unwrap(),
+        product1.image
+    );
+    assert_eq!(db.get_product_image(product2.id).await.unwrap(), None);
+
+    db.delete_product(product1.id).await.unwrap();
+    assert_eq!(
+        db.store_product_image(product1.id, image2.clone()).await,
+        Err(ServiceError::NotFound)
+    );
+    assert_eq!(
+        db.delete_product(product1.id).await,
+        Err(ServiceError::NotFound)
+    );
+    assert_eq!(db.get_product_image(product1.id).await, Ok(None));
+
+    let mut products = db.get_all_products().await.unwrap();
+    products.sort_by_key(|p| p.id);
+    assert_eq!(products.as_slice(), &[product2.clone(), product3.clone(),]);
+    assert_eq!(db.get_product_by_id(product1.id).await.unwrap(), None);
 }

@@ -103,7 +103,7 @@ pub struct Account {
     pub auth_methods: Vec<AuthMethod>,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub struct Image {
     pub data: Vec<u8>,
     pub mimetype: String,
@@ -112,7 +112,7 @@ pub struct Image {
 impl Debug for Image {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Image")
-            .field("data", &format!("{:?}[..20]", &self.data[..20]))
+            .field("data", &format!("{:?}[..20]", &self.data[..20.min(self.data.len())]))
             .field("mimetype", &self.mimetype)
             .finish()
     }
@@ -134,7 +134,7 @@ impl CoinAmount {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Product {
     pub id: u64,
     pub name: String,
@@ -147,13 +147,13 @@ pub struct Product {
     pub tags: Vec<String>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TransactionItem {
     pub effective_price: CoinAmount,
     pub product: Option<Product>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Transaction {
     pub id: u64,
     pub timestamp: Instant,
@@ -161,19 +161,19 @@ pub struct Transaction {
     pub items: Vec<TransactionItem>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct PaymentItem {
     pub effective_price: CoinAmount,
     pub product_id: Option<u64>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Payment {
     pub account: u64,
     pub items: Vec<PaymentItem>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AuthMethodType {
     PasswordBased,
     NfcBased,
@@ -181,7 +181,7 @@ pub enum AuthMethodType {
     PasswordResetToken,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Session {
     pub account: Account,
     pub token: String,
