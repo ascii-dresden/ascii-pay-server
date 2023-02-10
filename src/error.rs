@@ -6,7 +6,7 @@ use serde_json::json;
 /// Represent errors in the application
 ///
 /// All `ServiceError`s can be transformed to http errors.
-#[derive(Debug, Clone, JsonSchema)]
+#[derive(Debug, Clone, JsonSchema, PartialEq)]
 pub enum ServiceError {
     InternalServerError(String),
     NotFound,

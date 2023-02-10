@@ -17,7 +17,7 @@ use tokio::sync::Mutex;
 use crate::error::{ServiceError, ServiceResult};
 use crate::models::{
     self, Account, AuthMethod, AuthMethodType, AuthNfc, AuthPassword, AuthRequest, CardType,
-    CoinAmount, CoinType, Role, Session,
+    CoinAmount, CoinType, Image, Product, Role, Session,
 };
 
 mod migration;
@@ -278,8 +278,71 @@ fn to_coin_amount(amounts: &[(CoinType, Option<i32>)]) -> CoinAmount {
         amounts
             .iter()
             .filter_map(|(tp, amount)| Some((*tp, (*amount)?)))
+            .filter(|v| v.1 != 0)
             .collect(),
     )
+}
+
+#[derive(sqlx::FromRow)]
+struct ProductImageRow {
+    image: Option<Vec<u8>>,
+    image_mimetype: Option<String>,
+}
+
+impl From<ProductImageRow> for Option<Image> {
+    fn from(value: ProductImageRow) -> Self {
+        match value.image {
+            None => None,
+            Some(data) => {
+                let mimetype = value
+                    .image_mimetype
+                    .expect("if image is Some, mimetype must also be Some");
+                Some(Image { data, mimetype })
+            }
+        }
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct ProductRow {
+    id: i64,
+    name: String,
+    price_cents: i32,
+    price_coffee_stamps: i32,
+    price_bottle_stamps: i32,
+    bonus_cents: i32,
+    bonus_coffee_stamps: i32,
+    bonus_bottle_stamps: i32,
+    nickname: Option<String>,
+    #[sqlx(flatten)]
+    image: ProductImageRow,
+    barcode: Option<String>,
+    category: String,
+    tags: Vec<String>,
+}
+
+impl From<ProductRow> for Product {
+    fn from(value: ProductRow) -> Self {
+        Product {
+            id: value.id.try_into().expect("IDs are non-negative"),
+            name: value.name,
+            price: to_coin_amount(&[
+                (CoinType::Cent, Some(value.price_cents)),
+                (CoinType::BottleStamp, Some(value.price_bottle_stamps)),
+                (CoinType::CoffeeStamp, Some(value.price_coffee_stamps)),
+            ]),
+            bonus: to_coin_amount(&[
+                (CoinType::Cent, Some(value.bonus_cents)),
+                (CoinType::BottleStamp, Some(value.bonus_bottle_stamps)),
+                (CoinType::CoffeeStamp, Some(value.bonus_coffee_stamps)),
+            ]),
+            nickname: value.nickname,
+            image: value.image.into(),
+            barcode: value.barcode,
+            category: value.category,
+            tags: value.tags,
+        }
+    }
 }
 
 impl DatabaseConnection {
@@ -442,9 +505,9 @@ impl DatabaseConnection {
             "#).bind(i64::try_from(account.id).expect("account id is less than 2**63"))
         };
         let r = q
-            .bind(*account.balance.0.entry(CoinType::Cent).or_insert(0))
-            .bind(*account.balance.0.entry(CoinType::CoffeeStamp).or_insert(0))
-            .bind(*account.balance.0.entry(CoinType::BottleStamp).or_insert(0))
+            .bind(account.balance.0.get(&CoinType::Cent).unwrap_or(&0))
+            .bind(account.balance.0.get(&CoinType::CoffeeStamp).unwrap_or(&0))
+            .bind(account.balance.0.get(&CoinType::BottleStamp).unwrap_or(&0))
             .bind(&account.name)
             .bind(&account.email)
             .bind(AccountRoleDto::from(account.role))
@@ -500,26 +563,151 @@ impl DatabaseConnection {
     }
 
     pub async fn get_all_products(&mut self) -> ServiceResult<Vec<models::Product>> {
-        panic!("TODO")
+        let mut r = sqlx::query_as::<_, ProductRow>(
+            r#"
+            SELECT
+                id,
+                name,
+                price_cents,
+                price_coffee_stamps,
+                price_bottle_stamps,
+                bonus_cents,
+                bonus_coffee_stamps,
+                bonus_bottle_stamps,
+                nickname,
+                NULL AS image,
+                NULL AS image_mimetype,
+                barcode,
+                category,
+                tags
+            FROM product
+            "#,
+        )
+        .fetch(&mut self.connection);
+
+        let mut out = Vec::new();
+        while let Some(row) = r.next().await {
+            let row = to_service_result(row)?;
+            out.push(row.into());
+        }
+
+        Ok(out)
     }
 
     pub async fn get_product_by_id(&mut self, id: u64) -> ServiceResult<Option<models::Product>> {
-        panic!("TODO")
+        let r = sqlx::query_as::<_, ProductRow>(
+            r#"
+            SELECT
+                id,
+                name,
+                price_cents,
+                price_coffee_stamps,
+                price_bottle_stamps,
+                bonus_cents,
+                bonus_coffee_stamps,
+                bonus_bottle_stamps,
+                nickname,
+                NULL AS image,
+                NULL AS image_mimetype,
+                barcode,
+                category,
+                tags
+            FROM product
+            WHERE
+                product.id = $1
+            "#,
+        )
+        .bind(i64::try_from(id).expect("ids are less than 2**63"))
+        .fetch_optional(&mut self.connection)
+        .await;
+
+        Ok(to_service_result(r)?.map(Product::from))
     }
 
     pub async fn store_product(
         &mut self,
-        product: models::Product,
+        mut product: models::Product,
     ) -> ServiceResult<models::Product> {
-        panic!("TODO")
+        let r = sqlx::query(
+            r#"
+            INSERT INTO product (
+                name,
+                price_cents,
+                price_coffee_stamps,
+                price_bottle_stamps,
+                bonus_cents,
+                bonus_coffee_stamps,
+                bonus_bottle_stamps,
+                nickname,
+                image,
+                image_mimetype,
+                barcode,
+                category,
+                tags
+            ) VALUES (
+                $1,
+                $2,
+                $3,
+                $4,
+                $5,
+                $6,
+                $7,
+                $8,
+                $9,
+                $10,
+                $11,
+                $12,
+                $13
+            ) RETURNING id
+            "#,
+        )
+        .bind(&product.name)
+        .bind(&product.price.0.get(&CoinType::Cent).unwrap_or(&0))
+        .bind(&product.price.0.get(&CoinType::CoffeeStamp).unwrap_or(&0))
+        .bind(&product.price.0.get(&CoinType::BottleStamp).unwrap_or(&0))
+        .bind(&product.bonus.0.get(&CoinType::Cent).unwrap_or(&0))
+        .bind(&product.bonus.0.get(&CoinType::CoffeeStamp).unwrap_or(&0))
+        .bind(&product.bonus.0.get(&CoinType::BottleStamp).unwrap_or(&0))
+        .bind(&product.nickname)
+        .bind(product.image.as_ref().map(|i| &i.data))
+        .bind(product.image.as_ref().map(|i| &i.mimetype))
+        .bind(&product.barcode)
+        .bind(&product.category)
+        .bind(&product.tags)
+        .fetch_one(&mut self.connection)
+        .await;
+        let r = to_service_result(r)?;
+
+        product.id = r
+            .get::<i64, _>("id")
+            .try_into()
+            .expect("id is always positive");
+        Ok(product)
     }
 
     pub async fn delete_product(&mut self, id: u64) -> ServiceResult<()> {
-        panic!("TODO")
+        let id = i64::try_from(id).expect("id is always less than 2**63");
+        let r = sqlx::query(r#"DELETE FROM product WHERE id = $1"#)
+            .bind(id)
+            .execute(&mut self.connection)
+            .await;
+        let r = to_service_result(r)?;
+        if r.rows_affected() != 1 {
+            return Err(ServiceError::NotFound);
+        }
+        Ok(())
     }
 
     pub async fn get_product_image(&mut self, id: u64) -> ServiceResult<Option<models::Image>> {
-        panic!("TODO")
+        let id = i64::try_from(id).expect("id is always less than 2**63");
+        let r = sqlx::query_as::<_, ProductImageRow>(
+            r#"SELECT image, image_mimetype FROM product WHERE id = $1"#,
+        )
+        .bind(id)
+        .fetch_optional(&mut self.connection)
+        .await;
+        let r = to_service_result(r)?;
+        Ok(r.and_then(From::from))
     }
 
     pub async fn store_product_image(
@@ -527,11 +715,32 @@ impl DatabaseConnection {
         id: u64,
         image: models::Image,
     ) -> ServiceResult<()> {
-        panic!("TODO")
+        let id = i64::try_from(id).expect("id is always less than 2**63");
+        let r = sqlx::query(r#"UPDATE product SET image = $2, image_mimetype = $3 WHERE id = $1"#)
+            .bind(id)
+            .bind(image.data)
+            .bind(image.mimetype)
+            .execute(&mut self.connection)
+            .await;
+        let r = to_service_result(r)?;
+        if r.rows_affected() != 1 {
+            return Err(ServiceError::NotFound);
+        }
+        Ok(())
     }
 
     pub async fn delete_product_image(&mut self, id: u64) -> ServiceResult<()> {
-        panic!("TODO")
+        let id = i64::try_from(id).expect("id is always less than 2**63");
+        let r =
+            sqlx::query(r#"UPDATE product SET image = NULL, image_mimetype = NULL WHERE id = $1"#)
+                .bind(id)
+                .execute(&mut self.connection)
+                .await;
+        let r = to_service_result(r)?;
+        if r.rows_affected() != 1 {
+            return Err(ServiceError::NotFound);
+        }
+        Ok(())
     }
 
     pub async fn get_transactions_by_account(

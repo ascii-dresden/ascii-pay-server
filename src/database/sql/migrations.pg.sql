@@ -105,3 +105,17 @@ CREATE TABLE session (
 
 --##5 Add password reset link
 ALTER TYPE tp_auth_method_kind ADD VALUE 'password_reset_token';
+
+--##6 Add image mimetype
+ALTER TABLE product ADD COLUMN image_mimetype TEXT;
+
+--##7 Product category must be not null
+ALTER TABLE product ALTER COLUMN category SET NOT NULL;
+
+--##8 Prices must be not null 
+ALTER TABLE product ALTER COLUMN price_cents SET NOT NULL;
+ALTER TABLE product ALTER COLUMN price_coffee_stamps SET NOT NULL;
+ALTER TABLE product ALTER COLUMN price_bottle_stamps SET NOT NULL;
+ALTER TABLE product ALTER COLUMN bonus_cents SET NOT NULL;
+ALTER TABLE product ALTER COLUMN bonus_coffee_stamps SET NOT NULL;
+ALTER TABLE product ALTER COLUMN bonus_bottle_stamps SET NOT NULL;
