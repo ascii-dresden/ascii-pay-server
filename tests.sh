@@ -25,7 +25,11 @@ fi
 # Stop on first error
 set -e;
 
-docker compose -f docker-compose.test.yml up -d;
+if [[ $* == *--build* ]]; then
+    docker compose -f docker-compose.test.yml up -d --build;
+else
+    docker compose -f docker-compose.test.yml up -d;
+fi
 
 sleep 1;
 
