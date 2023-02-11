@@ -6,4 +6,13 @@ Integration test are based on a postman collection and executed via `newman`. Al
 
 ```bash
 ./tests.sh
+
+# OR
+
+docker compose up -d postgres
+cargo run
+cd collections
+newman run ascii-pay-tests.postman_collection.json
+cd ..
+docker compose down
 ```

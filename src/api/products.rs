@@ -17,12 +17,13 @@ use crate::request_state::RequestState;
 
 use super::accounts::CoinAmountDto;
 
-const SUPPORTED_IMAGE_TYPES: [&str; 5] = [
+const SUPPORTED_IMAGE_TYPES: [&str; 6] = [
     "image/png",
     "image/jpeg",
     "image/jpg",
     "image/webp",
     "image/svg",
+    "image/svg+xml"
 ];
 
 pub fn router(app_state: AppState) -> ApiRouter {
@@ -235,7 +236,6 @@ async fn upload_product_image(
     mut multipart: Multipart,
 ) -> ServiceResult<StatusCode> {
     state.session_require_admin()?;
-
     while let Ok(Some(field)) = multipart.next_field().await {
         let content_type = field.content_type().unwrap_or("").to_lowercase();
         if SUPPORTED_IMAGE_TYPES.iter().any(|t| *t == content_type) {

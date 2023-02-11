@@ -6,6 +6,8 @@ use aide::transform::TransformOperation;
 use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::Json;
+use base64::engine::general_purpose;
+use base64::Engine;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -146,7 +148,7 @@ pub struct AuthPasswordDto {
 #[derive(Debug, PartialEq, Serialize, JsonSchema)]
 pub struct AuthNfcDto {
     name: String,
-    card_id: Vec<u8>,
+    card_id: String,
     card_type: CardTypeDto,
 }
 
@@ -167,7 +169,7 @@ impl From<&models::AuthMethod> for AuthMethodDto {
             }
             models::AuthMethod::NfcBased(nfc_based) => AuthMethodDto::NfcBased(AuthNfcDto {
                 name: nfc_based.name.to_owned(),
-                card_id: nfc_based.card_id.to_owned(),
+                card_id: general_purpose::STANDARD.encode(nfc_based.card_id.to_owned()),
                 card_type: (&nfc_based.card_type).into(),
             }),
             models::AuthMethod::PublicTab => AuthMethodDto::PublicTab,
