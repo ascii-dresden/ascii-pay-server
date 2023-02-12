@@ -23,7 +23,7 @@ const SUPPORTED_IMAGE_TYPES: [&str; 6] = [
     "image/jpg",
     "image/webp",
     "image/svg",
-    "image/svg+xml"
+    "image/svg+xml",
 ];
 
 pub fn router(app_state: AppState) -> ApiRouter {

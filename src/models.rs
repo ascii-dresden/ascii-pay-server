@@ -112,7 +112,10 @@ pub struct Image {
 impl Debug for Image {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Image")
-            .field("data", &format!("{:?}[..20]", &self.data[..20.min(self.data.len())]))
+            .field(
+                "data",
+                &format!("{:?}[..20]", &self.data[..20.min(self.data.len())]),
+            )
             .field("mimetype", &self.mimetype)
             .finish()
     }
