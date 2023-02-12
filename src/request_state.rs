@@ -7,13 +7,14 @@ use axum::{
     http::request::Parts,
     RequestPartsExt, TypedHeader,
 };
-use headers::{authorization::Bearer, Authorization};
+use headers::{authorization::Bearer, Authorization, Cookie};
 use tokio::sync::Mutex;
 
 use crate::{
     database::{AppState, AppStateAsciiMifareChallenge, DatabaseConnection},
     error::{ServiceError, ServiceResult},
     models::{self, Session},
+    SESSION_COOKIE_NAME,
 };
 
 // we can also write a custom extractor that grabs a connection from the pool
@@ -42,7 +43,15 @@ where
             .map_err(|err| ServiceError::InternalServerError(err.to_string()))?;
         let mut db = DatabaseConnection { connection };
 
-        let session = if let Ok(TypedHeader(Authorization(bearer))) =
+        let session = if let Ok(TypedHeader(cookie)) = parts.extract::<TypedHeader<Cookie>>().await
+        {
+            if let Some(session_token) = cookie.get(SESSION_COOKIE_NAME) {
+                db.get_session_by_session_token(session_token.to_owned())
+                    .await?
+            } else {
+                None
+            }
+        } else if let Ok(TypedHeader(Authorization(bearer))) =
             parts.extract::<TypedHeader<Authorization<Bearer>>>().await
         {
             let session_token = bearer.token().to_owned();

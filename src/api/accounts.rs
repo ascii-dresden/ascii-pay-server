@@ -169,7 +169,7 @@ impl From<&models::AuthMethod> for AuthMethodDto {
             }
             models::AuthMethod::NfcBased(nfc_based) => AuthMethodDto::NfcBased(AuthNfcDto {
                 name: nfc_based.name.to_owned(),
-                card_id: general_purpose::STANDARD.encode(nfc_based.card_id.to_owned()),
+                card_id: general_purpose::STANDARD.encode(&nfc_based.card_id),
                 card_type: (&nfc_based.card_type).into(),
             }),
             models::AuthMethod::PublicTab => AuthMethodDto::PublicTab,

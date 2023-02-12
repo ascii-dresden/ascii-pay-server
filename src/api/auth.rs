@@ -3,18 +3,21 @@ use std::ops::Add;
 use aide::axum::routing::{delete_with, get_with, post_with};
 use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
-use axum::http::StatusCode;
+use aide::OperationOutput;
+use axum::http::{header, StatusCode};
+use axum::response::IntoResponse;
 use axum::Json;
 use base64::engine::general_purpose;
 use base64::Engine;
 use chrono::{Duration, Utc};
+use headers::{HeaderMap, HeaderValue};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::database::AppState;
 use crate::error::{ServiceError, ServiceResult};
-use crate::models;
 use crate::request_state::RequestState;
+use crate::{models, SESSION_COOKIE_NAME};
 
 use super::accounts::AccountDto;
 use super::{mifare, password_hash_verify};
@@ -56,6 +59,26 @@ pub struct AuthTokenDto {
     pub token: String,
 }
 
+impl OperationOutput for AuthTokenDto {
+    type Inner = AuthTokenDto;
+}
+impl IntoResponse for AuthTokenDto {
+    fn into_response(self) -> axum::response::Response {
+        let cookie = HeaderValue::from_str(
+            format!(
+                "{}={}; Path=/api/v1; HttpOnly",
+                SESSION_COOKIE_NAME, self.token
+            )
+            .as_str(),
+        )
+        .unwrap();
+
+        let mut header = HeaderMap::new();
+        header.insert(header::SET_COOKIE, cookie);
+        (StatusCode::OK, header, Json(self)).into_response()
+    }
+}
+
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 pub struct AuthPasswordBasedDto {
     pub username: String,
@@ -65,7 +88,7 @@ pub struct AuthPasswordBasedDto {
 async fn auth_password_based(
     mut state: RequestState,
     form: Json<AuthPasswordBasedDto>,
-) -> ServiceResult<Json<AuthTokenDto>> {
+) -> ServiceResult<AuthTokenDto> {
     let form = form.0;
     let account = state
         .db
@@ -90,7 +113,7 @@ async fn auth_password_based(
                         )
                         .await?;
 
-                    return Ok(Json(AuthTokenDto { token }));
+                    return Ok(AuthTokenDto { token });
                 }
             }
         }
@@ -114,7 +137,7 @@ pub struct AuthNfcBasedNfcIdDto {
 async fn auth_nfc_based_nfc_id(
     mut state: RequestState,
     form: Json<AuthNfcBasedNfcIdDto>,
-) -> ServiceResult<Json<AuthTokenDto>> {
+) -> ServiceResult<AuthTokenDto> {
     let form = form.0;
 
     let card_id = general_purpose::STANDARD
@@ -146,7 +169,7 @@ async fn auth_nfc_based_nfc_id(
                         )
                         .await?;
 
-                    return Ok(Json(AuthTokenDto { token }));
+                    return Ok(AuthTokenDto { token });
                 }
             }
         }

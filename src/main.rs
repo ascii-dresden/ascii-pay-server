@@ -19,6 +19,8 @@ mod error;
 mod models;
 mod request_state;
 
+pub const SESSION_COOKIE_NAME: &str = "ascii_pay_session";
+
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
@@ -48,7 +50,7 @@ async fn main() {
         .layer(DefaultBodyLimit::disable())
         .layer(
             CorsLayer::new()
-                .allow_methods([Method::GET, Method::POST])
+                .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
                 .allow_origin(Any),
         )
         .layer(CompressionLayer::new())
