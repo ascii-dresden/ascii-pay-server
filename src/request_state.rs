@@ -43,19 +43,18 @@ where
             .map_err(|err| ServiceError::InternalServerError(err.to_string()))?;
         let mut db = DatabaseConnection { connection };
 
-        let session = if let Ok(TypedHeader(cookie)) = parts.extract::<TypedHeader<Cookie>>().await
+        let session = if let Ok(TypedHeader(Authorization(bearer))) =
+            parts.extract::<TypedHeader<Authorization<Bearer>>>().await
         {
+            let session_token = bearer.token().to_owned();
+            db.get_session_by_session_token(session_token).await?
+        } else if let Ok(TypedHeader(cookie)) = parts.extract::<TypedHeader<Cookie>>().await {
             if let Some(session_token) = cookie.get(SESSION_COOKIE_NAME) {
                 db.get_session_by_session_token(session_token.to_owned())
                     .await?
             } else {
                 None
             }
-        } else if let Ok(TypedHeader(Authorization(bearer))) =
-            parts.extract::<TypedHeader<Authorization<Bearer>>>().await
-        {
-            let session_token = bearer.token().to_owned();
-            db.get_session_by_session_token(session_token).await?
         } else {
             None
         };
