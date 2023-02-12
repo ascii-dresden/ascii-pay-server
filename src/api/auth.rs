@@ -66,7 +66,7 @@ impl IntoResponse for AuthTokenDto {
     fn into_response(self) -> axum::response::Response {
         let cookie = HeaderValue::from_str(
             format!(
-                "{}={}; Path=/api/v1; HttpOnly",
+                "{}={}; Path=/api/v1; HttpOnly; SameSite=None",
                 SESSION_COOKIE_NAME, self.token
             )
             .as_str(),
