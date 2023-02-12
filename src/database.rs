@@ -628,8 +628,9 @@ impl DatabaseConnection {
         &mut self,
         mut product: models::Product,
     ) -> ServiceResult<models::Product> {
-        let r = sqlx::query(
-            r#"
+        let q = if product.id == 0 {
+            sqlx::query(
+                r#"
             INSERT INTO product (
                 name,
                 price_cents,
@@ -639,8 +640,6 @@ impl DatabaseConnection {
                 bonus_coffee_stamps,
                 bonus_bottle_stamps,
                 nickname,
-                image,
-                image_mimetype,
                 barcode,
                 category,
                 tags
@@ -655,27 +654,46 @@ impl DatabaseConnection {
                 $8,
                 $9,
                 $10,
-                $11,
-                $12,
-                $13
+                $11
             ) RETURNING id
             "#,
-        )
-        .bind(&product.name)
-        .bind(product.price.0.get(&CoinType::Cent).unwrap_or(&0))
-        .bind(product.price.0.get(&CoinType::CoffeeStamp).unwrap_or(&0))
-        .bind(product.price.0.get(&CoinType::BottleStamp).unwrap_or(&0))
-        .bind(product.bonus.0.get(&CoinType::Cent).unwrap_or(&0))
-        .bind(product.bonus.0.get(&CoinType::CoffeeStamp).unwrap_or(&0))
-        .bind(product.bonus.0.get(&CoinType::BottleStamp).unwrap_or(&0))
-        .bind(&product.nickname)
-        .bind(product.image.as_ref().map(|i| &i.data))
-        .bind(product.image.as_ref().map(|i| &i.mimetype))
-        .bind(&product.barcode)
-        .bind(&product.category)
-        .bind(&product.tags)
-        .fetch_one(&mut self.connection)
-        .await;
+            )
+        } else {
+            sqlx::query(
+                r#"
+                UPDATE product
+                SET
+                    name = $2,
+                    price_cents = $3,
+                    price_coffee_stamps = $4,
+                    price_bottle_stamps = $5,
+                    bonus_cents = $6,
+                    bonus_coffee_stamps = $7,
+                    bonus_bottle_stamps = $8,
+                    nickname = $9,
+                    barcode = $10,
+                    category = $11,
+                    tags = $12
+                WHERE id = $1
+                RETURNING id
+            "#,
+            )
+            .bind(i64::try_from(product.id).expect("product id is less than 2**63"))
+        };
+        let r = q
+            .bind(&product.name)
+            .bind(product.price.0.get(&CoinType::Cent).unwrap_or(&0))
+            .bind(product.price.0.get(&CoinType::CoffeeStamp).unwrap_or(&0))
+            .bind(product.price.0.get(&CoinType::BottleStamp).unwrap_or(&0))
+            .bind(product.bonus.0.get(&CoinType::Cent).unwrap_or(&0))
+            .bind(product.bonus.0.get(&CoinType::CoffeeStamp).unwrap_or(&0))
+            .bind(product.bonus.0.get(&CoinType::BottleStamp).unwrap_or(&0))
+            .bind(&product.nickname)
+            .bind(&product.barcode)
+            .bind(&product.category)
+            .bind(&product.tags)
+            .fetch_one(&mut self.connection)
+            .await;
         let r = to_service_result(r)?;
 
         product.id = r
