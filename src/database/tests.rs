@@ -166,10 +166,7 @@ pub fn test_product_crud(pool: PgPool) {
         category: "category".to_string(),
         name: "Product 1".to_string(),
         nickname: Some("nick's test".to_string()),
-        image: Some(Image {
-            data: vec![0x1, 0x2, 0x3],
-            mimetype: "image/png".to_string(),
-        }),
+        image: None,
         tags: vec![],
     };
 
