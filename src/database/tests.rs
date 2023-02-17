@@ -7,7 +7,7 @@ use crate::{
     error::ServiceError,
     models::{
         Account, AuthMethod, AuthMethodType, AuthNfc, AuthPassword, CardType, CoinAmount, CoinType,
-        Image, Product, Role,
+        Image, Payment, PaymentItem, Product, Role, TransactionItem,
     },
 };
 
@@ -153,11 +153,6 @@ async fn test_account_crud(pool: PgPool) {
 
 #[sqlx::test]
 pub fn test_product_crud(pool: PgPool) {
-    env_logger::builder()
-        .parse_filters("info")
-        .parse_default_env()
-        .init();
-
     let product1 = Product {
         id: 0,
         price: CoinAmount([(CoinType::Cent, 150)].into_iter().collect()),
@@ -275,4 +270,176 @@ pub fn test_product_crud(pool: PgPool) {
     products.sort_by_key(|p| p.id);
     assert_eq!(products.as_slice(), &[product2.clone(), product3.clone(),]);
     assert_eq!(db.get_product_by_id(product1.id).await.unwrap(), None);
+}
+
+#[sqlx::test]
+pub fn test_transaction(pool: PgPool) {
+    let app_state = AppState::from_pool(pool).await;
+    let mut db = DatabaseConnection {
+        connection: app_state.pool.acquire().await.unwrap(),
+    };
+
+    // create some test data
+    let acc1 = db
+        .store_account(Account {
+            name: "John Doe".to_string(),
+            email: "john.doe@example.org".to_string(),
+            id: 0,
+            balance: CoinAmount([(CoinType::Cent, 368)].into_iter().collect()),
+            role: Role::Basic,
+            auth_methods: vec![],
+        })
+        .await
+        .unwrap();
+
+    let acc2 = db
+        .store_account(Account {
+            name: "Best Buyer".to_string(),
+            email: "best@example.com".to_string(),
+            id: 0,
+            balance: CoinAmount(
+                [(CoinType::Cent, 800), (CoinType::BottleStamp, 20)]
+                    .into_iter()
+                    .collect(),
+            ),
+            role: Role::Admin,
+            auth_methods: vec![],
+        })
+        .await
+        .unwrap();
+
+    let product1 = db
+        .store_product(Product {
+            id: 0,
+            price: CoinAmount([(CoinType::Cent, 150)].into_iter().collect()),
+            bonus: CoinAmount(HashMap::new()),
+            barcode: Some("barcode".to_string()),
+            category: "category".to_string(),
+            name: "Product 1".to_string(),
+            nickname: Some("nick's test".to_string()),
+            image: Some(Image {
+                data: vec![0x1, 0x2, 0x3],
+                mimetype: "image/png".to_string(),
+            }),
+            tags: vec![],
+        })
+        .await
+        .unwrap();
+
+    let product2 = db
+        .store_product(Product {
+            id: 0,
+            price: CoinAmount(
+                [(CoinType::Cent, 150), (CoinType::BottleStamp, 10)]
+                    .into_iter()
+                    .collect(),
+            ),
+            bonus: CoinAmount([(CoinType::BottleStamp, 1)].into_iter().collect()),
+            barcode: Some("123891".to_string()),
+            category: "kaltgetränk".to_string(),
+            nickname: None,
+            name: "testMate".to_string(),
+            image: None,
+            tags: vec!["koffein".to_string()],
+        })
+        .await
+        .unwrap();
+
+    let item1 = PaymentItem {
+        effective_price: CoinAmount(
+            [(CoinType::Cent, 150), (CoinType::CoffeeStamp, -1)]
+                .into_iter()
+                .collect(),
+        ),
+        product_id: Some(product1.id),
+    };
+    let item_no_product_id = PaymentItem {
+        effective_price: CoinAmount([(CoinType::Cent, 112)].into_iter().collect()),
+        product_id: None,
+    };
+    let item2 = PaymentItem {
+        effective_price: CoinAmount([(CoinType::BottleStamp, 10)].into_iter().collect()),
+        product_id: Some(product2.id),
+    };
+    let payment1 = Payment {
+        account: acc1.id,
+        items: vec![item1.clone(), item_no_product_id.clone()],
+    };
+    let tx1 = db.payment(payment1.clone()).await.unwrap();
+
+    let mut product1_without_image = product1.clone();
+    product1_without_image.image = None;
+
+    assert!(tx1.id != 0);
+    assert_eq!(tx1.account, acc1.id);
+    assert_eq!(
+        tx1.items.as_slice(),
+        &[
+            TransactionItem {
+                effective_price: item1.effective_price.clone(),
+                product: Some(product1_without_image),
+            },
+            TransactionItem {
+                effective_price: item_no_product_id.effective_price.clone(),
+                product: None,
+            }
+        ]
+    );
+
+    let tx2 = db
+        .payment(Payment {
+            account: acc2.id,
+            items: vec![item_no_product_id],
+        })
+        .await
+        .unwrap();
+
+    // check that transactions are stored in db
+    let r = db.get_transactions_by_account(tx1.account).await.unwrap();
+    assert_eq!(r, vec![tx1.clone()]);
+
+    let r = db.get_transactions_by_account(tx2.account).await.unwrap();
+    assert_eq!(r, vec![tx2.clone()]);
+
+    assert_eq!(
+        db.get_transaction_by_id(tx1.id).await.unwrap(),
+        Some(tx1.clone())
+    );
+    assert_eq!(db.get_transaction_by_id(42).await.unwrap(), None);
+
+    // check balances are updated
+    assert_eq!(
+        db.get_account_by_id(acc1.id)
+            .await
+            .unwrap()
+            .expect("have account")
+            .balance,
+        CoinAmount(
+            [(CoinType::Cent, 106), (CoinType::CoffeeStamp, 1)]
+                .into_iter()
+                .collect()
+        )
+    );
+    assert_eq!(
+        db.get_account_by_id(acc2.id)
+            .await
+            .unwrap()
+            .expect("have account")
+            .balance,
+        CoinAmount(
+            [(CoinType::Cent, 800 - 112), (CoinType::BottleStamp, 20)]
+                .into_iter()
+                .collect(),
+        )
+    );
+
+    // it should be possible to do the same payment again
+    let tx3 = db.payment(payment1.clone()).await.unwrap();
+    assert_eq!(tx3.items, tx1.items);
+    assert_eq!(tx3.account, tx1.account);
+
+    assert_eq!(
+        db.get_transactions_by_account(tx3.account).await.unwrap(),
+        vec![tx1.clone(), tx3.clone(),]
+    );
 }

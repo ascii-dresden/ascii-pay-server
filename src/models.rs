@@ -159,7 +159,7 @@ pub struct TransactionItem {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Transaction {
     pub id: u64,
-    pub timestamp: Instant,
+    pub timestamp: DateTime<Utc>,
     pub account: u64,
     pub items: Vec<TransactionItem>,
 }
