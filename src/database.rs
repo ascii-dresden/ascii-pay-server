@@ -8,16 +8,16 @@ use futures::StreamExt;
 use log::error;
 use serde::{Deserialize, Serialize};
 use sqlx::migrate::Migrator;
-use sqlx::postgres::PgPoolOptions;
+use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::types::Json;
-use sqlx::{PgPool, Row};
+use sqlx::{FromRow, PgPool, Row};
 use sqlx::{Pool, Postgres};
 use tokio::sync::Mutex;
 
 use crate::error::{ServiceError, ServiceResult};
 use crate::models::{
     self, Account, AuthMethod, AuthMethodType, AuthNfc, AuthPassword, AuthRequest, CardType,
-    CoinAmount, CoinType, Image, Product, Role, Session,
+    CoinAmount, CoinType, Image, PaymentItem, Product, Role, Session, Transaction, TransactionItem,
 };
 
 mod migration;
@@ -343,6 +343,24 @@ impl From<ProductRow> for Product {
             tags: value.tags,
         }
     }
+}
+
+#[derive(sqlx::FromRow)]
+struct TransactionItemRow {
+    effective_price_cents: i32,
+    effective_price_coffee_stamps: i32,
+    effective_price_bottle_stamps: i32,
+}
+
+#[derive(sqlx::FromRow)]
+struct TransactionRow {
+    #[sqlx(try_from = "i64")]
+    transaction_id: u64,
+    timestamp: DateTime<Utc>,
+    #[sqlx(try_from = "i64")]
+    account_id: u64,
+    #[sqlx(flatten)]
+    item: TransactionItemRow,
 }
 
 impl DatabaseConnection {
@@ -765,20 +783,273 @@ impl DatabaseConnection {
         &mut self,
         account_id: u64,
     ) -> ServiceResult<Vec<models::Transaction>> {
-        panic!("TODO")
+        let id = i64::try_from(account_id).expect("id is always less than 2**63");
+        let mut r = sqlx::query(
+            r#"
+                SELECT
+                    item.transaction_id as transaction_id,
+                    item.timestamp as timestamp,
+                    item.account_id as account_id,
+                    item.effective_price_cents as effective_price_cents,
+                    item.effective_price_coffee_stamps as effective_price_coffee_stamps,
+                    item.effective_price_bottle_stamps as effective_price_bottle_stamps,
+                    p.id as id,
+                    p.name as name,
+                    p.price_cents as price_cents,
+                    p.price_coffee_stamps as price_coffee_stamps,
+                    p.price_bottle_stamps as price_bottle_stamps,
+                    p.bonus_cents as bonus_cents,
+                    p.bonus_coffee_stamps as bonus_coffee_stamps,
+                    p.bonus_bottle_stamps as bonus_bottle_stamps,
+                    p.nickname as nickname,
+                    NULL as image,
+                    NULL as image_mimetype,
+                    p.barcode as barcode,
+                    p.category as category,
+                    p.tags as tags
+                FROM
+                    transaction_item item
+                    LEFT OUTER JOIN product p ON item.product_id = p.id
+                WHERE
+                    item.account_id = $1
+                ORDER BY item.transaction_id ASC
+            "#,
+        )
+        .bind(id)
+        .fetch(&mut self.connection);
+
+        let mut out: Vec<Transaction> = Vec::new();
+        while let Some(row) = r.next().await {
+            let row = to_service_result(row)?;
+
+            let new_tx = extend_transaction_with_row(out.last_mut(), row)?;
+            if let Some(tx) = new_tx {
+                out.push(tx);
+            }
+        }
+
+        Ok(out)
     }
 
     pub async fn get_transaction_by_id(
         &mut self,
         id: u64,
     ) -> ServiceResult<Option<models::Transaction>> {
-        panic!("TODO")
+        let id = i64::try_from(id).expect("id is always less than 2**63");
+        let mut r = sqlx::query(
+            r#"
+            SELECT
+                item.transaction_id as transaction_id,
+                item.timestamp as timestamp,
+                item.account_id as account_id,
+                item.effective_price_cents as effective_price_cents,
+                item.effective_price_coffee_stamps as effective_price_coffee_stamps,
+                item.effective_price_bottle_stamps as effective_price_bottle_stamps,
+                p.id as id,
+                p.name as name,
+                p.price_cents as price_cents,
+                p.price_coffee_stamps as price_coffee_stamps,
+                p.price_bottle_stamps as price_bottle_stamps,
+                p.bonus_cents as bonus_cents,
+                p.bonus_coffee_stamps as bonus_coffee_stamps,
+                p.bonus_bottle_stamps as bonus_bottle_stamps,
+                p.nickname as nickname,
+                NULL as image,
+                NULL as image_mimetype,
+                p.barcode as barcode,
+                p.category as category,
+                p.tags as tags
+            FROM
+                transaction_item item
+                LEFT OUTER JOIN product p ON item.product_id = p.id
+            WHERE item.transaction_id = $1
+        "#,
+        )
+        .bind(id)
+        .fetch(&mut self.connection);
+
+        let mut tx = None;
+        while let Some(row) = r.next().await {
+            let row = to_service_result(row)?;
+            let new_tx = extend_transaction_with_row(tx.as_mut(), row)?;
+            if new_tx.is_some() {
+                assert!(tx.is_none(), "there should be at most one tx");
+                tx = new_tx;
+            }
+        }
+
+        Ok(tx)
     }
 
     pub async fn payment(
         &mut self,
         payment: models::Payment,
     ) -> ServiceResult<models::Transaction> {
-        panic!("TODO")
+        fn get_type_amounts(t: CoinType, items: &[PaymentItem]) -> Vec<i32> {
+            items
+                .into_iter()
+                .map(|item| *item.effective_price.0.get(&t).unwrap_or(&0))
+                .collect()
+        }
+
+        let total_price_cents: i32 = get_type_amounts(CoinType::Cent, &payment.items)
+            .into_iter()
+            .sum();
+        let total_price_bottle_stamps: i32 =
+            get_type_amounts(CoinType::BottleStamp, &payment.items)
+                .into_iter()
+                .sum();
+        let total_price_coffee_stamps: i32 =
+            get_type_amounts(CoinType::CoffeeStamp, &payment.items)
+                .into_iter()
+                .sum();
+
+        let mut r = sqlx::query(
+            r#"
+            WITH
+                transaction_args AS (
+                    SELECT
+                        nextval('transaction_id_seq') AS transaction_id,
+                        $1 AS timestamp,
+                        $2 AS account_id
+                ),
+                updated AS (
+                    UPDATE account
+                    SET
+                        balance_cents = balance_cents - $7,
+                        balance_bottle_stamps = balance_bottle_stamps - $8,
+                        balance_coffee_stamps = balance_coffee_stamps - $9
+                    WHERE
+                        id = $2
+                ),
+                inserted AS (
+                    INSERT INTO transaction_item (
+                        transaction_id,
+                        effective_price_cents,
+                        effective_price_bottle_stamps,
+                        effective_price_coffee_stamps,
+                        product_id,
+                        timestamp,
+                        account_id
+                    )
+                    SELECT
+                        transaction_id,
+                        effective_price_cents,
+                        effective_price_bottle_stamps,
+                        effective_price_coffee_stamps,
+                        product_id,
+                        timestamp,
+                        account_id
+                    FROM
+                        transaction_args,
+                        UNNEST($3, $4, $5, $6) AS item_args(
+                            effective_price_cents,
+                            effective_price_bottle_stamps,
+                            effective_price_coffee_stamps,
+                            product_id
+                        )
+                    RETURNING
+                        transaction_id,
+                        effective_price_cents,
+                        effective_price_bottle_stamps,
+                        effective_price_coffee_stamps,
+                        product_id,
+                        timestamp,
+                        account_id
+                    )
+            SELECT
+                inserted.*,
+                p.id as id,
+                p.name as name,
+                p.price_cents as price_cents,
+                p.price_coffee_stamps as price_coffee_stamps,
+                p.price_bottle_stamps as price_bottle_stamps,
+                p.bonus_cents as bonus_cents,
+                p.bonus_coffee_stamps as bonus_coffee_stamps,
+                p.bonus_bottle_stamps as bonus_bottle_stamps,
+                p.nickname as nickname,
+                NULL as image,
+                NULL as image_mimetype,
+                p.barcode as barcode,
+                p.category as category,
+                p.tags as tags
+            FROM inserted LEFT OUTER JOIN product p ON p.id = inserted.product_id
+            "#,
+        )
+        .bind(Utc::now())
+        .bind(i64::try_from(payment.account).expect("id less than 2**63"))
+        .bind(get_type_amounts(CoinType::Cent, &payment.items))
+        .bind(get_type_amounts(CoinType::BottleStamp, &payment.items))
+        .bind(get_type_amounts(CoinType::CoffeeStamp, &payment.items))
+        .bind(
+            payment
+                .items
+                .iter()
+                .map(|i| {
+                    i.product_id
+                        .map(|v| i64::try_from(v).expect("ids are less than 2**63"))
+                })
+                .collect::<Vec<_>>(),
+        )
+        .bind(total_price_cents)
+        .bind(total_price_bottle_stamps)
+        .bind(total_price_coffee_stamps)
+        .fetch(&mut self.connection);
+
+        let mut tx = None;
+        while let Some(row) = r.next().await {
+            let row = to_service_result(row)?;
+            let new_tx = extend_transaction_with_row(tx.as_mut(), row)?;
+            if new_tx.is_some() {
+                assert!(tx.is_none(), "inserted only one tx");
+                tx = new_tx;
+            };
+        }
+
+        Ok(tx.expect("inserted one TX"))
     }
+}
+
+fn extend_transaction_with_row(
+    prev: Option<&mut Transaction>,
+    row: PgRow,
+) -> ServiceResult<Option<Transaction>> {
+    let mut new_tx = None;
+    let txrow = to_service_result(TransactionRow::from_row(&row))?;
+    let tx = match prev {
+        Some(tx) if tx.id == txrow.transaction_id => tx,
+        _ => {
+            new_tx = Some(Transaction {
+                id: txrow.transaction_id,
+                account: txrow.account_id,
+                timestamp: txrow.timestamp,
+                items: Vec::new(),
+            });
+            new_tx.as_mut().expect("just constructed as Some")
+        }
+    };
+
+    let mut item = TransactionItem {
+        effective_price: to_coin_amount(&[
+            (CoinType::Cent, Some(txrow.item.effective_price_cents)),
+            (
+                CoinType::BottleStamp,
+                Some(txrow.item.effective_price_bottle_stamps),
+            ),
+            (
+                CoinType::CoffeeStamp,
+                Some(txrow.item.effective_price_coffee_stamps),
+            ),
+        ]),
+        product: None,
+    };
+
+    let product_id: Option<i64> = row.get("id");
+    if product_id.is_some() {
+        item.product = Some(to_service_result(ProductRow::from_row(&row))?.into());
+    }
+
+    tx.items.push(item);
+
+    Ok(new_tx)
 }

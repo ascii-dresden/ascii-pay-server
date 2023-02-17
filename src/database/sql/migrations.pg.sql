@@ -119,3 +119,21 @@ ALTER TABLE product ALTER COLUMN price_bottle_stamps SET NOT NULL;
 ALTER TABLE product ALTER COLUMN bonus_cents SET NOT NULL;
 ALTER TABLE product ALTER COLUMN bonus_coffee_stamps SET NOT NULL;
 ALTER TABLE product ALTER COLUMN bonus_bottle_stamps SET NOT NULL;
+
+--##9 Merge transaction table into transaction_item
+ALTER TABLE transaction_item ADD COLUMN transaction_id BIGINT NOT NULL;
+ALTER TABLE transaction_item ADD COLUMN timestamp TIMESTAMP WITH TIME ZONE NOT NULL;
+ALTER TABLE transaction_item ADD COLUMN account_id BIGINT NOT NULL;
+
+--##10 Add account id foreign key to transactions
+ALTER TABLE transaction_item
+    ADD CONSTRAINT fk_account_id
+    FOREIGN KEY(account_id)
+        REFERENCES account(id)
+        ON DELETE SET NULL;
+
+--##11 Delete transaction table
+DROP TABLE transaction;
+
+--##12 Create sequence for transaction ids
+CREATE SEQUENCE transaction_id_seq AS BIGINT START WITH 1 NO CYCLE;
