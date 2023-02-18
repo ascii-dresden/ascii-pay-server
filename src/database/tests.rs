@@ -442,4 +442,16 @@ pub fn test_transaction(pool: PgPool) {
         db.get_transactions_by_account(tx3.account).await.unwrap(),
         vec![tx1.clone(), tx3.clone(),]
     );
+
+    // if we delete the account, the id in the transaction is set to 0
+    db.delete_account(tx3.account).await.unwrap();
+
+    let mut tx3_anon = tx3.clone();
+    tx3_anon.account = 0;
+    let mut tx1_anon = tx1.clone();
+    tx1_anon.account = 0;
+    assert_eq!(
+        db.get_transactions_by_account(0).await.unwrap(),
+        vec![tx1_anon, tx3_anon]
+    )
 }

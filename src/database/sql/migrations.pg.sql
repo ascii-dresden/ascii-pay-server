@@ -137,3 +137,6 @@ DROP TABLE transaction;
 
 --##12 Create sequence for transaction ids
 CREATE SEQUENCE transaction_id_seq AS BIGINT START WITH 1 NO CYCLE;
+
+--##13 Allow deleting accounts with transactions
+ALTER TABLE transaction_item ALTER COLUMN account_id DROP NOT NULL;

@@ -357,8 +357,7 @@ struct TransactionRow {
     #[sqlx(try_from = "i64")]
     transaction_id: u64,
     timestamp: DateTime<Utc>,
-    #[sqlx(try_from = "i64")]
-    account_id: u64,
+    account_id: Option<i64>,
     #[sqlx(flatten)]
     item: TransactionItemRow,
 }
@@ -811,7 +810,7 @@ impl DatabaseConnection {
                     transaction_item item
                     LEFT OUTER JOIN product p ON item.product_id = p.id
                 WHERE
-                    item.account_id = $1
+                    (item.account_id = $1) OR ($1 = 0 AND item.account_id IS NULL)
                 ORDER BY item.transaction_id ASC
             "#,
         )
@@ -1021,7 +1020,8 @@ fn extend_transaction_with_row(
         _ => {
             new_tx = Some(Transaction {
                 id: txrow.transaction_id,
-                account: txrow.account_id,
+                account: u64::try_from(txrow.account_id.unwrap_or(0))
+                    .expect("id is always non-negative"),
                 timestamp: txrow.timestamp,
                 items: Vec::new(),
             });
