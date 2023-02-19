@@ -886,7 +886,7 @@ impl DatabaseConnection {
     ) -> ServiceResult<models::Transaction> {
         fn get_type_amounts(t: CoinType, items: &[PaymentItem]) -> Vec<i32> {
             items
-                .into_iter()
+                .iter()
                 .map(|item| *item.effective_price.0.get(&t).unwrap_or(&0))
                 .collect()
         }

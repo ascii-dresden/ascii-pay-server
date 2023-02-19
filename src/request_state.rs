@@ -1,21 +1,18 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use aide::OperationInput;
-use axum::{
-    async_trait,
-    extract::{FromRef, FromRequestParts},
-    http::request::Parts,
-    RequestPartsExt, TypedHeader,
-};
-use headers::{authorization::Bearer, Authorization, Cookie};
+use axum::extract::{FromRef, FromRequestParts};
+use axum::http::request::Parts;
+use axum::{async_trait, RequestPartsExt, TypedHeader};
+use headers::authorization::Bearer;
+use headers::{Authorization, Cookie};
 use tokio::sync::Mutex;
 
-use crate::{
-    database::{AppState, AppStateAsciiMifareChallenge, DatabaseConnection},
-    error::{ServiceError, ServiceResult},
-    models::{self, Session},
-    SESSION_COOKIE_NAME,
-};
+use crate::database::{AppState, AppStateAsciiMifareChallenge, DatabaseConnection};
+use crate::error::{ServiceError, ServiceResult};
+use crate::models::{self, Session};
+use crate::SESSION_COOKIE_NAME;
 
 // we can also write a custom extractor that grabs a connection from the pool
 // which setup is appropriate depends on your application
