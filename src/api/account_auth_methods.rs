@@ -33,6 +33,17 @@ pub fn router(app_state: AppState) -> ApiRouter {
             ),
         )
         .api_route(
+            "/account/:id/public-tab",
+            put_with(
+                set_public_tab_authentication,
+                set_public_tab_authentication_docs,
+            )
+            .delete_with(
+                delete_public_tab_authentication,
+                delete_public_tab_authentication_docs,
+            ),
+        )
+        .api_route(
             "/account/:id/password-reset-token",
             post_with(
                 create_password_reset_token,
@@ -201,6 +212,67 @@ async fn delete_password_authentication(
 
 fn delete_password_authentication_docs(op: TransformOperation) -> TransformOperation {
     op.description("Remove password authentication from the given account.")
+        .tag("account_authentication")
+        .response::<200, Json<AccountDto>>()
+        .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
+}
+
+async fn set_public_tab_authentication(
+    mut state: RequestState,
+    Path(id): Path<u64>,
+) -> ServiceResult<Json<AccountDto>> {
+    state.session_require_admin_or_self(id)?;
+
+    let account = state.db.get_account_by_id(id).await?;
+
+    if let Some(mut account) = account {
+        account
+            .auth_methods
+            .retain_mut(|m| !matches!(m, &mut models::AuthMethod::PublicTab));
+        account.auth_methods.push(models::AuthMethod::PublicTab);
+
+        let account = state.db.store_account(account).await?;
+        return Ok(Json(AccountDto::from(&account)));
+    }
+
+    Err(ServiceError::NotFound)
+}
+
+fn set_public_tab_authentication_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Enables public tab authentication for the given account.")
+        .tag("account_authentication")
+        .response::<200, Json<AccountDto>>()
+        .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
+}
+
+async fn delete_public_tab_authentication(
+    mut state: RequestState,
+    Path(id): Path<u64>,
+) -> ServiceResult<Json<AccountDto>> {
+    state.session_require_admin_or_self(id)?;
+
+    let account = state.db.get_account_by_id(id).await?;
+
+    if let Some(mut account) = account {
+        account
+            .auth_methods
+            .retain_mut(|m| !matches!(m, &mut models::AuthMethod::PublicTab));
+
+        let account = state.db.store_account(account).await?;
+        return Ok(Json(AccountDto::from(&account)));
+    }
+
+    Err(ServiceError::NotFound)
+}
+
+fn delete_public_tab_authentication_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Disables public tab authentication from the given account.")
         .tag("account_authentication")
         .response::<200, Json<AccountDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
