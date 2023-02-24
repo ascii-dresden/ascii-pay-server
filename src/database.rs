@@ -498,6 +498,38 @@ impl DatabaseConnection {
         }
     }
 
+    pub async fn get_sessions_by_account(
+        &mut self,
+        account_id: u64,
+    ) -> ServiceResult<Vec<models::Session>> {
+        let account_id = i64::try_from(account_id).expect("ids must fit into i64");
+        let mut r = sqlx::query_as::<_, SessionRow>(r#"
+            WITH
+                fulL_account AS (
+                    SELECT
+                    a.id, a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps,
+                    a.name, a.email, a.role,
+                    coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods
+                    FROM account AS a
+                    LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
+                    GROUP BY a.id
+                )
+            SELECT CAST(session.uuid as TEXT) as uuid, session.auth_method, session.valid_until, session.is_single_use, full_account.*
+            FROM full_account INNER JOIN session on full_account.id = session.account_id
+            WHERE session.valid_until > now() AND session.account_id = $1
+        "#)
+        .bind(account_id)
+        .fetch(&mut self.connection);
+
+        let mut out = Vec::new();
+        while let Some(row) = r.next().await {
+            let row = to_service_result(row)?;
+
+            out.push(row.into());
+        }
+        Ok(out)
+    }
+
     pub async fn store_account(
         &mut self,
         mut account: models::Account,

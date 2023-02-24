@@ -54,8 +54,14 @@ async fn test_session_crud(pool: PgPool) {
     assert_eq!(session.is_single_use, false);
     assert_eq!(session.token, token.clone());
 
+    assert_eq!(
+        db.get_sessions_by_account(acc1.id).await.unwrap(),
+        vec![session.clone()]
+    );
+
     db.delete_session_token(token.clone()).await.unwrap();
     assert_eq!(db.get_session_by_session_token(token).await.unwrap(), None);
+    assert_eq!(db.get_sessions_by_account(acc1.id).await.unwrap(), vec![]);
 
     let token = db
         .create_session_token(
