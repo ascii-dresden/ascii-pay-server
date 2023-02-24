@@ -9,8 +9,8 @@ use aide::{
 use axum::{response::IntoResponse, Extension, Json};
 
 pub fn api_docs(api: TransformOpenApi) -> TransformOpenApi {
-    api.title("Aide axum Open API")
-        .summary("An example Todo application")
+    api.title("ascii-pay-server")
+        .summary("A prepaid system")
         .description(include_str!("../README.md"))
         .tag(Tag {
             name: "accounts".into(),
