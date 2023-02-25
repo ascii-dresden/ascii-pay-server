@@ -1,6 +1,6 @@
 use std::ops::Add;
 
-use aide::axum::routing::{post_with, put_with};
+use aide::axum::routing::{get_with, post_with, put_with};
 use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
 use axum::extract::Path;
@@ -62,6 +62,11 @@ pub fn router(app_state: AppState) -> ApiRouter {
             post_with(create_nfc_authentication, create_nfc_authentication_docs)
                 .put_with(update_nfc_authentication, update_nfc_authentication_docs)
                 .delete_with(delete_nfc_authentication, delete_nfc_authentication_docs),
+        )
+        .api_route(
+            "/account/:id/sessions",
+            get_with(get_account_sessions, get_account_sessions_docs)
+                .delete_with(delete_account_session, delete_account_session_docs),
         )
         .with_state(app_state)
 }
@@ -434,6 +439,95 @@ fn delete_nfc_authentication_docs(op: TransformOperation) -> TransformOperation 
     op.description("Remmove an existing nfc based authentication method from the given account.")
         .tag("account_authentication")
         .response::<200, Json<AccountDto>>()
+        .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub enum AuthMethodTypeDto {
+    PasswordBased,
+    NfcBased,
+    PublicTab,
+    PasswordResetToken,
+}
+impl From<&models::AuthMethodType> for AuthMethodTypeDto {
+    fn from(value: &models::AuthMethodType) -> Self {
+        match value {
+            models::AuthMethodType::PasswordBased => AuthMethodTypeDto::PasswordBased,
+            models::AuthMethodType::NfcBased => AuthMethodTypeDto::NfcBased,
+            models::AuthMethodType::PublicTab => AuthMethodTypeDto::PublicTab,
+            models::AuthMethodType::PasswordResetToken => AuthMethodTypeDto::PasswordResetToken,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct SessionDto {
+    pub auth_method: AuthMethodTypeDto,
+    pub valid_until: String,
+    pub is_single_use: bool,
+}
+impl From<&models::Session> for SessionDto {
+    fn from(value: &models::Session) -> Self {
+        Self {
+            auth_method: (&value.auth_method).into(),
+            valid_until: format!("{:?}", value.valid_until),
+            is_single_use: value.is_single_use,
+        }
+    }
+}
+
+async fn get_account_sessions(
+    mut state: RequestState,
+    Path(id): Path<u64>,
+) -> ServiceResult<Json<Vec<SessionDto>>> {
+    state.session_require_admin_or_self(id)?;
+
+    let sessions = state.db.get_sessions_by_account(id).await?;
+
+    Ok(Json(sessions.iter().map(|s| s.into()).collect()))
+}
+
+fn get_account_sessions_docs(op: TransformOperation) -> TransformOperation {
+    op.description("List all active sessions for the given account.")
+        .tag("account_authentication")
+        .response::<200, Json<Vec<SessionDto>>>()
+        .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
+}
+
+async fn delete_account_session(
+    mut state: RequestState,
+    Path(id): Path<u64>,
+    form: Json<SessionDto>,
+) -> ServiceResult<Json<Vec<SessionDto>>> {
+    state.session_require_admin_or_self(id)?;
+
+    let form = form.0;
+    let sessions = state.db.get_sessions_by_account(id).await?;
+
+    for session in sessions {
+        let session_dto = SessionDto::from(&session);
+        if session_dto.auth_method == form.auth_method
+            && session_dto.valid_until == form.valid_until
+            && session_dto.is_single_use == form.is_single_use
+        {
+            state.db.delete_session_token(session.token).await?;
+        }
+    }
+
+    let sessions = state.db.get_sessions_by_account(id).await?;
+    Ok(Json(sessions.iter().map(|s| s.into()).collect()))
+}
+
+fn delete_account_session_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Delete a active session for the given account.")
+        .tag("account_authentication")
+        .response::<200, Json<Vec<SessionDto>>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
         .response_with::<401, (), _>(|res| res.description("Missing login!"))
         .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
