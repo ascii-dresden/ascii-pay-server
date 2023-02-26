@@ -47,6 +47,10 @@ pub fn router(app_state: AppState) -> ApiRouter {
             ),
         )
         .api_route(
+            "/auth/nfc-simulation",
+            post_with(auth_nfc_based_simulation, auth_nfc_based_simulation_docs),
+        )
+        .api_route(
             "/auth/account",
             get_with(auth_get_account, auth_get_account_docs),
         )
@@ -55,14 +59,14 @@ pub fn router(app_state: AppState) -> ApiRouter {
 }
 
 #[derive(Debug, PartialEq, Serialize, JsonSchema)]
-pub struct AuthTokenDto {
+pub struct AuthTokenCookieDto {
     pub token: String,
 }
 
-impl OperationOutput for AuthTokenDto {
-    type Inner = AuthTokenDto;
+impl OperationOutput for AuthTokenCookieDto {
+    type Inner = AuthTokenCookieDto;
 }
-impl IntoResponse for AuthTokenDto {
+impl IntoResponse for AuthTokenCookieDto {
     fn into_response(self) -> axum::response::Response {
         let cookie = HeaderValue::from_str(
             format!(
@@ -79,6 +83,11 @@ impl IntoResponse for AuthTokenDto {
     }
 }
 
+#[derive(Debug, PartialEq, Serialize, JsonSchema)]
+pub struct AuthTokenDto {
+    pub token: String,
+}
+
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 pub struct AuthPasswordBasedDto {
     pub username: String,
@@ -88,7 +97,7 @@ pub struct AuthPasswordBasedDto {
 async fn auth_password_based(
     mut state: RequestState,
     form: Json<AuthPasswordBasedDto>,
-) -> ServiceResult<AuthTokenDto> {
+) -> ServiceResult<AuthTokenCookieDto> {
     let form = form.0;
     let account = state
         .db
@@ -108,12 +117,12 @@ async fn auth_password_based(
                         .create_session_token(
                             account.id,
                             models::AuthMethodType::PasswordBased,
-                            Utc::now().add(Duration::minutes(30)),
+                            Utc::now().add(Duration::minutes(60)),
                             false,
                         )
                         .await?;
 
-                    return Ok(AuthTokenDto { token });
+                    return Ok(AuthTokenCookieDto { token });
                 }
             }
         }
@@ -125,7 +134,7 @@ async fn auth_password_based(
 fn auth_password_based_docs(op: TransformOperation) -> TransformOperation {
     op.description("Login with username and password.")
         .tag("auth")
-        .response::<200, Json<AuthTokenDto>>()
+        .response::<200, Json<AuthTokenCookieDto>>()
         .response_with::<401, (), _>(|res| res.description("Invalid username or password!"))
 }
 
@@ -137,7 +146,7 @@ pub struct AuthNfcBasedNfcIdDto {
 async fn auth_nfc_based_nfc_id(
     mut state: RequestState,
     form: Json<AuthNfcBasedNfcIdDto>,
-) -> ServiceResult<AuthTokenDto> {
+) -> ServiceResult<Json<AuthTokenDto>> {
     let form = form.0;
 
     let card_id = general_purpose::STANDARD
@@ -163,13 +172,13 @@ async fn auth_nfc_based_nfc_id(
                         .db
                         .create_session_token(
                             account.id,
-                            models::AuthMethodType::PasswordBased,
+                            models::AuthMethodType::NfcBased,
                             Utc::now().add(Duration::minutes(30)),
                             false,
                         )
                         .await?;
 
-                    return Ok(AuthTokenDto { token });
+                    return Ok(Json(AuthTokenDto { token }));
                 }
             }
         }
@@ -328,7 +337,7 @@ async fn auth_nfc_based_ascii_mifare_response(
                         .db
                         .create_session_token(
                             account.id,
-                            models::AuthMethodType::PasswordBased,
+                            models::AuthMethodType::NfcBased,
                             Utc::now().add(Duration::minutes(30)),
                             false,
                         )
@@ -353,6 +362,50 @@ fn auth_nfc_based_ascii_mifare_response_docs(op: TransformOperation) -> Transfor
         .response::<200, Json<AuthNfcBasedAsciiMifareResponseResponseDto>>()
         .response_with::<401, (), _>(|res| res.description("Invalid response!"))
 }
+
+
+#[derive(Debug, PartialEq, Deserialize, JsonSchema)]
+pub struct AuthNfcBasedSimulationDto {
+    pub account_id: u64,
+}
+
+async fn auth_nfc_based_simulation(
+    mut state: RequestState,
+    form: Json<AuthNfcBasedSimulationDto>,
+) -> ServiceResult<Json<AuthTokenDto>> {
+    state.session_require_admin()?;
+
+    let form = form.0;
+
+    let account = state
+        .db
+        .get_account_by_id(form.account_id)
+        .await?;
+
+    if let Some(account) = account {
+        let token = state
+            .db
+            .create_session_token(
+                account.id,
+                models::AuthMethodType::NfcBased,
+                Utc::now().add(Duration::minutes(30)),
+                false,
+            )
+            .await?;
+
+        return Ok(Json(AuthTokenDto { token }));
+    }
+
+    Err(ServiceError::NotFound)
+}
+
+fn auth_nfc_based_simulation_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Simulate login with nfc card.")
+        .tag("auth")
+        .response::<200, Json<AuthTokenDto>>()
+        .response_with::<401, (), _>(|res| res.description("Invalid card_id!"))
+}
+
 
 async fn auth_delete(mut state: RequestState) -> ServiceResult<StatusCode> {
     if let Some(session) = state.session {
