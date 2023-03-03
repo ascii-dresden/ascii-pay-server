@@ -6,13 +6,12 @@ use axum::extract::{FromRef, FromRequestParts};
 use axum::http::request::Parts;
 use axum::{async_trait, RequestPartsExt, TypedHeader};
 use headers::authorization::Bearer;
-use headers::{Authorization, Cookie};
+use headers::Authorization;
 use tokio::sync::Mutex;
 
 use crate::database::{AppState, AppStateAsciiMifareChallenge, DatabaseConnection};
 use crate::error::{ServiceError, ServiceResult};
 use crate::models::{self, Session};
-use crate::SESSION_COOKIE_NAME;
 
 // we can also write a custom extractor that grabs a connection from the pool
 // which setup is appropriate depends on your application
@@ -45,13 +44,6 @@ where
         {
             let session_token = bearer.token().to_owned();
             db.get_session_by_session_token(session_token).await?
-        } else if let Ok(TypedHeader(cookie)) = parts.extract::<TypedHeader<Cookie>>().await {
-            if let Some(session_token) = cookie.get(SESSION_COOKIE_NAME) {
-                db.get_session_by_session_token(session_token.to_owned())
-                    .await?
-            } else {
-                None
-            }
         } else {
             None
         };
