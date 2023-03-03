@@ -24,7 +24,8 @@ mod migration;
 #[cfg(test)]
 mod tests;
 
-pub struct AppStateAsciiMifareChallenge {
+pub struct AppStateNfcChallenge {
+    pub valid_until: DateTime<Utc>,
     pub rnd_a: Vec<u8>,
     pub rnd_b: Vec<u8>,
 }
@@ -32,7 +33,7 @@ pub struct AppStateAsciiMifareChallenge {
 #[derive(Clone)]
 pub struct AppState {
     pub pool: Pool<Postgres>,
-    pub ascii_mifare_challenge: Arc<Mutex<HashMap<u64, AppStateAsciiMifareChallenge>>>,
+    pub ascii_mifare_challenge: Arc<Mutex<HashMap<u64, AppStateNfcChallenge>>>,
 }
 
 #[derive(sqlx::Type)]
@@ -100,13 +101,15 @@ impl From<AccountRow> for Account {
 enum CardTypeDto {
     NfcId,
     AsciiMifare,
+    HostCardEmulation,
 }
 
 impl From<CardTypeDto> for CardType {
     fn from(value: CardTypeDto) -> Self {
         match value {
-            CardTypeDto::NfcId => CardType::NfcId,
+            CardTypeDto::NfcId => CardType::GenericNfc,
             CardTypeDto::AsciiMifare => CardType::AsciiMifare,
+            CardTypeDto::HostCardEmulation => CardType::HostCardEmulation,
         }
     }
 }
@@ -114,8 +117,9 @@ impl From<CardTypeDto> for CardType {
 impl From<CardType> for CardTypeDto {
     fn from(value: CardType) -> Self {
         match value {
-            CardType::NfcId => CardTypeDto::NfcId,
+            CardType::GenericNfc => CardTypeDto::NfcId,
             CardType::AsciiMifare => CardTypeDto::AsciiMifare,
+            CardType::HostCardEmulation => CardTypeDto::HostCardEmulation,
         }
     }
 }

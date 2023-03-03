@@ -13,11 +13,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::database::AppState;
 use crate::error::{ServiceError, ServiceResult};
-use crate::models;
+use crate::models::{self, CardType};
 use crate::request_state::RequestState;
 
-use super::accounts::AccountDto;
-use super::{mifare, password_hash_verify};
+use super::accounts::{AccountDto, CardTypeDto};
+use super::{nfc_id, nfc_mifare, password_hash_verify};
 
 pub fn router(app_state: AppState) -> ApiRouter {
     ApiRouter::new()
@@ -26,25 +26,22 @@ pub fn router(app_state: AppState) -> ApiRouter {
             post_with(auth_password_based, auth_password_based_docs),
         )
         .api_route(
-            "/auth/nfc-id",
-            post_with(auth_nfc_based_nfc_id, auth_nfc_based_nfc_id_docs),
-        )
-        .api_route(
-            "/auth/ascii-mifare/challenge",
+            "/auth/nfc/identify",
             post_with(
-                auth_nfc_based_ascii_mifare_challenge,
-                auth_nfc_based_ascii_mifare_challenge_docs,
+                auth_nfc_based_nfc_identify,
+                auth_nfc_based_nfc_identify_docs,
             ),
         )
         .api_route(
-            "/auth/ascii-mifare/response",
-            post_with(
-                auth_nfc_based_ascii_mifare_response,
-                auth_nfc_based_ascii_mifare_response_docs,
-            ),
+            "/auth/nfc/challenge",
+            post_with(auth_nfc_based_challenge, auth_nfc_based_challenge_docs),
         )
         .api_route(
-            "/auth/nfc-simulation",
+            "/auth/nfc/response",
+            post_with(auth_nfc_based_response, auth_nfc_based_response_docs),
+        )
+        .api_route(
+            "/auth/nfc/simulation",
             post_with(auth_nfc_based_simulation, auth_nfc_based_simulation_docs),
         )
         .api_route(
@@ -114,20 +111,26 @@ fn auth_password_based_docs(op: TransformOperation) -> TransformOperation {
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
-pub struct AuthNfcBasedNfcIdDto {
+pub struct AuthNfcBasedNfcIdentifyDto {
     pub card_id: String,
 }
 
-async fn auth_nfc_based_nfc_id(
+#[derive(Debug, PartialEq, Serialize, JsonSchema)]
+pub struct AuthNfcBasedNfcIdentifyResponseDto {
+    pub card_id: String,
+    pub card_type: CardTypeDto,
+}
+
+async fn auth_nfc_based_nfc_identify(
     mut state: RequestState,
-    form: Json<AuthNfcBasedNfcIdDto>,
-) -> ServiceResult<Json<AuthTokenDto>> {
+    form: Json<AuthNfcBasedNfcIdentifyDto>,
+) -> ServiceResult<Json<AuthNfcBasedNfcIdentifyResponseDto>> {
     let form = form.0;
 
     state.db.cleanup_session_tokens().await?;
 
     let card_id = general_purpose::STANDARD
-        .decode(form.card_id)
+        .decode(form.card_id.clone())
         .map_err(|_| {
             ServiceError::InternalServerError(
                 "Could not decode base64 parameter 'card_id'.".to_string(),
@@ -145,17 +148,10 @@ async fn auth_nfc_based_nfc_id(
         for auth_method in account.auth_methods.iter() {
             if let models::AuthMethod::NfcBased(auth_nfc) = auth_method {
                 if auth_nfc.card_id == card_id {
-                    let token = state
-                        .db
-                        .create_session_token(
-                            account.id,
-                            models::AuthMethodType::NfcBased,
-                            Utc::now().add(Duration::minutes(30)),
-                            false,
-                        )
-                        .await?;
-
-                    return Ok(Json(AuthTokenDto { token }));
+                    return Ok(Json(AuthNfcBasedNfcIdentifyResponseDto {
+                        card_id: form.card_id,
+                        card_type: (&auth_nfc.card_type).into(),
+                    }));
                 }
             }
         }
@@ -164,31 +160,31 @@ async fn auth_nfc_based_nfc_id(
     Err(ServiceError::Unauthorized("Invalid card_id"))
 }
 
-fn auth_nfc_based_nfc_id_docs(op: TransformOperation) -> TransformOperation {
+fn auth_nfc_based_nfc_identify_docs(op: TransformOperation) -> TransformOperation {
     op.description("Login with nfc card id.")
         .tag("auth")
-        .response::<200, Json<AuthTokenDto>>()
+        .response::<200, Json<AuthNfcBasedNfcIdentifyResponseDto>>()
         .response_with::<401, (), _>(|res| res.description("Invalid card_id!"))
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 #[allow(non_snake_case)]
-pub struct AuthNfcBasedAsciiMifareChallengeDto {
+pub struct AuthNfcBasedChallengeDto {
     pub card_id: String,
-    pub ek_rndB: String,
+    pub request: String,
 }
 #[derive(Debug, PartialEq, Serialize, JsonSchema)]
 #[allow(non_snake_case)]
-pub struct AuthNfcBasedAsciiMifareChallengeResponseDto {
+pub struct AuthNfcBasedChallengeResponseDto {
     pub card_id: String,
-    pub dk_rndA_rndBshifted: String,
+    pub challenge: String,
 }
 
 #[allow(non_snake_case)]
-async fn auth_nfc_based_ascii_mifare_challenge(
+async fn auth_nfc_based_challenge(
     mut state: RequestState,
-    form: Json<AuthNfcBasedAsciiMifareChallengeDto>,
-) -> ServiceResult<Json<AuthNfcBasedAsciiMifareChallengeResponseDto>> {
+    form: Json<AuthNfcBasedChallengeDto>,
+) -> ServiceResult<Json<AuthNfcBasedChallengeResponseDto>> {
     let form = form.0;
 
     state.db.cleanup_session_tokens().await?;
@@ -209,8 +205,8 @@ async fn auth_nfc_based_ascii_mifare_challenge(
         .await?;
 
     if let Some(account) = account {
-        let ek_rndB = general_purpose::STANDARD
-            .decode(form.ek_rndB)
+        let request = general_purpose::STANDARD
+            .decode(form.request)
             .map_err(|_| {
                 ServiceError::InternalServerError(
                     "Could not decode base64 parameter 'ek_rndB'.".to_string(),
@@ -220,17 +216,30 @@ async fn auth_nfc_based_ascii_mifare_challenge(
         for auth_method in account.auth_methods.iter() {
             if let models::AuthMethod::NfcBased(auth_nfc) = auth_method {
                 if auth_nfc.card_id == card_id {
-                    let dk_rndA_rndBshifted = mifare::authenticate_nfc_mifare_desfire_phase1(
-                        &state.ascii_mifare_challenge,
-                        account.id,
-                        auth_nfc,
-                        &ek_rndB,
-                    )
-                    .await?;
+                    let challenge = match auth_nfc.card_type {
+                        CardType::AsciiMifare => {
+                            nfc_mifare::authenticate_phase_challenge(
+                                &state.challenge_storage,
+                                account.id,
+                                auth_nfc,
+                                &request,
+                            )
+                            .await?
+                        }
+                        _ => {
+                            nfc_id::authenticate_phase_challenge(
+                                &state.challenge_storage,
+                                account.id,
+                                auth_nfc,
+                                &request,
+                            )
+                            .await?
+                        }
+                    };
 
-                    return Ok(Json(AuthNfcBasedAsciiMifareChallengeResponseDto {
+                    return Ok(Json(AuthNfcBasedChallengeResponseDto {
                         card_id: general_purpose::STANDARD.encode(card_id),
-                        dk_rndA_rndBshifted: general_purpose::STANDARD.encode(dk_rndA_rndBshifted),
+                        challenge: general_purpose::STANDARD.encode(challenge),
                     }));
                 }
             }
@@ -240,33 +249,33 @@ async fn auth_nfc_based_ascii_mifare_challenge(
     Err(ServiceError::Unauthorized("Invalid challenge!"))
 }
 
-fn auth_nfc_based_ascii_mifare_challenge_docs(op: TransformOperation) -> TransformOperation {
+fn auth_nfc_based_challenge_docs(op: TransformOperation) -> TransformOperation {
     op.description("Request challenge.")
         .tag("auth")
-        .response::<200, Json<AuthNfcBasedAsciiMifareChallengeResponseDto>>()
+        .response::<200, Json<AuthNfcBasedChallengeResponseDto>>()
         .response_with::<401, (), _>(|res| res.description("Invalid challenge!"))
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 #[allow(non_snake_case)]
-pub struct AuthNfcBasedAsciiMifareResponseDto {
+pub struct AuthNfcBasedResponseDto {
     pub card_id: String,
-    pub dk_rndA_rndBshifted: String,
-    pub ek_rndAshifted_card: String,
+    pub challenge: String,
+    pub response: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, JsonSchema)]
-pub struct AuthNfcBasedAsciiMifareResponseResponseDto {
+pub struct AuthNfcBasedResponseResponseDto {
     pub card_id: String,
-    pub session_key: String,
     pub token: String,
+    pub session_key: String,
 }
 
 #[allow(non_snake_case)]
-async fn auth_nfc_based_ascii_mifare_response(
+async fn auth_nfc_based_response(
     mut state: RequestState,
-    form: Json<AuthNfcBasedAsciiMifareResponseDto>,
-) -> ServiceResult<Json<AuthNfcBasedAsciiMifareResponseResponseDto>> {
+    form: Json<AuthNfcBasedResponseDto>,
+) -> ServiceResult<Json<AuthNfcBasedResponseResponseDto>> {
     let form = form.0;
 
     let card_id = general_purpose::STANDARD
@@ -285,15 +294,15 @@ async fn auth_nfc_based_ascii_mifare_response(
         .await?;
 
     if let Some(account) = account {
-        let dk_rndA_rndBshifted = general_purpose::STANDARD
-            .decode(form.dk_rndA_rndBshifted)
+        let challenge = general_purpose::STANDARD
+            .decode(form.challenge)
             .map_err(|_| {
                 ServiceError::InternalServerError(
                     "Could not decode base64 parameter 'dk_rndA_rndBshifted'.".to_string(),
                 )
             })?;
-        let ek_rndAshifted_card = general_purpose::STANDARD
-            .decode(form.ek_rndAshifted_card)
+        let response = general_purpose::STANDARD
+            .decode(form.response)
             .map_err(|_| {
                 ServiceError::InternalServerError(
                     "Could not decode base64 parameter 'ek_rndAshifted_card'.".to_string(),
@@ -303,14 +312,28 @@ async fn auth_nfc_based_ascii_mifare_response(
         for auth_method in account.auth_methods.iter() {
             if let models::AuthMethod::NfcBased(auth_nfc) = auth_method {
                 if auth_nfc.card_id == card_id {
-                    let session_key = mifare::authenticate_nfc_mifare_desfire_phase2(
-                        &state.ascii_mifare_challenge,
-                        account.id,
-                        auth_nfc,
-                        &dk_rndA_rndBshifted,
-                        &ek_rndAshifted_card,
-                    )
-                    .await?;
+                    let session_key = match auth_nfc.card_type {
+                        CardType::AsciiMifare => {
+                            nfc_mifare::authenticate_phase_response(
+                                &state.challenge_storage,
+                                account.id,
+                                auth_nfc,
+                                &challenge,
+                                &response,
+                            )
+                            .await?
+                        }
+                        _ => {
+                            nfc_id::authenticate_phase_response(
+                                &state.challenge_storage,
+                                account.id,
+                                auth_nfc,
+                                &challenge,
+                                &response,
+                            )
+                            .await?
+                        }
+                    };
 
                     let token = state
                         .db
@@ -322,7 +345,7 @@ async fn auth_nfc_based_ascii_mifare_response(
                         )
                         .await?;
 
-                    return Ok(Json(AuthNfcBasedAsciiMifareResponseResponseDto {
+                    return Ok(Json(AuthNfcBasedResponseResponseDto {
                         card_id: general_purpose::STANDARD.encode(card_id),
                         session_key: general_purpose::STANDARD.encode(session_key),
                         token,
@@ -335,10 +358,10 @@ async fn auth_nfc_based_ascii_mifare_response(
     Err(ServiceError::Unauthorized("Invalid response!"))
 }
 
-fn auth_nfc_based_ascii_mifare_response_docs(op: TransformOperation) -> TransformOperation {
+fn auth_nfc_based_response_docs(op: TransformOperation) -> TransformOperation {
     op.description("Respond to challenge.")
         .tag("auth")
-        .response::<200, Json<AuthNfcBasedAsciiMifareResponseResponseDto>>()
+        .response::<200, Json<AuthNfcBasedResponseResponseDto>>()
         .response_with::<401, (), _>(|res| res.description("Invalid response!"))
 }
 

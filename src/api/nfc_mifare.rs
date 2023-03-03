@@ -1,16 +1,17 @@
 use std::collections::HashMap;
+use std::ops::Add;
 use std::sync::Arc;
 
 use block_modes::block_padding::ZeroPadding;
 use block_modes::cipher::{BlockCipher, BlockDecrypt, BlockEncrypt, NewBlockCipher};
 use block_modes::{BlockMode, Cbc};
+use chrono::{Duration, Utc};
 use des::TdesEde2;
 use generic_array::GenericArray;
-use hex_literal::hex;
 use rand::RngCore;
 use tokio::sync::Mutex;
 
-use crate::database::AppStateAsciiMifareChallenge;
+use crate::database::AppStateNfcChallenge;
 use crate::error::{ServiceError, ServiceResult};
 use crate::models::AuthNfc;
 
@@ -56,7 +57,7 @@ fn tdes_encrypt(key: &[u8], value: &[u8]) -> ServiceResult<Vec<u8>> {
 
     let key = GenericArray::from_slice(&v);
 
-    let iv = GenericArray::from_slice(&hex!("00 00 00 00 00 00 00 00"));
+    let iv = GenericArray::from_slice(&[0u8; 8]);
     let cipher: Cbc<MiFareTdes, ZeroPadding> = Cbc::new(MiFareTdes::new(key), iv);
 
     Ok(cipher.encrypt_vec(value))
@@ -72,7 +73,7 @@ fn tdes_decrypt(key: &[u8], value: &[u8]) -> ServiceResult<Vec<u8>> {
 
     let key = GenericArray::from_slice(&v);
 
-    let iv = GenericArray::from_slice(&hex!("00 00 00 00 00 00 00 00"));
+    let iv = GenericArray::from_slice(&[0u8; 8]);
     let cipher: Cbc<MiFareTdes, ZeroPadding> = Cbc::new(MiFareTdes::new(key), iv);
 
     Ok(cipher.decrypt_vec(value)?)
@@ -105,17 +106,19 @@ fn vec_to_array<T, const N: usize>(v: Vec<T>) -> ServiceResult<[T; N]> {
 }
 
 #[allow(non_snake_case)]
-pub async fn authenticate_nfc_mifare_desfire_phase1(
-    ascii_mifare_challenge: &Arc<Mutex<HashMap<u64, AppStateAsciiMifareChallenge>>>,
+pub async fn authenticate_phase_challenge(
+    challenge_storage: &Arc<Mutex<HashMap<u64, AppStateNfcChallenge>>>,
     account_id: u64,
     auth_nfc: &AuthNfc,
-    ek_rndB: &[u8],
+    request: &[u8],
 ) -> ServiceResult<Vec<u8>> {
+    let ek_rndB = request;
     let key = auth_nfc.data.clone();
 
     let rndA = generate_key();
     let rndB = vec_to_array::<u8, 8>(tdes_decrypt(&key, ek_rndB)?)?;
-    let state = AppStateAsciiMifareChallenge {
+    let state = AppStateNfcChallenge {
+        valid_until: Utc::now().add(Duration::seconds(10)),
         rnd_a: rndA.to_vec(),
         rnd_b: rndB.to_vec(),
     };
@@ -130,26 +133,32 @@ pub async fn authenticate_nfc_mifare_desfire_phase1(
 
     let dk_rndA_rndBshifted = tdes_encrypt(&key, &rndA_rndBshifted)?;
 
-    let mut map = ascii_mifare_challenge.lock().await;
+    let mut map = challenge_storage.lock().await;
     map.insert(account_id, state);
 
     Ok(dk_rndA_rndBshifted)
 }
 
 #[allow(non_snake_case)]
-pub async fn authenticate_nfc_mifare_desfire_phase2(
-    ascii_mifare_challenge: &Arc<Mutex<HashMap<u64, AppStateAsciiMifareChallenge>>>,
+pub async fn authenticate_phase_response(
+    challenge_storage: &Arc<Mutex<HashMap<u64, AppStateNfcChallenge>>>,
     account_id: u64,
     auth_nfc: &AuthNfc,
-    dk_rndA_rndBshifted: &[u8],
-    ek_rndAshifted_card: &[u8],
+    challenge: &[u8],
+    response: &[u8],
 ) -> ServiceResult<Vec<u8>> {
+    let dk_rndA_rndBshifted = challenge;
+    let ek_rndAshifted_card = response;
     let key = auth_nfc.data.clone();
 
-    let mut map = ascii_mifare_challenge.lock().await;
+    let mut map = challenge_storage.lock().await;
     let state = map.remove(&account_id).ok_or(ServiceError::Unauthorized(
         "response does not match challenge!",
     ))?;
+
+    if state.valid_until < Utc::now() {
+        return Err(ServiceError::Unauthorized("challenge response timeout!"));
+    }
 
     let rndA = state.rnd_a;
     let rndB = state.rnd_b;
