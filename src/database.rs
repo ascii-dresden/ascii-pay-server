@@ -468,6 +468,18 @@ impl DatabaseConnection {
         Ok(())
     }
 
+    pub async fn cleanup_session_tokens(&mut self) -> ServiceResult<()> {
+        let r = sqlx::query(
+            r#"
+            DELETE FROM session WHERE valid_until < now()
+        "#,
+        )
+        .execute(&mut self.connection)
+        .await;
+        to_service_result(r)?;
+        Ok(())
+    }
+
     pub async fn get_session_by_session_token(
         &mut self,
         session_token: String,
