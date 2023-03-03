@@ -71,6 +71,9 @@ async fn auth_password_based(
     form: Json<AuthPasswordBasedDto>,
 ) -> ServiceResult<Json<AuthTokenDto>> {
     let form = form.0;
+
+    state.db.cleanup_session_tokens().await?;
+
     let account = state
         .db
         .get_account_by_auth_method(models::AuthRequest::PasswordBased {
@@ -120,6 +123,8 @@ async fn auth_nfc_based_nfc_id(
     form: Json<AuthNfcBasedNfcIdDto>,
 ) -> ServiceResult<Json<AuthTokenDto>> {
     let form = form.0;
+
+    state.db.cleanup_session_tokens().await?;
 
     let card_id = general_purpose::STANDARD
         .decode(form.card_id)
@@ -185,6 +190,8 @@ async fn auth_nfc_based_ascii_mifare_challenge(
     form: Json<AuthNfcBasedAsciiMifareChallengeDto>,
 ) -> ServiceResult<Json<AuthNfcBasedAsciiMifareChallengeResponseDto>> {
     let form = form.0;
+
+    state.db.cleanup_session_tokens().await?;
 
     let card_id = general_purpose::STANDARD
         .decode(form.card_id)
@@ -344,6 +351,8 @@ async fn auth_nfc_based_simulation(
     mut state: RequestState,
     form: Json<AuthNfcBasedSimulationDto>,
 ) -> ServiceResult<Json<AuthTokenDto>> {
+    state.db.cleanup_session_tokens().await?;
+
     state.session_require_admin()?;
 
     let form = form.0;
@@ -378,6 +387,8 @@ async fn auth_delete(mut state: RequestState) -> ServiceResult<StatusCode> {
     if let Some(session) = state.session {
         state.db.delete_session_token(session.token).await?;
     }
+
+    state.db.cleanup_session_tokens().await?;
 
     Ok(StatusCode::NO_CONTENT)
 }
