@@ -22,6 +22,7 @@ schemars = { version = "0.8.11" }
 headers = "0.3.8"
 
 block-modes = "0.8"
+aes = "0.7"
 des = "0.7"
 generic-array = "0.14.6"
 hex-literal = "0.3.4"

@@ -119,7 +119,7 @@ async fn test_account_crud(pool: PgPool) {
     let john_nfc = AuthMethod::NfcBased(AuthNfc {
         card_id: vec![1; 32],
         data: vec![],
-        card_type: CardType::NfcId,
+        card_type: CardType::GenericNfc,
         name: "My NFC Card".to_string(),
     });
     acc1.auth_methods.push(john_nfc.clone());

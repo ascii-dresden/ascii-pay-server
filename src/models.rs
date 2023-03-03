@@ -19,8 +19,9 @@ pub enum Role {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum CardType {
-    NfcId,
+    GenericNfc,
     AsciiMifare,
+    HostCardEmulation,
 }
 
 #[derive(Debug, PartialEq, Clone)]

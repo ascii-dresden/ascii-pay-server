@@ -9,7 +9,7 @@ use headers::authorization::Bearer;
 use headers::Authorization;
 use tokio::sync::Mutex;
 
-use crate::database::{AppState, AppStateAsciiMifareChallenge, DatabaseConnection};
+use crate::database::{AppState, AppStateNfcChallenge, DatabaseConnection};
 use crate::error::{ServiceError, ServiceResult};
 use crate::models::{self, Session};
 
@@ -18,7 +18,7 @@ use crate::models::{self, Session};
 pub struct RequestState {
     pub db: DatabaseConnection,
     pub session: Option<Session>,
-    pub ascii_mifare_challenge: Arc<Mutex<HashMap<u64, AppStateAsciiMifareChallenge>>>,
+    pub challenge_storage: Arc<Mutex<HashMap<u64, AppStateNfcChallenge>>>,
 }
 
 #[async_trait]
@@ -51,7 +51,7 @@ where
         Ok(Self {
             db,
             session,
-            ascii_mifare_challenge: state.ascii_mifare_challenge.clone(),
+            challenge_storage: state.ascii_mifare_challenge.clone(),
         })
     }
 }
