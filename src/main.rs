@@ -19,8 +19,6 @@ mod error;
 mod models;
 mod request_state;
 
-pub const SESSION_COOKIE_NAME: &str = "ascii_pay_session";
-
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();

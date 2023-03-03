@@ -3,21 +3,18 @@ use std::ops::Add;
 use aide::axum::routing::{delete_with, get_with, post_with};
 use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
-use aide::OperationOutput;
-use axum::http::{header, StatusCode};
-use axum::response::IntoResponse;
+use axum::http::StatusCode;
 use axum::Json;
 use base64::engine::general_purpose;
 use base64::Engine;
 use chrono::{Duration, Utc};
-use headers::{HeaderMap, HeaderValue};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::database::AppState;
 use crate::error::{ServiceError, ServiceResult};
+use crate::models;
 use crate::request_state::RequestState;
-use crate::{models, SESSION_COOKIE_NAME};
 
 use super::accounts::AccountDto;
 use super::{mifare, password_hash_verify};
@@ -59,31 +56,6 @@ pub fn router(app_state: AppState) -> ApiRouter {
 }
 
 #[derive(Debug, PartialEq, Serialize, JsonSchema)]
-pub struct AuthTokenCookieDto {
-    pub token: String,
-}
-
-impl OperationOutput for AuthTokenCookieDto {
-    type Inner = AuthTokenCookieDto;
-}
-impl IntoResponse for AuthTokenCookieDto {
-    fn into_response(self) -> axum::response::Response {
-        let cookie = HeaderValue::from_str(
-            format!(
-                "{}={}; Path=/api/v1; HttpOnly; SameSite=None",
-                SESSION_COOKIE_NAME, self.token
-            )
-            .as_str(),
-        )
-        .unwrap();
-
-        let mut header = HeaderMap::new();
-        header.insert(header::SET_COOKIE, cookie);
-        (StatusCode::OK, header, Json(self)).into_response()
-    }
-}
-
-#[derive(Debug, PartialEq, Serialize, JsonSchema)]
 pub struct AuthTokenDto {
     pub token: String,
 }
@@ -97,7 +69,7 @@ pub struct AuthPasswordBasedDto {
 async fn auth_password_based(
     mut state: RequestState,
     form: Json<AuthPasswordBasedDto>,
-) -> ServiceResult<AuthTokenCookieDto> {
+) -> ServiceResult<Json<AuthTokenDto>> {
     let form = form.0;
     let account = state
         .db
@@ -122,7 +94,7 @@ async fn auth_password_based(
                         )
                         .await?;
 
-                    return Ok(AuthTokenCookieDto { token });
+                    return Ok(Json(AuthTokenDto { token }));
                 }
             }
         }
@@ -134,7 +106,7 @@ async fn auth_password_based(
 fn auth_password_based_docs(op: TransformOperation) -> TransformOperation {
     op.description("Login with username and password.")
         .tag("auth")
-        .response::<200, Json<AuthTokenCookieDto>>()
+        .response::<200, Json<AuthTokenDto>>()
         .response_with::<401, (), _>(|res| res.description("Invalid username or password!"))
 }
 
@@ -363,7 +335,6 @@ fn auth_nfc_based_ascii_mifare_response_docs(op: TransformOperation) -> Transfor
         .response_with::<401, (), _>(|res| res.description("Invalid response!"))
 }
 
-
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 pub struct AuthNfcBasedSimulationDto {
     pub account_id: u64,
@@ -377,10 +348,7 @@ async fn auth_nfc_based_simulation(
 
     let form = form.0;
 
-    let account = state
-        .db
-        .get_account_by_id(form.account_id)
-        .await?;
+    let account = state.db.get_account_by_id(form.account_id).await?;
 
     if let Some(account) = account {
         let token = state
@@ -405,7 +373,6 @@ fn auth_nfc_based_simulation_docs(op: TransformOperation) -> TransformOperation 
         .response::<200, Json<AuthTokenDto>>()
         .response_with::<401, (), _>(|res| res.description("Invalid card_id!"))
 }
-
 
 async fn auth_delete(mut state: RequestState) -> ServiceResult<StatusCode> {
     if let Some(session) = state.session {
