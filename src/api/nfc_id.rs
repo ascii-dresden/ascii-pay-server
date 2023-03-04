@@ -51,7 +51,7 @@ impl BlockDecrypt for NfcAes {
 fn aes_encrypt(key: &[u8], value: &[u8]) -> ServiceResult<Vec<u8>> {
     let key = GenericArray::from_slice(key);
 
-    let iv = GenericArray::from_slice(&[0u8; 32]);
+    let iv = GenericArray::from_slice(&[0u8; 16]);
     let cipher: Cbc<NfcAes, ZeroPadding> = Cbc::new(NfcAes::new(key), iv);
 
     Ok(cipher.encrypt_vec(value))
@@ -60,7 +60,7 @@ fn aes_encrypt(key: &[u8], value: &[u8]) -> ServiceResult<Vec<u8>> {
 fn aes_decrypt(key: &[u8], value: &[u8]) -> ServiceResult<Vec<u8>> {
     let key = GenericArray::from_slice(key);
 
-    let iv = GenericArray::from_slice(&[0u8; 32]);
+    let iv = GenericArray::from_slice(&[0u8; 16]);
     let cipher: Cbc<NfcAes, ZeroPadding> = Cbc::new(NfcAes::new(key), iv);
 
     Ok(cipher.decrypt_vec(value)?)
@@ -166,7 +166,7 @@ pub async fn authenticate_phase_response(
 
     let rndAshifted_card = aes_decrypt(&key, ek_rndAshifted_card)?;
 
-    let mut rndAshifted: Vec<u8> = Vec::with_capacity(132);
+    let mut rndAshifted: Vec<u8> = Vec::with_capacity(32);
     rndAshifted.extend(&rndA[1..32]);
     rndAshifted.push(rndA[0]);
 

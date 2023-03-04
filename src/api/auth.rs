@@ -118,7 +118,7 @@ pub struct AuthNfcBasedNfcIdentifyDto {
 #[derive(Debug, PartialEq, Serialize, JsonSchema)]
 pub struct AuthNfcBasedNfcIdentifyResponseDto {
     pub card_id: String,
-    pub card_type: CardTypeDto,
+    pub card_type: Option<CardTypeDto>,
 }
 
 async fn auth_nfc_based_nfc_identify(
@@ -150,14 +150,17 @@ async fn auth_nfc_based_nfc_identify(
                 if auth_nfc.card_id == card_id {
                     return Ok(Json(AuthNfcBasedNfcIdentifyResponseDto {
                         card_id: form.card_id,
-                        card_type: (&auth_nfc.card_type).into(),
+                        card_type: Some((&auth_nfc.card_type).into()),
                     }));
                 }
             }
         }
     }
 
-    Err(ServiceError::Unauthorized("Invalid card_id"))
+    Ok(Json(AuthNfcBasedNfcIdentifyResponseDto {
+        card_id: form.card_id,
+        card_type: None,
+    }))
 }
 
 fn auth_nfc_based_nfc_identify_docs(op: TransformOperation) -> TransformOperation {
@@ -209,7 +212,7 @@ async fn auth_nfc_based_challenge(
             .decode(form.request)
             .map_err(|_| {
                 ServiceError::InternalServerError(
-                    "Could not decode base64 parameter 'ek_rndB'.".to_string(),
+                    "Could not decode base64 parameter 'request'.".to_string(),
                 )
             })?;
 
@@ -298,14 +301,14 @@ async fn auth_nfc_based_response(
             .decode(form.challenge)
             .map_err(|_| {
                 ServiceError::InternalServerError(
-                    "Could not decode base64 parameter 'dk_rndA_rndBshifted'.".to_string(),
+                    "Could not decode base64 parameter 'challenge'.".to_string(),
                 )
             })?;
         let response = general_purpose::STANDARD
             .decode(form.response)
             .map_err(|_| {
                 ServiceError::InternalServerError(
-                    "Could not decode base64 parameter 'ek_rndAshifted_card'.".to_string(),
+                    "Could not decode base64 parameter 'response'.".to_string(),
                 )
             })?;
 
