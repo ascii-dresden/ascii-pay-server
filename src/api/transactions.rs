@@ -11,7 +11,7 @@ use crate::error::{ServiceError, ServiceResult};
 use crate::models;
 use crate::request_state::RequestState;
 
-use super::accounts::CoinAmountDto;
+use super::accounts::{AccountDto, CoinAmountDto};
 use super::products::ProductDto;
 
 pub fn router(app_state: AppState) -> ApiRouter {
@@ -127,11 +127,17 @@ pub struct PaymentDto {
     pub items: Vec<PaymentItemDto>,
 }
 
+#[derive(Debug, PartialEq, Serialize, JsonSchema)]
+pub struct PaymentResponseDto {
+    pub account: AccountDto,
+    pub transaction: TransactionDto,
+}
+
 async fn post_payment(
     mut state: RequestState,
     Path(id): Path<u64>,
     form: Json<PaymentDto>,
-) -> ServiceResult<Json<TransactionDto>> {
+) -> ServiceResult<Json<PaymentResponseDto>> {
     state.session_require_admin_or_self(id)?;
 
     let form = form.0;
@@ -149,13 +155,21 @@ async fn post_payment(
     };
 
     let transaction = state.db.payment(payment).await?;
-    Ok(Json(TransactionDto::from(&transaction)))
+    let account = state.db.get_account_by_id(id).await?;
+    if let Some(account) = account {
+        return Ok(Json(PaymentResponseDto {
+            account: AccountDto::from(&account),
+            transaction: TransactionDto::from(&transaction),
+        }));
+    }
+
+    Err(ServiceError::NotFound)
 }
 
 fn post_payment_docs(op: TransformOperation) -> TransformOperation {
     op.description("Execute a payment from the given account.")
         .tag("transactions")
-        .response::<200, Json<TransactionDto>>()
+        .response::<200, Json<PaymentResponseDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
         .response_with::<401, (), _>(|res| res.description("Missing login!"))
         .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
