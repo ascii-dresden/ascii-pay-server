@@ -28,6 +28,10 @@ pub fn router(app_state: AppState) -> ApiRouter {
             "/account/:id/transactions",
             get_with(list_transactions, list_transactions_docs),
         )
+        .api_route(
+            "/transactions",
+            get_with(list_global_transactions, list_global_transactions_docs),
+        )
         .with_state(app_state)
 }
 
@@ -79,6 +83,25 @@ pub async fn list_transactions(
 
 fn list_transactions_docs(op: TransformOperation) -> TransformOperation {
     op.description("List all transactions for the given account.")
+        .tag("transactions")
+        .response::<200, Json<Vec<TransactionDto>>>()
+        .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["admin", "self"])
+}
+
+pub async fn list_global_transactions(
+    mut state: RequestState,
+) -> ServiceResult<Json<Vec<TransactionDto>>> {
+    state.session_require_admin()?;
+
+    let transactions = state.db.get_transactions().await?;
+    Ok(Json(transactions.iter().map(|t| t.into()).collect()))
+}
+
+fn list_global_transactions_docs(op: TransformOperation) -> TransformOperation {
+    op.description("List all transactions.")
         .tag("transactions")
         .response::<200, Json<Vec<TransactionDto>>>()
         .response_with::<404, (), _>(|res| res.description("The requested account does not exist!"))
