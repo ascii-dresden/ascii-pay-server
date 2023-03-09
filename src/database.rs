@@ -826,6 +826,51 @@ impl DatabaseConnection {
         Ok(())
     }
 
+    pub async fn get_transactions(&mut self) -> ServiceResult<Vec<models::Transaction>> {
+        let mut r = sqlx::query(
+            r#"
+                SELECT
+                    item.transaction_id as transaction_id,
+                    item.timestamp as timestamp,
+                    item.account_id as account_id,
+                    item.effective_price_cents as effective_price_cents,
+                    item.effective_price_coffee_stamps as effective_price_coffee_stamps,
+                    item.effective_price_bottle_stamps as effective_price_bottle_stamps,
+                    p.id as id,
+                    p.name as name,
+                    p.price_cents as price_cents,
+                    p.price_coffee_stamps as price_coffee_stamps,
+                    p.price_bottle_stamps as price_bottle_stamps,
+                    p.bonus_cents as bonus_cents,
+                    p.bonus_coffee_stamps as bonus_coffee_stamps,
+                    p.bonus_bottle_stamps as bonus_bottle_stamps,
+                    p.nickname as nickname,
+                    NULL as image,
+                    NULL as image_mimetype,
+                    p.barcode as barcode,
+                    p.category as category,
+                    p.tags as tags
+                FROM
+                    transaction_item item
+                    LEFT OUTER JOIN product p ON item.product_id = p.id
+                ORDER BY item.transaction_id ASC
+            "#,
+        )
+        .fetch(&mut self.connection);
+
+        let mut out: Vec<Transaction> = Vec::new();
+        while let Some(row) = r.next().await {
+            let row = to_service_result(row)?;
+
+            let new_tx = extend_transaction_with_row(out.last_mut(), row)?;
+            if let Some(tx) = new_tx {
+                out.push(tx);
+            }
+        }
+
+        Ok(out)
+    }
+
     pub async fn get_transactions_by_account(
         &mut self,
         account_id: u64,
