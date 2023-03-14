@@ -120,14 +120,14 @@ impl From<RoleDto> for models::Role {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub enum CardTypeDto {
-    NfcId,
+    GenericNfc,
     AsciiMifare,
     HostCardEmulation,
 }
 impl From<&models::CardType> for CardTypeDto {
     fn from(value: &models::CardType) -> Self {
         match value {
-            models::CardType::GenericNfc => CardTypeDto::NfcId,
+            models::CardType::GenericNfc => CardTypeDto::GenericNfc,
             models::CardType::AsciiMifare => CardTypeDto::AsciiMifare,
             models::CardType::HostCardEmulation => CardTypeDto::HostCardEmulation,
         }
@@ -136,7 +136,7 @@ impl From<&models::CardType> for CardTypeDto {
 impl From<CardTypeDto> for models::CardType {
     fn from(value: CardTypeDto) -> Self {
         match value {
-            CardTypeDto::NfcId => models::CardType::GenericNfc,
+            CardTypeDto::GenericNfc => models::CardType::GenericNfc,
             CardTypeDto::AsciiMifare => models::CardType::AsciiMifare,
             CardTypeDto::HostCardEmulation => models::CardType::HostCardEmulation,
         }
