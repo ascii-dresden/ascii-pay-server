@@ -371,7 +371,7 @@ pub fn test_transaction(pool: PgPool) {
         account: acc1.id,
         items: vec![item1.clone(), item_no_product_id.clone()],
     };
-    let tx1 = db.payment(payment1.clone()).await.unwrap();
+    let tx1 = db.payment(payment1.clone(), Utc::now()).await.unwrap();
 
     let mut product1_without_image = product1.clone();
     product1_without_image.image = None;
@@ -393,10 +393,13 @@ pub fn test_transaction(pool: PgPool) {
     );
 
     let tx2 = db
-        .payment(Payment {
-            account: acc2.id,
-            items: vec![item_no_product_id],
-        })
+        .payment(
+            Payment {
+                account: acc2.id,
+                items: vec![item_no_product_id],
+            },
+            Utc::now(),
+        )
         .await
         .unwrap();
 
@@ -440,7 +443,7 @@ pub fn test_transaction(pool: PgPool) {
     );
 
     // it should be possible to do the same payment again
-    let tx3 = db.payment(payment1.clone()).await.unwrap();
+    let tx3 = db.payment(payment1.clone(), Utc::now()).await.unwrap();
     assert_eq!(tx3.items, tx1.items);
     assert_eq!(tx3.account, tx1.account);
 

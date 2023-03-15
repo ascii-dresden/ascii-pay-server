@@ -11,7 +11,7 @@ path = "src/main.rs"
 [dependencies]
 tokio = { version = "1.25.0", features = ["full"] }
 axum = { version="0.6.4", features=["multipart", "headers"] }
-tower-http = { version = "0.4.0", features = ["cors", "compression-br"] }
+tower-http = { version = "0.4.0", features = ["cors"] }
 sqlx = { version = "0.6.2", features = ["runtime-tokio-rustls", "postgres", "json", "chrono"] }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version="1.0.91" }

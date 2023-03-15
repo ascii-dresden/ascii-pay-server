@@ -1,5 +1,3 @@
-use aide::axum::routing::get;
-use aide::axum::ApiRouter;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
@@ -7,10 +5,9 @@ use std::hash::Hash;
 use std::path::PathBuf;
 
 use crate::{
-    database::{AppState, DatabaseConnection},
+    database::DatabaseConnection,
     error::ServiceResult,
     models::{CoinAmount, CoinType, Image, Product},
-    request_state::RequestState,
 };
 
 #[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone)]
@@ -66,15 +63,16 @@ struct OldCategoryFile {
     pub products: Vec<OldProduct>,
 }
 
-async fn load_product_repo_into_database(
+pub async fn load_product_repo_into_database(
     db: &mut DatabaseConnection,
     path: &str,
-) -> ServiceResult<()> {
+) -> ServiceResult<HashMap<String, u64>> {
     let path = PathBuf::from(path);
     let config_file = path.join("main.json");
 
     let mut file = File::open(&config_file).unwrap();
     let dataset: Vec<OldCategoryFile> = serde_json::from_reader(&mut file).unwrap();
+    let mut dict = HashMap::<String, u64>::new();
 
     for category in dataset {
         for mut product in category.products {
@@ -117,6 +115,8 @@ async fn load_product_repo_into_database(
                 })
                 .await?;
 
+            dict.insert(product.id, new_product.id);
+
             if let Some(image) = product.image {
                 let image_path = path.join(image);
                 let bytes = std::fs::read(image_path).unwrap();
@@ -133,17 +133,5 @@ async fn load_product_repo_into_database(
         }
     }
 
-    Ok(())
-}
-
-pub fn router(app_state: AppState) -> ApiRouter {
-    ApiRouter::new()
-        .route("/products/import", get(import_products))
-        .with_state(app_state)
-}
-
-pub async fn import_products(mut state: RequestState) -> ServiceResult<()> {
-    let path = std::env::var("ASCII_PAY_PRODUCTS").unwrap_or_else(|_| "./".to_string());
-    load_product_repo_into_database(&mut state.db, path.as_str()).await?;
-    Ok(())
+    Ok(dict)
 }
