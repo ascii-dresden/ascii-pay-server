@@ -74,6 +74,8 @@ struct AccountRow {
     email: String,
     role: AccountRoleDto,
     auth_methods: Vec<Json<AccountAuthMethodData>>,
+    enable_monthly_mail_report: bool,
+    enable_automatic_stamp_usage: bool,
 }
 
 impl From<AccountRow> for Account {
@@ -92,6 +94,8 @@ impl From<AccountRow> for Account {
             email: row.email,
             role: row.role.into(),
             auth_methods: row.auth_methods.into_iter().map(|j| j.0.into()).collect(),
+            enable_monthly_mail_report: row.enable_monthly_mail_report,
+            enable_automatic_stamp_usage: row.enable_automatic_stamp_usage,
         }
     }
 }
@@ -373,7 +377,8 @@ impl DatabaseConnection {
             SELECT
                 a.id, a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps,
                 a.name, a.email, a.role,
-                coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods
+                coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
+                a.enable_monthly_mail_report, a.enable_automatic_stamp_usage
             FROM account AS a
             LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
             GROUP BY a.id
@@ -396,7 +401,8 @@ impl DatabaseConnection {
             SELECT
                 a.id, a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps,
                 a.name, a.email, a.role,
-                coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods
+                coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
+                a.enable_monthly_mail_report, a.enable_automatic_stamp_usage
             FROM account AS a
             LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
             WHERE a.id = $1
@@ -421,7 +427,8 @@ impl DatabaseConnection {
             SELECT
                 a.id, a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps,
                 a.name, a.email, a.role,
-                coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods
+                coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
+                a.enable_monthly_mail_report, a.enable_automatic_stamp_usage
             FROM account AS a INNER JOIN matching ON matching.account_id = a.id
             LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
             GROUP BY a.id
@@ -494,7 +501,8 @@ impl DatabaseConnection {
                     SELECT
                     a.id, a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps,
                     a.name, a.email, a.role,
-                    coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods
+                    coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
+                    a.enable_monthly_mail_report, a.enable_automatic_stamp_usage
                     FROM account AS a
                     LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
                     GROUP BY a.id
@@ -525,7 +533,8 @@ impl DatabaseConnection {
                     SELECT
                     a.id, a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps,
                     a.name, a.email, a.role,
-                    coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods
+                    coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
+                    a.enable_monthly_mail_report, a.enable_automatic_stamp_usage
                     FROM account AS a
                     LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
                     GROUP BY a.id
@@ -553,8 +562,8 @@ impl DatabaseConnection {
         let q = if account.id == 0 {
             sqlx::query(
                 r#"
-                INSERT INTO account (balance_cents, balance_coffee_stamps, balance_bottle_stamps, name, email, role)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                INSERT INTO account (balance_cents, balance_coffee_stamps, balance_bottle_stamps, name, email, role, enable_monthly_mail_report, enable_automatic_stamp_usage)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 RETURNING id
             "#,
             )
@@ -563,7 +572,7 @@ impl DatabaseConnection {
                 WITH
                     delete AS (DELETE FROM account_auth_method WHERE account_id = $1)
                 UPDATE account
-                SET balance_cents = $2, balance_coffee_stamps = $3, balance_bottle_stamps = $4, name = $5, email = $6, role = $7
+                SET balance_cents = $2, balance_coffee_stamps = $3, balance_bottle_stamps = $4, name = $5, email = $6, role = $7, enable_monthly_mail_report = $8, enable_automatic_stamp_usage = $9
                 WHERE id = $1
                 RETURNING id
 
@@ -576,6 +585,8 @@ impl DatabaseConnection {
             .bind(&account.name)
             .bind(&account.email)
             .bind(AccountRoleDto::from(account.role))
+            .bind(account.enable_monthly_mail_report)
+            .bind(account.enable_automatic_stamp_usage)
             .fetch_one(&mut self.connection)
             .await;
         let r = to_service_result(r)?;

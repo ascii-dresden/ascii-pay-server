@@ -72,6 +72,8 @@ pub async fn load_sql_dump_into_database(
                 },
                 balance: CoinAmount::zero(),
                 auth_methods,
+                enable_monthly_mail_report: account_row.receives_monthly_report,
+                enable_automatic_stamp_usage: true,
             })
             .await?;
 
