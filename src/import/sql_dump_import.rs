@@ -102,21 +102,21 @@ pub async fn load_sql_dump_into_database(
                 }
 
                 if transaction_item.pay_with_stamps == 1 {
-                    amount.insert(CoinType::CoffeeStamp, -10);
-                    coffee_stamps += 10;
+                    amount.insert(CoinType::CoffeeStamp, 10);
+                    coffee_stamps -= 10;
                 }
                 if transaction_item.pay_with_stamps == 2 {
-                    amount.insert(CoinType::BottleStamp, -10);
-                    bottle_stamps += 10;
+                    amount.insert(CoinType::BottleStamp, 10);
+                    bottle_stamps -= 10;
                 }
 
                 if transaction_item.give_stamps == 1 {
-                    amount.insert(CoinType::CoffeeStamp, 1);
-                    coffee_stamps -= 1;
+                    amount.insert(CoinType::CoffeeStamp, -1);
+                    coffee_stamps += 1;
                 }
                 if transaction_item.give_stamps == 2 {
-                    amount.insert(CoinType::BottleStamp, 1);
-                    bottle_stamps -= 1;
+                    amount.insert(CoinType::BottleStamp, -1);
+                    bottle_stamps += 1;
                 }
 
                 payment_items.push(PaymentItem {
