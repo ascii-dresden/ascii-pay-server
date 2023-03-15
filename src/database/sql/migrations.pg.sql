@@ -112,7 +112,7 @@ ALTER TABLE product ADD COLUMN image_mimetype TEXT;
 --##7 Product category must be not null
 ALTER TABLE product ALTER COLUMN category SET NOT NULL;
 
---##8 Prices must be not null 
+--##8 Prices must be not null
 ALTER TABLE product ALTER COLUMN price_cents SET NOT NULL;
 ALTER TABLE product ALTER COLUMN price_coffee_stamps SET NOT NULL;
 ALTER TABLE product ALTER COLUMN price_bottle_stamps SET NOT NULL;
@@ -140,3 +140,7 @@ CREATE SEQUENCE transaction_id_seq AS BIGINT START WITH 1 NO CYCLE;
 
 --##13 Allow deleting accounts with transactions
 ALTER TABLE transaction_item ALTER COLUMN account_id DROP NOT NULL;
+
+--##14 Add account settings
+ALTER TABLE account ADD COLUMN enable_monthly_mail_report BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE account ADD COLUMN enable_automatic_stamp_usage BOOLEAN NOT NULL DEFAULT TRUE;

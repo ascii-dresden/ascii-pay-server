@@ -102,6 +102,8 @@ pub struct Account {
     pub email: String,
     pub role: Role,
     pub auth_methods: Vec<AuthMethod>,
+    pub enable_monthly_mail_report: bool,
+    pub enable_automatic_stamp_usage: bool,
 }
 
 #[derive(PartialEq, Clone)]

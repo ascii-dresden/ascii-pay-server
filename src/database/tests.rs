@@ -31,6 +31,8 @@ async fn test_session_crud(pool: PgPool) {
         balance: CoinAmount(HashMap::new()),
         role: Role::Basic,
         auth_methods: vec![john_pw.clone()],
+        enable_monthly_mail_report: false,
+        enable_automatic_stamp_usage: true,
     };
     let acc1 = db.store_account(acc1).await.unwrap();
 
@@ -94,6 +96,8 @@ async fn test_account_crud(pool: PgPool) {
         balance: CoinAmount(HashMap::new()),
         role: Role::Basic,
         auth_methods: vec![john_pw.clone()],
+        enable_monthly_mail_report: false,
+        enable_automatic_stamp_usage: true,
     };
     let mut acc1_clone = acc1.clone();
     let mut acc1 = db.store_account(acc1).await.unwrap();
@@ -109,6 +113,8 @@ async fn test_account_crud(pool: PgPool) {
         balance: CoinAmount(HashMap::new()),
         role: Role::Member,
         auth_methods: vec![],
+        enable_monthly_mail_report: false,
+        enable_automatic_stamp_usage: true,
     };
     let acc2 = db.store_account(acc2).await.unwrap();
 
@@ -294,6 +300,8 @@ pub fn test_transaction(pool: PgPool) {
             balance: CoinAmount([(CoinType::Cent, 368)].into_iter().collect()),
             role: Role::Basic,
             auth_methods: vec![],
+            enable_monthly_mail_report: false,
+            enable_automatic_stamp_usage: true,
         })
         .await
         .unwrap();
@@ -310,6 +318,8 @@ pub fn test_transaction(pool: PgPool) {
             ),
             role: Role::Admin,
             auth_methods: vec![],
+            enable_monthly_mail_report: false,
+            enable_automatic_stamp_usage: true,
         })
         .await
         .unwrap();

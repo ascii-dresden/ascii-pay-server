@@ -188,6 +188,8 @@ pub struct AccountDto {
     pub email: String,
     pub role: RoleDto,
     pub auth_methods: Vec<AuthMethodDto>,
+    pub enable_monthly_mail_report: bool,
+    pub enable_automatic_stamp_usage: bool,
 }
 
 impl From<&models::Account> for AccountDto {
@@ -199,6 +201,8 @@ impl From<&models::Account> for AccountDto {
             email: value.email.to_owned(),
             role: (&value.role).into(),
             auth_methods: value.auth_methods.iter().map(|m| m.into()).collect(),
+            enable_monthly_mail_report: value.enable_monthly_mail_report,
+            enable_automatic_stamp_usage: value.enable_automatic_stamp_usage,
         }
     }
 }
@@ -271,6 +275,8 @@ pub struct SaveAccountDto {
     pub name: String,
     pub email: String,
     pub role: RoleDto,
+    pub enable_monthly_mail_report: bool,
+    pub enable_automatic_stamp_usage: bool,
 }
 
 async fn create_account(
@@ -288,6 +294,8 @@ async fn create_account(
         email: form.email,
         role: form.role.into(),
         auth_methods: Vec::new(),
+        enable_monthly_mail_report: form.enable_monthly_mail_report,
+        enable_automatic_stamp_usage: form.enable_automatic_stamp_usage,
     };
 
     let account = state.db.store_account(account).await?;
@@ -316,6 +324,8 @@ async fn update_account(
     if let Some(mut account) = account {
         account.name = form.name;
         account.email = form.email;
+        account.enable_monthly_mail_report = form.enable_monthly_mail_report;
+        account.enable_automatic_stamp_usage = form.enable_automatic_stamp_usage;
 
         let new_role = form.role.into();
         if account.role != new_role {
@@ -387,6 +397,8 @@ async fn create_admin_account(
         email: form.email,
         role: models::Role::Admin,
         auth_methods: Vec::new(),
+        enable_monthly_mail_report: false,
+        enable_automatic_stamp_usage: true,
     };
 
     account
