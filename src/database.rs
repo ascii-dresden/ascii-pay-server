@@ -853,7 +853,7 @@ impl DatabaseConnection {
                 FROM
                     transaction_item item
                     LEFT OUTER JOIN product p ON item.product_id = p.id
-                ORDER BY item.transaction_id ASC
+                ORDER BY item.timestamp ASC, item.transaction_id ASC
             "#,
         )
         .fetch(&mut self.connection);
@@ -904,7 +904,7 @@ impl DatabaseConnection {
                     LEFT OUTER JOIN product p ON item.product_id = p.id
                 WHERE
                     (item.account_id = $1) OR ($1 = 0 AND item.account_id IS NULL)
-                ORDER BY item.transaction_id ASC
+                ORDER BY item.timestamp ASC, item.transaction_id ASC
             "#,
         )
         .bind(id)
@@ -976,6 +976,7 @@ impl DatabaseConnection {
     pub async fn payment(
         &mut self,
         payment: models::Payment,
+        timestamp: DateTime<Utc>,
     ) -> ServiceResult<models::Transaction> {
         fn get_type_amounts(t: CoinType, items: &[PaymentItem]) -> Vec<i32> {
             items
@@ -1068,7 +1069,7 @@ impl DatabaseConnection {
             FROM inserted LEFT OUTER JOIN product p ON p.id = inserted.product_id
             "#,
         )
-        .bind(Utc::now())
+        .bind(timestamp)
         .bind(i64::try_from(payment.account).expect("id less than 2**63"))
         .bind(get_type_amounts(CoinType::Cent, &payment.items))
         .bind(get_type_amounts(CoinType::BottleStamp, &payment.items))

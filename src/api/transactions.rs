@@ -3,6 +3,7 @@ use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
 use axum::extract::Path;
 use axum::Json;
+use chrono::Utc;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -177,7 +178,7 @@ async fn post_payment(
             .collect(),
     };
 
-    let transaction = state.db.payment(payment).await?;
+    let transaction = state.db.payment(payment, Utc::now()).await?;
     let account = state.db.get_account_by_id(id).await?;
     if let Some(account) = account {
         return Ok(Json(PaymentResponseDto {
