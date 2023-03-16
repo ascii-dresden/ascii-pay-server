@@ -124,7 +124,7 @@ async fn create_password_reset_token(
     mut state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<Json<PasswordResetTokenDto>> {
-    state.session_require_admin()?;
+    state.session_require_admin_or_self(id)?;
 
     let account = state.db.get_account_by_id(id).await?;
     if let Some(account) = account {
