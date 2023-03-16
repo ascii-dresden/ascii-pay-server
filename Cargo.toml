@@ -20,6 +20,7 @@ base64 = { version="0.21.0" }
 aide = { version="0.10.0", features=["redoc", "axum", "axum-multipart"] }
 schemars = { version = "0.8.11" }
 headers = "0.3.8"
+lazy_static = "1.4.0"
 
 block-modes = "0.8"
 aes = "0.7"
@@ -33,6 +34,12 @@ dotenv = "0.15.0"
 log = "0.4.17"
 env_logger = "0.10.0"
 chrono = "0.4.23"
+
+lettre = { version = "0.10.3", optional = true }
+
+[features]
+mail = ["lettre"]
+default = ["mail"]
 
 [profile.release]
 lto = true

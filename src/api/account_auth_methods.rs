@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::database::AppState;
 use crate::error::{ServiceError, ServiceResult};
-use crate::models;
 use crate::request_state::RequestState;
+use crate::models;
 
 use super::accounts::{AccountDto, CardTypeDto};
 use super::password_hash_create;
@@ -128,15 +128,23 @@ async fn create_password_reset_token(
 
     let account = state.db.get_account_by_id(id).await?;
     if let Some(account) = account {
+        let valid_until = Utc::now().add(Duration::minutes(30));
         let token = state
             .db
             .create_session_token(
                 account.id,
                 models::AuthMethodType::PasswordResetToken,
-                Utc::now().add(Duration::minutes(30)),
+                valid_until,
                 false,
             )
             .await?;
+
+        #[cfg(feature = "mail")]
+        if !account.email.is_empty() {
+            if let Err(e) = crate::mail::send_invitation_link(&account, &token, &valid_until) {
+                log::warn!("Could not send mail: {:?}", e);
+            }
+        }
 
         return Ok(Json(PasswordResetTokenDto { token }));
     }
