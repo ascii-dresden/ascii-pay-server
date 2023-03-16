@@ -37,6 +37,20 @@ impl From<block_modes::BlockModeError> for ServiceError {
     }
 }
 
+#[cfg(feature = "mail")]
+impl From<lettre::transport::smtp::Error> for ServiceError {
+    fn from(error: lettre::transport::smtp::Error) -> Self {
+        ServiceError::InternalServerError(format!("{}", error))
+    }
+}
+
+#[cfg(feature = "mail")]
+impl From<lettre::error::Error> for ServiceError {
+    fn from(error: lettre::error::Error) -> Self {
+        ServiceError::InternalServerError(format!("{}", error))
+    }
+}
+
 impl OperationOutput for ServiceError {
     type Inner = String;
 }
