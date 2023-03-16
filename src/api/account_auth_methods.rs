@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::database::AppState;
 use crate::error::{ServiceError, ServiceResult};
-use crate::request_state::RequestState;
 use crate::models;
+use crate::request_state::RequestState;
 
 use super::accounts::{AccountDto, CardTypeDto};
 use super::password_hash_create;

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::migrate::Migrator;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::types::Json;
-use sqlx::{FromRow, PgPool, Row};
+use sqlx::{Connection, FromRow, PgPool, Row};
 use sqlx::{Pool, Postgres};
 use tokio::sync::Mutex;
 
@@ -19,6 +19,10 @@ use crate::models::{
     self, Account, AuthMethod, AuthMethodType, AuthNfc, AuthPassword, AuthRequest, CardType,
     CoinAmount, CoinType, Image, PaymentItem, Product, Role, Session, Transaction, TransactionItem,
 };
+
+const MINIMUM_PAYMENT_CENTS: i32 = 0;
+const MINIMUM_PAYMENT_BOTTLE_STAMPS: i32 = 0;
+const MINIMUM_PAYMENT_COFFEE_STAMPS: i32 = 0;
 
 mod migration;
 #[cfg(test)]
@@ -98,6 +102,13 @@ impl From<AccountRow> for Account {
             enable_automatic_stamp_usage: row.enable_automatic_stamp_usage,
         }
     }
+}
+
+#[derive(sqlx::FromRow)]
+struct PaymentAccountRow {
+    balance_cents: i32,
+    balance_coffee_stamps: i32,
+    balance_bottle_stamps: i32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -1008,7 +1019,55 @@ impl DatabaseConnection {
                 .into_iter()
                 .sum();
 
-        let mut r = sqlx::query(
+        let mut transaction = self.connection.begin().await?;
+        let r = sqlx::query_as::<_, PaymentAccountRow>(
+            r#"
+            SELECT a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps
+            FROM account AS a
+            WHERE a.id = $1
+        "#,
+        )
+        .bind(i64::try_from(payment.account).expect("account id is less than 2**63"))
+        .fetch_optional(&mut transaction)
+        .await;
+
+        match to_service_result(r)? {
+            Some(account) => {
+                let mut errors: Vec<String> = Vec::new();
+
+                let new_balance_cents = account.balance_cents - total_price_cents;
+                if new_balance_cents < MINIMUM_PAYMENT_CENTS
+                    && new_balance_cents < account.balance_cents
+                {
+                    errors.push(String::from("Cent"));
+                }
+
+                let new_balance_bottle_stamps =
+                    account.balance_bottle_stamps - total_price_bottle_stamps;
+                if new_balance_bottle_stamps < MINIMUM_PAYMENT_BOTTLE_STAMPS
+                    && new_balance_bottle_stamps < account.balance_bottle_stamps
+                {
+                    errors.push(String::from("BottleStamp"));
+                }
+
+                let new_balance_coffee_stamps =
+                    account.balance_coffee_stamps - total_price_coffee_stamps;
+                if new_balance_coffee_stamps < MINIMUM_PAYMENT_COFFEE_STAMPS
+                    && new_balance_coffee_stamps < account.balance_coffee_stamps
+                {
+                    errors.push(String::from("CoffeeStamp"));
+                }
+
+                if !errors.is_empty() {
+                    return ServiceResult::Err(ServiceError::PaymentError(errors));
+                }
+            }
+            None => {
+                return ServiceResult::Err(ServiceError::NotFound);
+            }
+        }
+
+        let r = sqlx::query(
             r#"
             WITH
                 transaction_args AS (
@@ -1098,11 +1157,13 @@ impl DatabaseConnection {
         .bind(total_price_cents)
         .bind(total_price_bottle_stamps)
         .bind(total_price_coffee_stamps)
-        .fetch(&mut self.connection);
+        .fetch_all(&mut transaction)
+        .await;
+
+        to_service_result(transaction.commit().await)?;
 
         let mut tx = None;
-        while let Some(row) = r.next().await {
-            let row = to_service_result(row)?;
+        for row in to_service_result(r)? {
             let new_tx = extend_transaction_with_row(tx.as_mut(), row)?;
             if new_tx.is_some() {
                 assert!(tx.is_none(), "inserted only one tx");
@@ -1110,7 +1171,7 @@ impl DatabaseConnection {
             };
         }
 
-        Ok(tx.expect("inserted one TX"))
+        ServiceResult::Ok(tx.expect("inserted one TX"))
     }
 }
 

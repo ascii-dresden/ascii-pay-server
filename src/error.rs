@@ -12,6 +12,7 @@ pub enum ServiceError {
     NotFound,
     Unauthorized(&'static str),
     Forbidden,
+    PaymentError(Vec<String>),
 }
 
 impl std::fmt::Display for ServiceError {
@@ -24,6 +25,12 @@ impl std::error::Error for ServiceError {}
 
 /// Helper for `ServiceError` result
 pub type ServiceResult<T> = Result<T, ServiceError>;
+
+impl From<sqlx::Error> for ServiceError {
+    fn from(error: sqlx::Error) -> Self {
+        ServiceError::InternalServerError(error.to_string())
+    }
+}
 
 impl From<block_modes::InvalidKeyIvLength> for ServiceError {
     fn from(error: block_modes::InvalidKeyIvLength) -> Self {
@@ -77,6 +84,13 @@ impl IntoResponse for ServiceError {
                 StatusCode::FORBIDDEN,
                 Json(json!({
                     "error": "Forbidden",
+                })),
+            ),
+            ServiceError::PaymentError(cause) => (
+                StatusCode::CONFLICT,
+                Json(json!({
+                    "error": "PaymentError",
+                    "cause": cause
                 })),
             ),
         }
