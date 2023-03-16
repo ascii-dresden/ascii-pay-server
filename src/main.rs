@@ -1,5 +1,5 @@
 use aide::{axum::ApiRouter, openapi::OpenApi};
-use axum::http::Method;
+use axum::http::{Method, header};
 use axum::{extract::DefaultBodyLimit, Extension};
 use log::info;
 use std::net::SocketAddr;
@@ -70,6 +70,7 @@ async fn main() {
         .layer(
             CorsLayer::new()
                 .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
+                .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
                 .allow_origin(Any),
         )
         .with_state(app_state);
