@@ -144,3 +144,7 @@ ALTER TABLE transaction_item ALTER COLUMN account_id DROP NOT NULL;
 --##14 Add account settings
 ALTER TABLE account ADD COLUMN enable_monthly_mail_report BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE account ADD COLUMN enable_automatic_stamp_usage BOOLEAN NOT NULL DEFAULT TRUE;
+
+--##15 Add transaction authorization
+ALTER TABLE transaction_item ADD COLUMN authorized_by_account_id BIGINT;
+ALTER TABLE transaction_item ADD COLUMN authorized_with_method tp_auth_method_kind;

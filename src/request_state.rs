@@ -83,35 +83,31 @@ impl RequestState {
         false
     }
 
-    pub fn session_require_admin(&self) -> ServiceResult<()> {
-        if !self.session_is_present() {
-            return Err(ServiceError::Unauthorized("Missing login!"));
-        }
+    pub fn session_require_admin(&self) -> ServiceResult<models::Account> {
+        let account = self.session_require_login()?;
 
         if self.session_is_admin() {
-            return Ok(());
+            return Ok(account);
         }
 
         Err(ServiceError::Forbidden)
     }
 
-    pub fn session_require_admin_or_self(&self, account_id: u64) -> ServiceResult<()> {
-        if !self.session_is_present() {
-            return Err(ServiceError::Unauthorized("Missing login!"));
-        }
+    pub fn session_require_admin_or_self(&self, account_id: u64) -> ServiceResult<models::Account> {
+        let account = self.session_require_login()?;
 
         if self.session_is_admin() {
-            return Ok(());
+            return Ok(account);
         }
 
         if self.session_is_self(account_id) {
-            return Ok(());
+            return Ok(account);
         }
 
         Err(ServiceError::Forbidden)
     }
 
-    pub fn session_require_self(&self) -> ServiceResult<models::Account> {
+    pub fn session_require_login(&self) -> ServiceResult<models::Account> {
         if !self.session_is_present() {
             return Err(ServiceError::Unauthorized("Missing login!"));
         }
@@ -138,5 +134,17 @@ impl RequestState {
         }
 
         Err(ServiceError::NotFound)
+    }
+
+    pub fn session_require(&self) -> ServiceResult<Session> {
+        if !self.session_is_present() {
+            return Err(ServiceError::Unauthorized("Missing login!"));
+        }
+
+        if let Some(ref session) = self.session {
+            return Ok(session.clone());
+        }
+
+        Err(ServiceError::Forbidden)
     }
 }

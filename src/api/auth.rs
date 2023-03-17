@@ -426,7 +426,7 @@ fn auth_delete_docs(op: TransformOperation) -> TransformOperation {
 }
 
 pub async fn auth_get_account(state: RequestState) -> ServiceResult<Json<AccountDto>> {
-    let account = state.session_require_self()?;
+    let account = state.session_require_login()?;
     Ok(Json(AccountDto::from(&account)))
 }
 
