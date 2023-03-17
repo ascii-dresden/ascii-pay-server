@@ -153,6 +153,7 @@ pub async fn load_sql_dump_into_database(
                 },
                 Utc.datetime_from_str(&transaction.date, "%Y-%m-%d %H:%M:%S.%f")
                     .unwrap(),
+                false,
             )
             .await?;
 

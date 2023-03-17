@@ -178,7 +178,7 @@ async fn post_payment(
             .collect(),
     };
 
-    let transaction = state.db.payment(payment, Utc::now()).await?;
+    let transaction = state.db.payment(payment, Utc::now(), true).await?;
     let account = state.db.get_account_by_id(id).await?;
     if let Some(account) = account {
         return Ok(Json(PaymentResponseDto {
