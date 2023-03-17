@@ -10,6 +10,7 @@ mod auth;
 mod nfc_id;
 mod nfc_mifare;
 mod products;
+mod report;
 mod transactions;
 
 pub fn init(app_state: AppState) -> ApiRouter {
@@ -18,7 +19,8 @@ pub fn init(app_state: AppState) -> ApiRouter {
         .merge(accounts::router(app_state.clone()))
         .merge(auth::router(app_state.clone()))
         .merge(products::router(app_state.clone()))
-        .merge(transactions::router(app_state))
+        .merge(transactions::router(app_state.clone()))
+        .merge(report::router(app_state))
 }
 
 fn password_hash_create(password: &str) -> ServiceResult<Vec<u8>> {
