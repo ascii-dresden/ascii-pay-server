@@ -24,8 +24,7 @@ pub fn init(app_state: AppState) -> ApiRouter {
 fn password_hash_create(password: &str) -> ServiceResult<Vec<u8>> {
     let mut data = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut data);
-    let bytes =
-        Encoded::default2i(password.as_bytes(),&data, b"", b"").to_u8();
+    let bytes = Encoded::default2i(password.as_bytes(), &data, b"", b"").to_u8();
     Ok(bytes)
 }
 
