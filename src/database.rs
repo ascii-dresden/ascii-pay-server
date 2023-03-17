@@ -377,6 +377,8 @@ struct TransactionRow {
     transaction_id: u64,
     timestamp: DateTime<Utc>,
     account_id: Option<i64>,
+    authorized_by_account_id: Option<i64>,
+    authorized_with_method: Option<AuthMethodTypeDto>,
     #[sqlx(flatten)]
     item: TransactionItemRow,
 }
@@ -858,6 +860,8 @@ impl DatabaseConnection {
                     item.effective_price_cents as effective_price_cents,
                     item.effective_price_coffee_stamps as effective_price_coffee_stamps,
                     item.effective_price_bottle_stamps as effective_price_bottle_stamps,
+                    item.authorized_by_account_id as authorized_by_account_id,
+                    item.authorized_with_method as authorized_with_method,
                     p.id as id,
                     p.name as name,
                     p.price_cents as price_cents,
@@ -907,6 +911,8 @@ impl DatabaseConnection {
                     item.effective_price_cents as effective_price_cents,
                     item.effective_price_coffee_stamps as effective_price_coffee_stamps,
                     item.effective_price_bottle_stamps as effective_price_bottle_stamps,
+                    item.authorized_by_account_id as authorized_by_account_id,
+                    item.authorized_with_method as authorized_with_method,
                     p.id as id,
                     p.name as name,
                     p.price_cents as price_cents,
@@ -959,6 +965,8 @@ impl DatabaseConnection {
                 item.effective_price_cents as effective_price_cents,
                 item.effective_price_coffee_stamps as effective_price_coffee_stamps,
                 item.effective_price_bottle_stamps as effective_price_bottle_stamps,
+                item.authorized_by_account_id as authorized_by_account_id,
+                item.authorized_with_method as authorized_with_method,
                 p.id as id,
                 p.name as name,
                 p.price_cents as price_cents,
@@ -999,7 +1007,7 @@ impl DatabaseConnection {
         &mut self,
         payment: models::Payment,
         timestamp: DateTime<Utc>,
-        check_for_account_balance: bool,
+        check_payment_conditions: bool,
     ) -> ServiceResult<models::Transaction> {
         fn get_type_amounts(t: CoinType, items: &[PaymentItem]) -> Vec<i32> {
             items
@@ -1022,7 +1030,29 @@ impl DatabaseConnection {
 
         let mut transaction = self.connection.begin().await?;
 
-        if check_for_account_balance {
+        if check_payment_conditions {
+            let allow_credit_loading = if let Some(ref session) = payment.authorization {
+                matches!(session.account.role, Role::Admin)
+                    || matches!(session.auth_method, AuthMethodType::NfcBased)
+            } else {
+                true
+            };
+
+            if !allow_credit_loading {
+                for item in payment.items.iter() {
+                    if item
+                        .effective_price
+                        .0
+                        .get(&CoinType::Cent)
+                        .copied()
+                        .unwrap_or(0)
+                        < 0
+                    {
+                        return ServiceResult::Err(ServiceError::Forbidden);
+                    }
+                }
+            }
+
             let r = sqlx::query_as::<_, PaymentAccountRow>(
                 r#"
             SELECT a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps
@@ -1078,7 +1108,9 @@ impl DatabaseConnection {
                     SELECT
                         nextval('transaction_id_seq') AS transaction_id,
                         $1 AS timestamp,
-                        $2 AS account_id
+                        $2 AS account_id,
+                        $10 AS authorized_by_account_id,
+                        $11 AS authorized_with_method
                 ),
                 updated AS (
                     UPDATE account
@@ -1097,7 +1129,9 @@ impl DatabaseConnection {
                         effective_price_coffee_stamps,
                         product_id,
                         timestamp,
-                        account_id
+                        account_id,
+                        authorized_by_account_id,
+                        authorized_with_method
                     )
                     SELECT
                         transaction_id,
@@ -1106,7 +1140,9 @@ impl DatabaseConnection {
                         effective_price_coffee_stamps,
                         product_id,
                         timestamp,
-                        account_id
+                        account_id,
+                        authorized_by_account_id,
+                        authorized_with_method
                     FROM
                         transaction_args,
                         UNNEST($3, $4, $5, $6) AS item_args(
@@ -1122,7 +1158,9 @@ impl DatabaseConnection {
                         effective_price_coffee_stamps,
                         product_id,
                         timestamp,
-                        account_id
+                        account_id,
+                        authorized_by_account_id,
+                        authorized_with_method
                     )
             SELECT
                 inserted.*,
@@ -1161,6 +1199,17 @@ impl DatabaseConnection {
         .bind(total_price_cents)
         .bind(total_price_bottle_stamps)
         .bind(total_price_coffee_stamps)
+        .bind(
+            payment
+                .authorization
+                .as_ref()
+                .map(|session| i64::try_from(session.account.id).expect("id less than 2**63")),
+        )
+        .bind(
+            payment
+                .authorization
+                .map(|ref session| AuthMethodTypeDto::from(session.auth_method)),
+        )
         .fetch_all(&mut transaction)
         .await;
 
@@ -1193,6 +1242,10 @@ fn extend_transaction_with_row(
                 account: u64::try_from(txrow.account_id.unwrap_or(0))
                     .expect("id is always non-negative"),
                 timestamp: txrow.timestamp,
+                authorized_by_account_id: txrow
+                    .authorized_by_account_id
+                    .map(|id| u64::try_from(id).expect("id is always non-negative")),
+                authorized_with_method: txrow.authorized_with_method.map(|m| m.into()),
                 items: Vec::new(),
             });
             new_tx.as_mut().expect("just constructed as Some")

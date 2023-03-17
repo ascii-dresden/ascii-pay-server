@@ -12,6 +12,7 @@ use crate::error::{ServiceError, ServiceResult};
 use crate::models;
 use crate::request_state::RequestState;
 
+use super::account_auth_methods::AuthMethodTypeDto;
 use super::accounts::{AccountDto, CoinAmountDto};
 use super::products::ProductDto;
 
@@ -58,6 +59,8 @@ pub struct TransactionDto {
     pub id: u64,
     pub timestamp: String,
     pub account_id: u64,
+    pub authorized_by_account_id: Option<u64>,
+    pub authorized_with_method: Option<AuthMethodTypeDto>,
     pub items: Vec<TransactionItemDto>,
 }
 
@@ -67,6 +70,8 @@ impl From<&models::Transaction> for TransactionDto {
             id: value.id.to_owned(),
             timestamp: format!("{:?}", value.timestamp),
             account_id: value.account.to_owned(),
+            authorized_by_account_id: value.authorized_by_account_id.to_owned(),
+            authorized_with_method: value.authorized_with_method.map(|ref m| m.into()),
             items: value.items.iter().map(|i| i.into()).collect(),
         }
     }
@@ -163,6 +168,7 @@ async fn post_payment(
     form: Json<PaymentDto>,
 ) -> ServiceResult<Json<PaymentResponseDto>> {
     state.session_require_admin_or_self(id)?;
+    let session = state.session_require()?;
 
     let form = form.0;
 
@@ -176,6 +182,7 @@ async fn post_payment(
                 product_id: item.product_id,
             })
             .collect(),
+        authorization: Some(session),
     };
 
     let transaction = state.db.payment(payment, Utc::now(), true).await?;

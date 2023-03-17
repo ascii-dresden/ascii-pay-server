@@ -380,6 +380,7 @@ pub fn test_transaction(pool: PgPool) {
     let payment1 = Payment {
         account: acc1.id,
         items: vec![item1.clone(), item_no_product_id.clone()],
+        authorization: None,
     };
     let tx1 = db
         .payment(payment1.clone(), Utc::now(), false)
@@ -410,6 +411,7 @@ pub fn test_transaction(pool: PgPool) {
             Payment {
                 account: acc2.id,
                 items: vec![item_no_product_id],
+                authorization: None,
             },
             Utc::now(),
             false,

@@ -150,6 +150,7 @@ pub async fn load_sql_dump_into_database(
                 Payment {
                     account: new_account.id,
                     items: payment_items,
+                    authorization: None,
                 },
                 Utc.datetime_from_str(&transaction.date, "%Y-%m-%d %H:%M:%S.%f")
                     .unwrap(),

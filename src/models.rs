@@ -164,6 +164,8 @@ pub struct Transaction {
     pub id: u64,
     pub timestamp: DateTime<Utc>,
     pub account: u64,
+    pub authorized_by_account_id: Option<u64>,
+    pub authorized_with_method: Option<AuthMethodType>,
     pub items: Vec<TransactionItem>,
 }
 
@@ -177,9 +179,10 @@ pub struct PaymentItem {
 pub struct Payment {
     pub account: u64,
     pub items: Vec<PaymentItem>,
+    pub authorization: Option<Session>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum AuthMethodType {
     PasswordBased,
     NfcBased,
