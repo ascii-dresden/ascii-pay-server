@@ -75,8 +75,6 @@ async fn main() {
         )
         .with_state(app_state);
 
-    // run it with hyper
-
     let addr = format!("{}:{}", env::API_HOST.as_str(), env::API_PORT.as_str());
     let addr = SocketAddr::from_str(&addr).unwrap();
     info!("listening on {}", addr);

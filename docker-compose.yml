@@ -12,6 +12,7 @@ services:
       - API_PORT=3000
       - DATABASE_URL=postgres://ascii:ascii@postgres:5432/ascii-pay
       - RUST_LOG=info,sqlx::query=warn
+      - DOMAIN_NAME=http://localhost:8080
     depends_on:
       - postgres
     ports:
