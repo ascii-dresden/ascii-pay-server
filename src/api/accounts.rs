@@ -153,6 +153,7 @@ pub struct AuthNfcDto {
     name: String,
     card_id: String,
     card_type: CardTypeDto,
+    depends_on_session: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, JsonSchema)]
@@ -174,6 +175,7 @@ impl From<&models::AuthMethod> for AuthMethodDto {
                 name: nfc_based.name.to_owned(),
                 card_id: general_purpose::STANDARD.encode(&nfc_based.card_id),
                 card_type: (&nfc_based.card_type).into(),
+                depends_on_session: nfc_based.depends_on_session.clone(),
             }),
             models::AuthMethod::PublicTab => AuthMethodDto::PublicTab,
         }
