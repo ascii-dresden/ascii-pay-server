@@ -148,3 +148,11 @@ ALTER TABLE account ADD COLUMN enable_automatic_stamp_usage BOOLEAN NOT NULL DEF
 --##15 Add transaction authorization
 ALTER TABLE transaction_item ADD COLUMN authorized_by_account_id BIGINT;
 ALTER TABLE transaction_item ADD COLUMN authorized_with_method tp_auth_method_kind;
+
+--##16 Add account_auth_method - session relation
+ALTER TABLE account_auth_method ADD COLUMN depends_on_session UUID;
+ALTER TABLE account_auth_method
+    ADD CONSTRAINT fk_depends_on_session
+    FOREIGN KEY(depends_on_session)
+        REFERENCES session(uuid)
+        ON DELETE CASCADE;

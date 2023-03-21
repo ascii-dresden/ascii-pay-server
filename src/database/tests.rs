@@ -127,6 +127,7 @@ async fn test_account_crud(pool: PgPool) {
         data: vec![],
         card_type: CardType::GenericNfc,
         name: "My NFC Card".to_string(),
+        depends_on_session: None,
     });
     acc1.auth_methods.push(john_nfc.clone());
     let acc1_clone = acc1.clone();

@@ -57,6 +57,7 @@ pub async fn load_sql_dump_into_database(
                     _ => crate::models::CardType::GenericNfc,
                 },
                 data: str_to_bytes(&item.data),
+                depends_on_session: None,
             }));
         }
 

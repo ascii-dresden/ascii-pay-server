@@ -300,6 +300,7 @@ pub struct CreateAuthNfcDto {
     pub card_id: String,
     pub card_type: CardTypeDto,
     pub data: Option<String>,
+    pub depends_on_session: Option<bool>,
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
@@ -322,6 +323,12 @@ async fn create_nfc_authentication(
 
     let form = form.0;
     let account = state.db.get_account_by_id(id).await?;
+
+    let depends_on_session = if let Some(true) = form.depends_on_session {
+        Some(state.session_require()?.token)
+    } else {
+        None
+    };
 
     if let Some(mut account) = account {
         let card_id = general_purpose::STANDARD
@@ -346,6 +353,7 @@ async fn create_nfc_authentication(
                 card_id,
                 card_type: form.card_type.into(),
                 data,
+                depends_on_session,
             }));
 
         let account = state.db.store_account(account).await?;

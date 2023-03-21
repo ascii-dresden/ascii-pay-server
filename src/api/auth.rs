@@ -3,6 +3,7 @@ use std::ops::Add;
 use aide::axum::routing::{delete_with, get_with, post_with};
 use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
+use axum::extract::Query;
 use axum::http::StatusCode;
 use axum::Json;
 use base64::engine::general_purpose;
@@ -63,8 +64,14 @@ pub struct AuthPasswordBasedDto {
     pub password: String,
 }
 
+#[derive(Debug, PartialEq, Deserialize, JsonSchema)]
+struct AuthPasswordBasedOptionsDto {
+    long_lived: Option<bool>,
+}
+
 async fn auth_password_based(
     mut state: RequestState,
+    query: Query<AuthPasswordBasedOptionsDto>,
     form: Json<AuthPasswordBasedDto>,
 ) -> ServiceResult<Json<AuthTokenDto>> {
     let form = form.0;
@@ -84,12 +91,17 @@ async fn auth_password_based(
                 if password_hash_verify(&password_based.password_hash, &form.password)?
                     && password_based.username == form.username
                 {
+                    let duration = if let Some(true) = query.long_lived {
+                        Duration::days(360)
+                    } else {
+                        Duration::minutes(60)
+                    };
                     let token = state
                         .db
                         .create_session_token(
                             account.id,
                             models::AuthMethodType::PasswordBased,
-                            Utc::now().add(Duration::minutes(60)),
+                            Utc::now().add(duration),
                             false,
                         )
                         .await?;

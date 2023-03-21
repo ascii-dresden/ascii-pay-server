@@ -150,6 +150,7 @@ enum AccountAuthMethodData {
         card_id: Vec<u8>,
         card_type: CardTypeDto,
         data: Vec<u8>,
+        depends_on_session: Option<String>,
     },
     PublicTab,
 }
@@ -169,11 +170,13 @@ impl From<AccountAuthMethodData> for AuthMethod {
                 card_id,
                 card_type,
                 data,
+                depends_on_session,
             } => AuthMethod::NfcBased(AuthNfc {
                 name,
                 card_id,
                 card_type: card_type.into(),
                 data,
+                depends_on_session,
             }),
             AccountAuthMethodData::PublicTab => AuthMethod::PublicTab,
         }
@@ -192,6 +195,7 @@ impl From<AuthMethod> for AccountAuthMethodData {
                 card_id: auth.card_id,
                 card_type: auth.card_type.into(),
                 data: auth.data,
+                depends_on_session: auth.depends_on_session,
             },
             AuthMethod::PublicTab => AccountAuthMethodData::PublicTab,
         }
@@ -608,9 +612,9 @@ impl DatabaseConnection {
 
         let r = sqlx::query(
             r#"
-            INSERT INTO account_auth_method (account_id, login_key, data)
-            SELECT $1, login_key, data
-            FROM UNNEST($2, $3) AS input (login_key, data)
+            INSERT INTO account_auth_method (account_id, login_key, data, depends_on_session)
+            SELECT $1, login_key, data, CAST(depends_on_session AS UUID) as depends_on_session
+            FROM UNNEST($2, $3, $4) AS input (login_key, data, depends_on_session)
         "#,
         )
         .bind(account_id)
@@ -628,6 +632,19 @@ impl DatabaseConnection {
                 .map(|m| {
                     serde_json::to_value(AccountAuthMethodData::from(m.clone()))
                         .expect("to json cannot fail")
+                })
+                .collect::<Vec<_>>(),
+        )
+        .bind(
+            account
+                .auth_methods
+                .iter()
+                .map(|m| {
+                    if let AuthMethod::NfcBased(ref nfc_based) = m {
+                        nfc_based.depends_on_session.clone()
+                    } else {
+                        None
+                    }
                 })
                 .collect::<Vec<_>>(),
         )

@@ -36,6 +36,7 @@ pub struct AuthNfc {
     pub card_id: Vec<u8>,
     pub card_type: CardType,
     pub data: Vec<u8>,
+    pub depends_on_session: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
