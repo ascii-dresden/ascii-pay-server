@@ -199,3 +199,29 @@ pub struct Session {
     pub valid_until: DateTime<Utc>,
     pub is_single_use: bool,
 }
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct RegisterHistory {
+    pub id: u64,
+    pub timestamp: DateTime<Utc>,
+    pub source_register: RegisterHistoryState,
+    pub target_register: RegisterHistoryState,
+    pub envelope_register: RegisterHistoryState,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct RegisterHistoryState {
+    pub coin200: i32,
+    pub coin100: i32,
+    pub coin50: i32,
+    pub coin20: i32,
+    pub coin10: i32,
+    pub coin5: i32,
+    pub coin2: i32,
+    pub coin1: i32,
+    pub note100: i32,
+    pub note50: i32,
+    pub note20: i32,
+    pub note10: i32,
+    pub note5: i32,
+}

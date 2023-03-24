@@ -156,3 +156,13 @@ ALTER TABLE account_auth_method
     FOREIGN KEY(depends_on_session)
         REFERENCES session(uuid)
         ON DELETE CASCADE;
+
+--##17 Add register history
+CREATE TABLE register_history (
+    id BIGINT
+        GENERATED ALWAYS AS IDENTITY (START WITH 1)
+        PRIMARY KEY
+        CHECK (id > 0),
+    timestamp TIMESTAMP WITH TIME ZONE,
+    data JSONB NOT NULL
+);

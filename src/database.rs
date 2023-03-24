@@ -387,6 +387,89 @@ struct TransactionRow {
     item: TransactionItemRow,
 }
 
+#[derive(sqlx::FromRow)]
+struct RegisterHistoryRow {
+    id: i64,
+    timestamp: DateTime<Utc>,
+    data: Json<RegisterHistoryRowData>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct RegisterHistoryRowData {
+    source_register: RegisterHistoryRowDataState,
+    target_register: RegisterHistoryRowDataState,
+    envelope_register: RegisterHistoryRowDataState,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy)]
+pub struct RegisterHistoryRowDataState {
+    coin200: i32,
+    coin100: i32,
+    coin50: i32,
+    coin20: i32,
+    coin10: i32,
+    coin5: i32,
+    coin2: i32,
+    coin1: i32,
+    note100: i32,
+    note50: i32,
+    note20: i32,
+    note10: i32,
+    note5: i32,
+}
+
+impl From<RegisterHistoryRow> for models::RegisterHistory {
+    fn from(value: RegisterHistoryRow) -> Self {
+        models::RegisterHistory {
+            id: value.id.try_into().expect("IDs are non-negative"),
+            timestamp: value.timestamp,
+            source_register: value.data.source_register.into(),
+            target_register: value.data.target_register.into(),
+            envelope_register: value.data.envelope_register.into(),
+        }
+    }
+}
+
+impl From<RegisterHistoryRowDataState> for models::RegisterHistoryState {
+    fn from(value: RegisterHistoryRowDataState) -> Self {
+        models::RegisterHistoryState {
+            coin200: value.coin200,
+            coin100: value.coin100,
+            coin50: value.coin50,
+            coin20: value.coin20,
+            coin10: value.coin10,
+            coin5: value.coin5,
+            coin2: value.coin2,
+            coin1: value.coin1,
+            note100: value.note100,
+            note50: value.note50,
+            note20: value.note20,
+            note10: value.note10,
+            note5: value.note5,
+        }
+    }
+}
+
+impl From<models::RegisterHistoryState> for RegisterHistoryRowDataState {
+    fn from(value: models::RegisterHistoryState) -> Self {
+        RegisterHistoryRowDataState {
+            coin200: value.coin200,
+            coin100: value.coin100,
+            coin50: value.coin50,
+            coin20: value.coin20,
+            coin10: value.coin10,
+            coin5: value.coin5,
+            coin2: value.coin2,
+            coin1: value.coin1,
+            note100: value.note100,
+            note50: value.note50,
+            note20: value.note20,
+            note10: value.note10,
+            note5: value.note5,
+        }
+    }
+}
+
 impl DatabaseConnection {
     pub async fn get_all_accounts(&mut self) -> ServiceResult<Vec<models::Account>> {
         let mut r = sqlx::query_as::<_, AccountRow>(
@@ -1242,6 +1325,114 @@ impl DatabaseConnection {
         }
 
         ServiceResult::Ok(tx.expect("inserted one TX"))
+    }
+
+    pub async fn get_all_register_histories(
+        &mut self,
+    ) -> ServiceResult<Vec<models::RegisterHistory>> {
+        let mut r = sqlx::query_as::<_, RegisterHistoryRow>(
+            r#"
+            SELECT
+                id,
+                timestamp,
+                data
+            FROM register_history
+            "#,
+        )
+        .fetch(&mut self.connection);
+
+        let mut out = Vec::new();
+        while let Some(row) = r.next().await {
+            let row = to_service_result(row)?;
+            out.push(row.into());
+        }
+
+        Ok(out)
+    }
+
+    pub async fn get_register_history_by_id(
+        &mut self,
+        id: u64,
+    ) -> ServiceResult<Option<models::RegisterHistory>> {
+        let r = sqlx::query_as::<_, RegisterHistoryRow>(
+            r#"
+            SELECT
+                id,
+                timestamp,
+                data
+            FROM register_history
+            WHERE
+                product.id = $1
+            "#,
+        )
+        .bind(i64::try_from(id).expect("ids are less than 2**63"))
+        .fetch_optional(&mut self.connection)
+        .await;
+
+        Ok(to_service_result(r)?.map(models::RegisterHistory::from))
+    }
+
+    pub async fn store_register_history(
+        &mut self,
+        mut register_history: models::RegisterHistory,
+    ) -> ServiceResult<models::RegisterHistory> {
+        let q = if register_history.id == 0 {
+            sqlx::query(
+                r#"
+            INSERT INTO register_history (
+                timestamp,
+                data
+            ) VALUES (
+                $1,
+                $2
+            ) RETURNING id
+            "#,
+            )
+        } else {
+            sqlx::query(
+                r#"
+                UPDATE register_history
+                SET
+                    timestamp = $2,
+                    data = $3
+                WHERE id = $1
+                RETURNING id
+            "#,
+            )
+            .bind(i64::try_from(register_history.id).expect("product id is less than 2**63"))
+        };
+        let r = q
+            .bind(register_history.timestamp)
+            .bind(
+                serde_json::to_value(RegisterHistoryRowData {
+                    source_register: register_history.source_register.into(),
+                    target_register: register_history.target_register.into(),
+                    envelope_register: register_history.envelope_register.into(),
+                })
+                .expect("to json cannot fail"),
+            )
+            .fetch_one(&mut self.connection)
+            .await;
+        let r = to_service_result(r)?;
+
+        register_history.id = r
+            .get::<i64, _>("id")
+            .try_into()
+            .expect("id is always positive");
+        Ok(register_history)
+    }
+
+    pub async fn delete_register_history(&mut self, id: u64) -> ServiceResult<()> {
+        let id = i64::try_from(id).expect("id is always less than 2**63");
+        let r = sqlx::query(r#"DELETE FROM register_history WHERE id = $1"#)
+            .bind(id)
+            .execute(&mut self.connection)
+            .await;
+        let r = to_service_result(r)?;
+        if r.rows_affected() != 1 {
+            return Err(ServiceError::NotFound);
+        }
+        Ok(())
     }
 }
 
