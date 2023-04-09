@@ -47,17 +47,13 @@
 
         };
       in {
-        checks = { inherit ascii-pay-server; };
+        inherit ascii-pay-server;
 
         packages.default = ascii-pay-server;
-
+        defaultPackage."x86_64-linux" = ascii-pay-server;
         apps.default = flake-utils.lib.mkApp { drv = "ascii-pay-server"; };
-
-        devShells.default = pkgs.mkShell {
-          inputsFrom = builtins.attrValues self.checks.${system};
-
-          # Extra inputs can be added here
-          nativeBuildInputs = with pkgs; [ ];
+        hydraJobs = {
+          ascii-pay-server."x86_64-linux" = ascii-pay-server;
         };
       });
 }
