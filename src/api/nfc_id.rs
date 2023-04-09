@@ -8,7 +8,6 @@ use block_modes::cipher::{BlockCipher, BlockDecrypt, BlockEncrypt, NewBlockCiphe
 use block_modes::{BlockMode, Cbc};
 use chrono::{Duration, Utc};
 use generic_array::GenericArray;
-use hex_literal::hex;
 use rand::RngCore;
 use tokio::sync::Mutex;
 
@@ -80,9 +79,18 @@ fn vec_to_array<T, const N: usize>(v: Vec<T>) -> ServiceResult<[T; N]> {
     })
 }
 
+fn str_to_bytes(s: &str) -> Vec<u8> {
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap_or_default())
+        .collect()
+}
+
 fn get_reader_key() -> Vec<u8> {
-    let key = hex!("c50ab42b5d32b6ccf26b4c5d2e9862c7694cfba9a8eac568a36e1f400a0f480d");
-    Vec::from(key)
+    let key = std::env::var("READER_KEY").unwrap_or_else(|_| {
+        "c50ab42b5d32b6ccf26b4c5d2e9862c7694cfba9a8eac568a36e1f400a0f480d".to_owned()
+    });
+    str_to_bytes(&key)
 }
 
 #[allow(non_snake_case)]
