@@ -1,6 +1,4 @@
 {
-  description = "Build ascii-pay-server";
-
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
@@ -20,45 +18,38 @@
     };
   };
 
-  outputs = { self, nixpkgs, crane, flake-utils, rust-overlay, ... }:
+  outputs = inputs@{ self, nixpkgs, flake-utils, crane, rust-overlay}:
     flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = import nixpkgs {
+    let
+      pkgs = import nixpkgs {
           inherit system;
           overlays = [ (import rust-overlay) ];
         };
         lib = pkgs.lib;
+      rust = pkgs.rust-bin.nightly.latest.default.override { };
 
-        rustWithWasiTarget = pkgs.rust-bin.nightly.latest.default.override { };
+      craneLib = (crane.mkLib pkgs).overrideToolchain rust;
+      package = pkgs.callPackage ./derivation.nix { craneLib = craneLib; };
+    in
+    rec {
+    doCheck=false;
+    packages = {
+      ascii-pay-server = package;
+      default = package;
+    };
+    apps = {
+      ascii-pay-server = flake-utils.lib.mkApp { drv = packages.ascii-pay-server; };
+      default = apps.ascii-pay-server;
+    };
+  }) // {
+    nixosModules = rec {
+        default = ascii-pay-server;
+        ascii-pay-server = import ./nixos-module;
+    };
 
-        craneLib = (crane.mkLib pkgs).overrideToolchain rustWithWasiTarget;
-
-        filter = path: _type: builtins.match ".*md$|.*sql$" path != null;
-        markdownOrSQLOrCargo = path: type:
-          (filter path type) || (craneLib.filterCargoSources path type);
-
-        ascii-pay-server = craneLib.buildPackage {
-          src = lib.cleanSourceWith {
-            src = craneLib.path ./.;
-            filter = markdownOrSQLOrCargo;
-          };
-
-          doCheck = false;
-
-        };
-      in {
-        inherit ascii-pay-server;
-
-        overlay = (final: prev: {
-          ascii-pay-server = ascii-pay-server;
-          ascii-pay-server-src = ./.;
-        });
-
-        packages.default = ascii-pay-server;
-        defaultPackage."x86_64-linux" = ascii-pay-server;
-        apps.default = flake-utils.lib.mkApp { drv = "ascii-pay-server"; };
-        hydraJobs = {
-          ascii-pay-server."x86_64-linux" = ascii-pay-server;
-        };
-      });
+    overlays.default = final: prev: {
+      inherit (self.packages.${prev.system})
+      ascii-pay-server;
+    };
+  };
 }
