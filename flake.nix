@@ -46,7 +46,12 @@
         default = ascii-pay-server;
         ascii-pay-server = import ./nixos-module;
     };
-
+      overlay = final: prev: {
+        ascii-pay-server = final.callPackage ./derivation.nix {
+          src = ./.;
+        };
+        ascii-pay-server-src = ./.;
+      };
     overlays.default = final: prev: {
       inherit (self.packages.${prev.system})
       ascii-pay-server;
