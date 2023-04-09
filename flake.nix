@@ -49,6 +49,11 @@
       in {
         inherit ascii-pay-server;
 
+        overlay = (final: prev: {
+          ascii-pay-server = ascii-pay-server;
+          ascii-pay-server-src = ./.;
+        });
+
         packages.default = ascii-pay-server;
         defaultPackage."x86_64-linux" = ascii-pay-server;
         apps.default = flake-utils.lib.mkApp { drv = "ascii-pay-server"; };
