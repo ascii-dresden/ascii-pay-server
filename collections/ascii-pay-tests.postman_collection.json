@@ -167,7 +167,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Member account\",\n    \"email\": \"\",\n    \"role\": \"Member\"\n}",
+							"raw": "{\n    \"name\": \"Member account\",\n    \"email\": \"\",\n    \"role\": \"Member\",\n    \"enable_monthly_mail_report\": false,\n    \"enable_automatic_stamp_usage\": false\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -208,7 +208,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Member account\",\n    \"email\": \"member@example.com\",\n    \"role\": \"Member\"\n}",
+							"raw": "{\n    \"name\": \"Member account\",\n    \"email\": \"member@example.com\",\n    \"role\": \"Member\",\n    \"enable_monthly_mail_report\": true,\n    \"enable_automatic_stamp_usage\": false\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -319,15 +319,6 @@
 					"request": {
 						"method": "DELETE",
 						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password\"\n}\n",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
 						"url": {
 							"raw": "{{base_url}}/api/v1/auth",
 							"host": [
