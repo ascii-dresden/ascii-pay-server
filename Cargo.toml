@@ -9,16 +9,16 @@ name = "ascii-pay-server"
 path = "src/main.rs"
 
 [dependencies]
-tokio = { version = "1.25.0", features = ["full"] }
-axum = { version="0.6.4", features=["multipart", "headers"] }
+tokio = { version = "1.26.0", features = ["full"] }
+axum = { version="0.6.12", features=["multipart", "headers"] }
 tower-http = { version = "0.4.0", features = ["cors"] }
-sqlx = { version = "0.6.2", features = ["runtime-tokio-rustls", "postgres", "json", "chrono"] }
-serde = { version = "1.0.152", features = ["derive"] }
-serde_json = { version="1.0.91" }
+sqlx = { version = "0.6.3", features = ["runtime-tokio-rustls", "postgres", "json", "chrono"] }
+serde = { version = "1.0.158", features = ["derive"] }
+serde_json = { version="1.0.94" }
 argon2rs = { version="0.2.5", default-features = false }
 base64 = { version="0.21.0" }
 aide = { version="0.10.0", features=["redoc", "axum", "axum-multipart"] }
-schemars = { version = "0.8.11" }
+schemars = { version = "0.8.12" }
 headers = "0.3.8"
 lazy_static = "1.4.0"
 
@@ -28,12 +28,12 @@ des = "0.7"
 generic-array = "0.14.6"
 hex-literal = "0.3.4"
 rand = "0.8.5"
-futures = { version = "0.3.26" }
+futures = { version = "0.3.27" }
 
 dotenv = "0.15.0"
 log = "0.4.17"
 env_logger = "0.10.0"
-chrono = "0.4.23"
+chrono = { version="0.4.24", default-features = false, features=["clock"] }
 
 lettre = { version = "0.10.3", optional = true, default-features = false, features= ["smtp-transport", "rustls-tls", "builder"] }
 
