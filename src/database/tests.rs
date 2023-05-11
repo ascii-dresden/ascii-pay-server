@@ -53,7 +53,7 @@ async fn test_session_crud(pool: PgPool) {
 
     assert_eq!(session.account, acc1);
     assert_eq!(session.auth_method, AuthMethodType::PasswordBased);
-    assert_eq!(session.is_single_use, false);
+    assert!(!session.is_single_use);
     assert_eq!(session.token, token.clone());
 
     assert_eq!(
