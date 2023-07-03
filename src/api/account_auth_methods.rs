@@ -128,7 +128,7 @@ async fn create_password_reset_token(
 
     let account = state.db.get_account_by_id(id).await?;
     if let Some(account) = account {
-        let valid_until = Utc::now().add(Duration::minutes(30));
+        let valid_until = Utc::now().add(Duration::days(1));
         let token = state
             .db
             .create_session_token(
