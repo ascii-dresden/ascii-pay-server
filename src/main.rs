@@ -8,8 +8,7 @@ use std::sync::Arc;
 use tokio::signal;
 use tower_http::cors::{Any, CorsLayer};
 
-use crate::database::{AppState, DatabaseConnection};
-use crate::error::ServiceError;
+use crate::database::AppState;
 
 mod api;
 mod database;
@@ -18,8 +17,6 @@ pub mod env;
 mod error;
 mod models;
 mod request_state;
-
-mod import;
 
 #[cfg(feature = "mail")]
 mod mail;
@@ -35,30 +32,6 @@ async fn main() {
     aide::gen::extract_schemas(true);
 
     let app_state = AppState::connect(env::DATABASE_URL.as_str()).await;
-
-    let args: Vec<String> = std::env::args().collect();
-    let import_sql_dump = args.iter().any(|a| a == "import-sql-dump");
-
-    if import_sql_dump {
-        let connection = app_state
-            .pool
-            .acquire()
-            .await
-            .map_err(|err| ServiceError::InternalServerError(err.to_string()))
-            .unwrap();
-        let mut db = DatabaseConnection { connection };
-
-        let products_path =
-            std::env::var("IMPORT_ASCII_PAY_PRODUCTS").unwrap_or_else(|_| "./".to_string());
-        let sql_dump_path =
-            std::env::var("IMPORT_ASCII_PAY_SQL_DUMP").unwrap_or_else(|_| "./".to_string());
-        import::import(&mut db, &products_path, &sql_dump_path)
-            .await
-            .unwrap();
-
-        return;
-    }
-
     let mut api = OpenApi::default();
 
     let app = ApiRouter::new()
