@@ -18,6 +18,9 @@ mod error;
 mod models;
 mod request_state;
 
+mod apns;
+mod wallet;
+
 #[cfg(feature = "mail")]
 mod mail;
 
@@ -38,6 +41,7 @@ async fn main() {
         .nest_api_service("/api/v1", api::init(app_state.clone()))
         .nest_api_service("/docs", docs::docs_routes())
         .finish_api_with(&mut api, docs::api_docs)
+        .nest_service("/v1", api::wallet_routes::router(app_state.clone()))
         .layer(Extension(Arc::new(api)))
         .layer(DefaultBodyLimit::disable())
         .layer(

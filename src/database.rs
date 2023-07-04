@@ -16,8 +16,9 @@ use tokio::sync::Mutex;
 
 use crate::error::{ServiceError, ServiceResult};
 use crate::models::{
-    self, Account, AuthMethod, AuthMethodType, AuthNfc, AuthPassword, AuthRequest, CardType,
-    CoinAmount, CoinType, Image, PaymentItem, Product, Role, Session, Transaction, TransactionItem,
+    self, Account, AppleWalletPass, AppleWalletRegistration, AuthMethod, AuthMethodType, AuthNfc,
+    AuthPassword, AuthRequest, CardType, CoinAmount, CoinType, Image, PaymentItem, Product, Role,
+    Session, Transaction, TransactionItem,
 };
 
 const MINIMUM_PAYMENT_CENTS: i32 = 0;
@@ -100,6 +101,55 @@ impl From<AccountRow> for Account {
             auth_methods: row.auth_methods.into_iter().map(|j| j.0.into()).collect(),
             enable_monthly_mail_report: row.enable_monthly_mail_report,
             enable_automatic_stamp_usage: row.enable_automatic_stamp_usage,
+        }
+    }
+}
+
+#[derive(sqlx::FromRow)]
+pub struct AppleWalletPassRow {
+    pub account_id: i64,
+    pub pass_type_id: String,
+    pub authentication_token: String,
+    pub qr_code: String,
+    pub updated_at: i64,
+}
+
+impl From<AppleWalletPassRow> for AppleWalletPass {
+    fn from(row: AppleWalletPassRow) -> Self {
+        AppleWalletPass {
+            account_id: row
+                .account_id
+                .try_into()
+                .expect("id in database is always positive"),
+            pass_type_id: row.pass_type_id,
+            authentication_token: row.authentication_token,
+            qr_code: row.qr_code,
+            updated_at: row
+                .updated_at
+                .try_into()
+                .expect("id in database is always positive"),
+        }
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct AppleWalletRegistrationRow {
+    pub account_id: i64,
+    pub pass_type_id: String,
+    pub device_id: String,
+    pub push_token: String,
+}
+
+impl From<AppleWalletRegistrationRow> for AppleWalletRegistration {
+    fn from(row: AppleWalletRegistrationRow) -> Self {
+        AppleWalletRegistration {
+            account_id: row
+                .account_id
+                .try_into()
+                .expect("id in database is always positive"),
+            pass_type_id: row.pass_type_id,
+            device_id: row.device_id,
+            push_token: row.push_token,
         }
     }
 }
@@ -1362,7 +1412,7 @@ impl DatabaseConnection {
                 data
             FROM register_history
             WHERE
-                product.id = $1
+                register_history.id = $1
             "#,
         )
         .bind(i64::try_from(id).expect("ids are less than 2**63"))
@@ -1426,6 +1476,232 @@ impl DatabaseConnection {
         let id = i64::try_from(id).expect("id is always less than 2**63");
         let r = sqlx::query(r#"DELETE FROM register_history WHERE id = $1"#)
             .bind(id)
+            .execute(&mut self.connection)
+            .await;
+        let r = to_service_result(r)?;
+        if r.rows_affected() != 1 {
+            return Err(ServiceError::NotFound);
+        }
+        Ok(())
+    }
+
+    pub async fn get_apple_wallet_pass(
+        &mut self,
+        account_id: u64,
+        pass_type_id: &str,
+    ) -> ServiceResult<Option<AppleWalletPass>> {
+        let r = sqlx::query_as::<_, AppleWalletPassRow>(
+            r#"
+            SELECT
+                account_id,
+                pass_type_id,
+                authentication_token,
+                qr_code,
+                updated_at
+            FROM apple_wallet_pass
+            WHERE
+                apple_wallet_pass.account_id = $1 AND apple_wallet_pass.pass_type_id = $2
+            "#,
+        )
+        .bind(i64::try_from(account_id).expect("ids are less than 2**63"))
+        .bind(pass_type_id)
+        .fetch_optional(&mut self.connection)
+        .await;
+
+        Ok(to_service_result(r)?.map(models::AppleWalletPass::from))
+    }
+
+    pub async fn list_passes_for_device(
+        &mut self,
+        pass_type_id: &str,
+        device_id: &str,
+    ) -> ServiceResult<Vec<AppleWalletPass>> {
+        let mut r = sqlx::query_as::<_, AppleWalletPassRow>(
+            r#"
+            SELECT
+                account_id,
+                pass_type_id,
+                authentication_token,
+                qr_code,
+                updated_at
+            FROM apple_wallet_pass
+            WHERE
+                apple_wallet_pass.pass_type_id = $1 AND apple_wallet_pass.device_id = $2
+            "#,
+        )
+        .bind(pass_type_id)
+        .bind(device_id)
+        .fetch(&mut self.connection);
+
+        let mut out = Vec::new();
+        while let Some(row) = r.next().await {
+            let row = to_service_result(row)?;
+            out.push(row.into());
+        }
+
+        Ok(out)
+    }
+
+    pub async fn store_apple_wallet_pass(
+        &mut self,
+        mut pass: AppleWalletPass,
+    ) -> ServiceResult<AppleWalletPass> {
+        let r = sqlx::query(
+            r#"
+            INSERT INTO apple_wallet_pass (
+                account_id,
+                pass_type_id,
+                qr_code,
+                updated_at
+            ) VALUES (
+                $1,
+                $2,
+                $3,
+                $4
+            ) ON CONFLICT (
+                account_id,
+                pass_type_id
+            ) DO UPDATE SET
+                qr_code = $3,
+                updated_at = $4
+            RETURNING authentication_token
+            "#,
+        )
+        .bind(i64::try_from(pass.account_id).expect("ids are less than 2**63"))
+        .bind(&pass.pass_type_id)
+        .bind(&pass.qr_code)
+        .bind(i64::try_from(pass.updated_at).expect("ids are less than 2**63"))
+        .fetch_one(&mut self.connection)
+        .await;
+        let r = to_service_result(r)?;
+
+        pass.authentication_token = r.get::<String, _>("authentication_token");
+        Ok(pass)
+    }
+
+    #[allow(dead_code)]
+    pub async fn delete_apple_wallet_pass(
+        &mut self,
+        account_id: u64,
+        pass_type_id: &str,
+    ) -> ServiceResult<()> {
+        let account_id = i64::try_from(account_id).expect("id is always less than 2**63");
+        let r = sqlx::query(
+            r#"DELETE FROM apple_wallet_pass WHERE account_id = $1 AND pass_type_id = $2"#,
+        )
+        .bind(account_id)
+        .bind(pass_type_id)
+        .execute(&mut self.connection)
+        .await;
+        let r = to_service_result(r)?;
+        if r.rows_affected() != 1 {
+            return Err(ServiceError::NotFound);
+        }
+        Ok(())
+    }
+
+    pub async fn get_apple_wallet_registration(
+        &mut self,
+        account_id: u64,
+        pass_type_id: &str,
+        device_id: &str,
+    ) -> ServiceResult<Option<AppleWalletRegistration>> {
+        let r = sqlx::query_as::<_, AppleWalletRegistrationRow>(
+            r#"
+            SELECT
+                account_id,
+                pass_type_id,
+                device_id,
+                push_token
+            FROM apple_wallet_registration
+            WHERE
+                apple_wallet_registration.account_id = $1 AND apple_wallet_registration.pass_type_id = $2 AND apple_wallet_registration.device_id = $3
+            "#,
+        )
+        .bind(i64::try_from(account_id).expect("ids are less than 2**63"))
+        .bind(pass_type_id)
+        .bind(device_id)
+        .fetch_optional(&mut self.connection)
+        .await;
+
+        Ok(to_service_result(r)?.map(models::AppleWalletRegistration::from))
+    }
+    pub async fn list_apple_wallet_registration(
+        &mut self,
+        account_id: u64,
+        pass_type_id: &str,
+    ) -> ServiceResult<Vec<AppleWalletRegistration>> {
+        let mut r = sqlx::query_as::<_, AppleWalletRegistrationRow>(
+            r#"
+            SELECT
+                account_id,
+                pass_type_id,
+                device_id,
+                push_token
+            FROM apple_wallet_registration
+            WHERE
+                apple_wallet_registration.account_id = $1 AND apple_wallet_registration.pass_type_id = $2
+            "#,
+        )
+        .bind(i64::try_from(account_id).expect("ids are less than 2**63"))
+        .bind(pass_type_id)
+        .fetch(&mut self.connection);
+
+        let mut out = Vec::new();
+        while let Some(row) = r.next().await {
+            let row = to_service_result(row)?;
+            out.push(row.into());
+        }
+
+        Ok(out)
+    }
+
+    pub async fn store_apple_wallet_registration(
+        &mut self,
+        registration: AppleWalletRegistration,
+    ) -> ServiceResult<AppleWalletRegistration> {
+        let r = sqlx::query(
+            r#"
+            INSERT INTO apple_wallet_registration (
+                account_id,
+                pass_type_id,
+                device_id,
+                push_token
+            ) VALUES (
+                $1,
+                $2,
+                $3,
+                $4
+            ) ON CONFLICT (
+                account_id,
+                pass_type_id,
+                device_id
+            ) DO UPDATE SET
+                push_token = $4
+            "#,
+        )
+        .bind(i64::try_from(registration.account_id).expect("ids are less than 2**63"))
+        .bind(&registration.pass_type_id)
+        .bind(&registration.device_id)
+        .bind(&registration.push_token)
+        .fetch_one(&mut self.connection)
+        .await;
+        let r = to_service_result(r)?;
+
+        Ok(registration)
+    }
+
+    pub async fn delete_apple_wallet_registration(
+        &mut self,
+        account_id: u64,
+        pass_type_id: &str,
+        device_id: &str,
+    ) -> ServiceResult<()> {
+        let account_id = i64::try_from(account_id).expect("id is always less than 2**63");
+        let r = sqlx::query(r#"DELETE FROM apple_wallet_registration WHERE account_id = $1 AND pass_type_id = $2 AND device_id = $3"#)
+            .bind(account_id)
+            .bind(pass_type_id)
+            .bind(device_id)
             .execute(&mut self.connection)
             .await;
         let r = to_service_result(r)?;

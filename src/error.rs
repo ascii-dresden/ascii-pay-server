@@ -44,6 +44,30 @@ impl From<block_modes::BlockModeError> for ServiceError {
     }
 }
 
+impl From<std::num::ParseIntError> for ServiceError {
+    fn from(error: std::num::ParseIntError) -> Self {
+        ServiceError::InternalServerError(error.to_string())
+    }
+}
+
+impl From<std::io::Error> for ServiceError {
+    fn from(error: std::io::Error) -> Self {
+        ServiceError::InternalServerError(error.to_string())
+    }
+}
+
+impl From<openssl::error::ErrorStack> for ServiceError {
+    fn from(error: openssl::error::ErrorStack) -> Self {
+        ServiceError::InternalServerError(error.to_string())
+    }
+}
+
+impl From<awc::error::SendRequestError> for ServiceError {
+    fn from(error: awc::error::SendRequestError) -> Self {
+        ServiceError::InternalServerError(error.to_string())
+    }
+}
+
 #[cfg(feature = "mail")]
 impl From<lettre::transport::smtp::Error> for ServiceError {
     fn from(error: lettre::transport::smtp::Error) -> Self {

@@ -225,3 +225,22 @@ pub struct RegisterHistoryState {
     pub note10: i32,
     pub note5: i32,
 }
+
+/// Represent a wallet pass
+#[derive(Debug, PartialEq, Clone)]
+pub struct AppleWalletPass {
+    pub account_id: u64,
+    pub pass_type_id: String,
+    pub authentication_token: String,
+    pub qr_code: String,
+    pub updated_at: u64,
+}
+
+/// Represent a wallet registration
+#[derive(Debug, PartialEq, Clone)]
+pub struct AppleWalletRegistration {
+    pub account_id: u64,
+    pub pass_type_id: String,
+    pub device_id: String,
+    pub push_token: String,
+}

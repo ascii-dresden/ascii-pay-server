@@ -8,13 +8,14 @@ use axum::http::StatusCode;
 use axum::Json;
 use base64::engine::general_purpose;
 use base64::Engine;
+use log::error;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::database::AppState;
 use crate::error::{ServiceError, ServiceResult};
-use crate::models;
 use crate::request_state::RequestState;
+use crate::{models, wallet};
 
 use super::password_hash_create;
 
@@ -337,6 +338,13 @@ async fn update_account(
         }
 
         let account = state.db.store_account(account).await?;
+
+        tokio::task::spawn_local(async move {
+            if let Err(e) = wallet::send_update_notification(&mut state.db, id).await {
+                error!("Could not send apns update! {:?}", e)
+            }
+        });
+
         return Ok(Json(AccountDto::from(&account)));
     }
 

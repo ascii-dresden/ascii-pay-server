@@ -46,4 +46,44 @@ lazy_static::lazy_static! {
     ///
     /// Field name: `MAIL_PASS`
     pub static ref MAIL_PASS: String = std::env::var("MAIL_PASS").unwrap_or_else(|_| "ascii".to_owned());
+
+    /// Url to this server. This can differ from the BASE_URL if the apple wallet service is not mounted at root.
+    ///
+    /// Field name: `APPLE_WALLET_SERVICE_URL`
+    pub static ref APPLE_WALLET_SERVICE_URL: String = std::env::var("APPLE_WALLET_SERVICE_URL").unwrap_or_else(|_| "https://pay.ascii.coffee/".to_owned());
+
+    /// Path to the apple wallet template.
+    ///
+    /// Field name: `APPLE_WALLET_TEMPLATE`
+    pub static ref APPLE_WALLET_TEMPLATE: String = std::env::var("APPLE_WALLET_TEMPLATE").unwrap_or_else(|_| "./AsciiPayCard.pass".to_owned());
+
+    /// Path to the apple wallet apns certificate.
+    ///
+    /// Field name: `APPLE_WALLET_APNS_CERTIFICATE`
+    pub static ref APPLE_WALLET_APNS_CERTIFICATE: String = std::env::var("APPLE_WALLET_APNS_CERTIFICATE").unwrap_or_else(|_| "../certificates/apple-apns.pem".to_owned());
+
+    /// Path to the apple wallet wwdr certificate.
+    ///
+    /// Field name: `APPLE_WALLET_WWDR_CERTIFICATE`
+    pub static ref APPLE_WALLET_WWDR_CERTIFICATE: String = std::env::var("APPLE_WALLET_WWDR_CERTIFICATE").unwrap_or_else(|_| "../certificates/apple-wwdr.pem".to_owned());
+
+    /// Path to the apple wallet pass certificate.
+    ///
+    /// Field name: `APPLE_WALLET_PASS_CERTIFICATE`
+    pub static ref APPLE_WALLET_PASS_CERTIFICATE: String = std::env::var("APPLE_WALLET_PASS_CERTIFICATE").unwrap_or_else(|_| "../certificates/apple-pass.p12".to_owned());
+
+    /// Password for apple wallet pass certificate.
+    ///
+    /// Field name: `APPLE_WALLET_PASS_CERTIFICATE_PASSWORD`
+    pub static ref APPLE_WALLET_PASS_CERTIFICATE_PASSWORD: String = std::env::var("APPLE_WALLET_PASS_CERTIFICATE_PASSWORD").unwrap_or_else(|_| "ascii".to_owned());
+
+    /// The pass type identifier as registered by apple.
+    ///
+    /// Field name: `APPLE_WALLET_PASS_TYPE_IDENTIFIER`
+    pub static ref APPLE_WALLET_PASS_TYPE_IDENTIFIER: String = std::env::var("APPLE_WALLET_PASS_TYPE_IDENTIFIER").unwrap_or_else(|_| "pass.coffee.ascii.pay".to_owned());
+
+    /// The team identifier that was used to register the pass type identifier by apple.
+    ///
+    /// Field name: `APPLE_WALLET_TEAM_IDENTIFIER`
+    pub static ref APPLE_WALLET_TEAM_IDENTIFIER: String = std::env::var("APPLE_WALLET_TEAM_IDENTIFIER").unwrap_or_else(|_| "QVU8H45PQ5".to_owned());
 }

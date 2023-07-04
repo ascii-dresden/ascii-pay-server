@@ -4,13 +4,14 @@ use aide::transform::TransformOperation;
 use axum::extract::Path;
 use axum::Json;
 use chrono::Utc;
+use log::error;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::database::AppState;
 use crate::error::{ServiceError, ServiceResult};
-use crate::models;
 use crate::request_state::RequestState;
+use crate::{models, wallet};
 
 use super::account_auth_methods::AuthMethodTypeDto;
 use super::accounts::{AccountDto, CoinAmountDto};
@@ -188,6 +189,12 @@ async fn post_payment(
     let transaction = state.db.payment(payment, Utc::now(), true).await?;
     let account = state.db.get_account_by_id(id).await?;
     if let Some(account) = account {
+        tokio::task::spawn_local(async move {
+            if let Err(e) = wallet::send_update_notification(&mut state.db, id).await {
+                error!("Could not send apns update! {:?}", e)
+            }
+        });
+
         return Ok(Json(PaymentResponseDto {
             account: AccountDto::from(&account),
             transaction: TransactionDto::from(&transaction),

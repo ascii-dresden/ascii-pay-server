@@ -166,3 +166,31 @@ CREATE TABLE register_history (
     timestamp TIMESTAMP WITH TIME ZONE,
     data JSONB NOT NULL
 );
+
+--##18 apple wallet pass
+CREATE TABLE "apple_wallet_pass" (
+    "account_id" BIGINT NOT NULL,
+    "pass_type_id" VARCHAR NOT NULL,
+    "authentication_token" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "qr_code" VARCHAR NOT NULL,
+    "updated_at" BIGINT NOT NULL,
+    PRIMARY KEY ("account_id", "pass_type_id"),
+
+    CONSTRAINT fk_account_id
+        FOREIGN KEY(account_id)
+            REFERENCES account(id)
+            ON DELETE CASCADE
+);
+
+CREATE TABLE "apple_wallet_registration" (
+    "account_id" BIGINT NOT NULL,
+    "pass_type_id" VARCHAR NOT NULL,
+    "device_id" VARCHAR NOT NULL,
+    "push_token" VARCHAR NOT NULL,
+    PRIMARY KEY ("account_id", "pass_type_id", "device_id"),
+
+    CONSTRAINT fk_account_id_pass
+        FOREIGN KEY(account_id, pass_type_id)
+            REFERENCES apple_wallet_pass(account_id, pass_type_id)
+            ON DELETE CASCADE
+);

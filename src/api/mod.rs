@@ -14,6 +14,8 @@ mod register;
 mod report;
 mod transactions;
 
+pub mod wallet_routes;
+
 pub fn init(app_state: AppState) -> ApiRouter {
     ApiRouter::new()
         .merge(account_auth_methods::router(app_state.clone()))
