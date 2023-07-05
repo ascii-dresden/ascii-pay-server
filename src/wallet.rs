@@ -59,9 +59,21 @@ pub fn create_pass_binary(
     field.change_message("balance_updated");
     store_card.add_primary_field(field);
 
+    let bottle_stamps: i32 = account.balance.0.get(&CoinType::BottleStamp).copied().unwrap_or(0);
+    let mut field = template::Field::new_f64("account_bottle_stamps",  bottle_stamps as f64);
+    field.label("account_bottle_stamps");
+    field.change_message("bottle_stamps_updated");
+    store_card.add_secondary_field(field);
+
+    let coffee_stamps = account.balance.0.get(&CoinType::CoffeeStamp).copied().unwrap_or(0);
+    let mut field = template::Field::new_f64("account_coffee_stamps",  coffee_stamps as f64);
+    field.label("account_coffee_stamps");
+    field.change_message("coffee_stamps_updated");
+    store_card.add_secondary_field(field);
+
     let mut field = template::Field::new_string("account_name", &account.name);
     field.label("account_name");
-    store_card.add_secondary_field(field);
+    store_card.add_back_field(field);
 
     pass.store_card(store_card);
 

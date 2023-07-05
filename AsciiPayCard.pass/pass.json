@@ -10,9 +10,9 @@
       "latitude": 13.723384617811181
     }
   ],
-  "organizationName": "Ascii Pay",
-  "description": "Ascii Pay Card",
-  "logoText": "Ascii Pay Card",
+  "organizationName": "ascii pay",
+  "description": "Loyalty pass for ascii pay",
+  "logoText": "ascii pay",
   "foregroundColor": "rgb(255, 255, 255)",
   "labelColor": "rgb(255, 255, 255)",
   "backgroundColor": "rgb(113, 194, 133)"

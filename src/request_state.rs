@@ -2,11 +2,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use aide::OperationInput;
-use axum::extract::{FromRef, FromRequestParts};
+use axum::extract::{FromRef, FromRequestParts, Query};
 use axum::http::request::Parts;
 use axum::{async_trait, RequestPartsExt, TypedHeader};
 use headers::authorization::Bearer;
 use headers::Authorization;
+use serde::Deserialize;
 use tokio::sync::Mutex;
 
 use crate::database::{AppState, AppStateNfcChallenge, DatabaseConnection};
@@ -19,6 +20,22 @@ pub struct RequestState {
     pub db: DatabaseConnection,
     pub session: Option<Session>,
     pub challenge_storage: Arc<Mutex<HashMap<u64, AppStateNfcChallenge>>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SessionTokenQuery{
+    pub session_token: String
+}
+async fn get_session_token(parts: &mut Parts) -> Option<String> {
+    if let Ok(TypedHeader(Authorization(bearer))) = parts.extract::<TypedHeader<Authorization<Bearer>>>().await {
+        return Some(bearer.token().to_owned());
+    }
+
+    if let Ok(query) = parts.extract::<Query<SessionTokenQuery>>().await {
+        return Some(query.session_token.to_owned());
+    }
+
+    None
 }
 
 #[async_trait]
@@ -39,10 +56,7 @@ where
             .map_err(|err| ServiceError::InternalServerError(err.to_string()))?;
         let mut db = DatabaseConnection { connection };
 
-        let session = if let Ok(TypedHeader(Authorization(bearer))) =
-            parts.extract::<TypedHeader<Authorization<Bearer>>>().await
-        {
-            let session_token = bearer.token().to_owned();
+        let session = if let Some(session_token) = get_session_token(parts).await {
             db.get_session_by_session_token(session_token).await?
         } else {
             None

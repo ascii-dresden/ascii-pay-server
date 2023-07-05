@@ -1,5 +1,9 @@
 "balance" = "Guthaben";
 "balance_updated" = "Ihr Guthaben wurde auf %@ aktualisiert.";
+"bottle_stamps_updated" = "Ihre Pfandstempel wurde auf %@ aktualisiert.";
+"coffee_stamps_updated" = "Ihr Kaffeestempel wurde auf %@ aktualisiert.";
 "account_name" = "Name";
 "account_number" = "Kundennummer";
 "account_login" = "Webseite";
+"account_bottle_stamps" = "Pfandstempel";
+"account_coffee_stamps" = "Kaffeestempel";

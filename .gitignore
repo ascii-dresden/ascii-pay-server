@@ -1,5 +1,7 @@
 /target
 /dist
+/certificates
+/.idea
 
 .env
 .DS_Store

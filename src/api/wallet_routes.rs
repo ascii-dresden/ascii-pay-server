@@ -1,7 +1,7 @@
 use axum::body::Bytes;
 use axum::extract::{Path, Query};
 use axum::http::{header, StatusCode};
-use axum::response::{IntoResponse, Redirect, Response};
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router, TypedHeader};
 use chrono::{DateTime, TimeZone, Utc};
@@ -44,8 +44,7 @@ pub fn router(app_state: AppState) -> Router {
         )
         .route("/passes/:pass_type_id/:serial_number", get(pass_delivery))
         .route("/log", get(log))
-        .route("/ApplePassCard", get(forward_pass))
-        .route("/ApplePassCard.pkpass", get(create_pass))
+        .route("/asciipay.pkpass", get(create_pass))
         .with_state(app_state)
 }
 
@@ -323,15 +322,7 @@ pub async fn pass_delivery(
     }
 }
 
-/// GET route for `/v1/AsciiPayCard` if user is logged in
-pub async fn forward_pass(state: RequestState) -> ServiceResult<impl IntoResponse> {
-    let session = state.session_require()?;
-    let uri = &format!("/v1/AsciiPayCard.pkpass?auth_token={}", session.token);
-
-    Ok(Redirect::temporary(uri))
-}
-
-/// GET route for `/v1/AsciiPayCard.pkpass` if user is logged in
+/// GET route for `/v1/asciipay.pkpass` if user is logged in
 pub async fn create_pass(mut state: RequestState) -> ServiceResult<PassResult> {
     let account = state.session_require_login()?;
 

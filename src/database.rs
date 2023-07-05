@@ -1495,7 +1495,7 @@ impl DatabaseConnection {
             SELECT
                 account_id,
                 pass_type_id,
-                authentication_token,
+                CAST(authentication_token AS TEXT),
                 qr_code,
                 updated_at
             FROM apple_wallet_pass
@@ -1521,7 +1521,7 @@ impl DatabaseConnection {
             SELECT
                 account_id,
                 pass_type_id,
-                authentication_token,
+                CAST(authentication_token AS TEXT),
                 qr_code,
                 updated_at
             FROM apple_wallet_pass
@@ -1546,6 +1546,7 @@ impl DatabaseConnection {
         &mut self,
         mut pass: AppleWalletPass,
     ) -> ServiceResult<AppleWalletPass> {
+        println!("TEST 1");
         let r = sqlx::query(
             r#"
             INSERT INTO apple_wallet_pass (
@@ -1564,7 +1565,7 @@ impl DatabaseConnection {
             ) DO UPDATE SET
                 qr_code = $3,
                 updated_at = $4
-            RETURNING authentication_token
+            RETURNING CAST(authentication_token AS TEXT)
             "#,
         )
         .bind(i64::try_from(pass.account_id).expect("ids are less than 2**63"))
@@ -1575,6 +1576,8 @@ impl DatabaseConnection {
         .await;
         let r = to_service_result(r)?;
 
+        println!("TEST 2");
+        println!("{:?}", r.columns());
         pass.authentication_token = r.get::<String, _>("authentication_token");
         Ok(pass)
     }

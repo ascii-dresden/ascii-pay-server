@@ -15,6 +15,9 @@ services:
       - DOMAIN_NAME=http://localhost:8080
     depends_on:
       - postgres
+    volumes:
+      - ./AsciiPayCard.pass:/opt/ascii-pay-server/AsciiPayCard.pass
+      - ./certificates:/opt/certificates
     ports:
       - "3000:3000"
     networks:

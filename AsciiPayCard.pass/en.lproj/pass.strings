@@ -1,5 +1,9 @@
 "balance" = "Balance";
 "balance_updated" = "Your balance was updated to %@.";
+"bottle_stamps_updated" = "Your bottle stamps were updated to %@.";
+"coffee_stamps_updated" = "Your coffee stamps were updated to %@.";
 "account_name" = "Name";
 "account_number" = "Account number";
 "account_login" = "Webpage";
+"account_bottle_stamps" = "Bottle stamps";
+"account_coffee_stamps" = "Coffee stamps";

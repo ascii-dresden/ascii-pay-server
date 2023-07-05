@@ -16,6 +16,8 @@ RUN cargo build --release
 
 FROM alpine:3.16 as dist
 
+RUN apk update && apk add libc6-compat libcrypto3 libssl3
+
 WORKDIR /opt/ascii-pay-server
 ENTRYPOINT /opt/ascii-pay-server/ascii-pay-server
 
