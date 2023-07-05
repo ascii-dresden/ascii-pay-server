@@ -1,6 +1,6 @@
 [package]
 name = "ascii-pay-server"
-version = "2.0.0"
+version = "2.1.0"
 authors = ["Lars Westermann <lars-westermann@live.de>"]
 edition = "2021"
 
@@ -9,12 +9,12 @@ name = "ascii-pay-server"
 path = "src/main.rs"
 
 [dependencies]
-tokio = { version = "1.26.0", features = ["full"] }
-axum = { version="0.6.12", features=["multipart", "headers"] }
+tokio = { version = "1.27.0", features = ["full"] }
+axum = { version="0.6.17", features=["multipart", "headers"] }
 tower-http = { version = "0.4.0", features = ["cors"] }
 sqlx = { version = "0.6.3", features = ["runtime-tokio-rustls", "postgres", "json", "chrono"] }
-serde = { version = "1.0.158", features = ["derive"] }
-serde_json = { version="1.0.94" }
+serde = { version = "1.0.160", features = ["derive"] }
+serde_json = { version="1.0.96" }
 argon2rs = { version="0.2.5", default-features = false }
 base64 = { version="0.21.0" }
 aide = { version="0.10.0", features=["redoc", "axum", "axum-multipart"] }
@@ -25,21 +25,21 @@ lazy_static = "1.4.0"
 block-modes = "0.8"
 aes = "0.7"
 des = "0.7"
-generic-array = "0.14.6"
+generic-array = "0.14.7"
 hex-literal = "0.4.1"
 rand = "0.8.5"
-futures = { version = "0.3.27" }
+futures = { version = "0.3.28" }
 
 dotenv = "0.15.0"
 log = "0.4.17"
 env_logger = "0.10.0"
 chrono = { version="0.4.24", default-features = false, features=["clock"] }
 
-wallet-pass = "0.3"
+wallet-pass = "0.3.0"
 awc = { version="3.1.1", features=["openssl"] }
-openssl = "0.10.0"
+openssl = "0.10.52"
 
-lettre = { version = "0.10.3", optional = true, default-features = false, features= ["smtp-transport", "rustls-tls", "builder"] }
+lettre = { version = "0.10.4", optional = true, default-features = false, features= ["smtp-transport", "rustls-tls", "builder"] }
 
 [features]
 mail = ["lettre"]

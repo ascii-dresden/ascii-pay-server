@@ -1,6 +1,6 @@
 FROM rust:alpine as build
 
-RUN apk update && apk add musl-dev
+RUN apk update && apk add musl-dev openssl-dev
 
 WORKDIR /usr/src/ascii-pay-server
 ENV CARGO_TERM_COLOR always

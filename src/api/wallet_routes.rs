@@ -58,7 +58,7 @@ pub fn router(app_state: AppState) -> Router {
 ///
 /// Params definition
 /// :device_id      - the device's identifier
-/// :pass_type_id   - the bundle identifier for a class of passes, sometimes refered to as the pass topic, e.g. pass.com.apple.backtoschoolgift, registered with WWDR
+/// :pass_type_id   - the bundle identifier for a class of passes, sometimes referred to as the pass topic, e.g. pass.com.apple.backtoschoolgift, registered with WWDR
 /// :serial_number  - the pass' serial number
 /// :pushToken      - the value needed for Apple Push Notification service
 ///
