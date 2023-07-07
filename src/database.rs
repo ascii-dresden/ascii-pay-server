@@ -1546,7 +1546,6 @@ impl DatabaseConnection {
         &mut self,
         mut pass: AppleWalletPass,
     ) -> ServiceResult<AppleWalletPass> {
-        println!("TEST 1");
         let r = sqlx::query(
             r#"
             INSERT INTO apple_wallet_pass (
@@ -1576,8 +1575,6 @@ impl DatabaseConnection {
         .await;
         let r = to_service_result(r)?;
 
-        println!("TEST 2");
-        println!("{:?}", r.columns());
         pass.authentication_token = r.get::<String, _>("authentication_token");
         Ok(pass)
     }
