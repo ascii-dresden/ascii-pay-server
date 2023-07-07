@@ -23,11 +23,13 @@ pub struct RequestState {
 }
 
 #[derive(Debug, Deserialize)]
-struct SessionTokenQuery{
-    pub session_token: String
+struct SessionTokenQuery {
+    pub session_token: String,
 }
 async fn get_session_token(parts: &mut Parts) -> Option<String> {
-    if let Ok(TypedHeader(Authorization(bearer))) = parts.extract::<TypedHeader<Authorization<Bearer>>>().await {
+    if let Ok(TypedHeader(Authorization(bearer))) =
+        parts.extract::<TypedHeader<Authorization<Bearer>>>().await
+    {
         return Some(bearer.token().to_owned());
     }
 

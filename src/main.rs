@@ -8,7 +8,6 @@ use std::sync::Arc;
 use tokio::signal;
 use tower_http::cors::{Any, CorsLayer};
 
-use crate::apns::ApplePushNotificationService;
 use crate::database::AppState;
 
 mod api;
@@ -29,11 +28,6 @@ mod mail;
 async fn main() {
     dotenv::dotenv().ok();
     env_logger::init();
-
-    let apns = ApplePushNotificationService::new().unwrap();
-    // apns.send("test").await.unwrap();
-
-    return;
 
     aide::gen::on_error(|error| {
         println!("{error}");

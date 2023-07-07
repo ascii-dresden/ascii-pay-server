@@ -5,7 +5,7 @@ use std::{
 };
 
 use log::error;
-use reqwest::{Identity, Client, Certificate, header, Version};
+use reqwest::{header, Certificate, Client, Identity, Version};
 
 use crate::{env, error::ServiceResult};
 
@@ -21,11 +21,10 @@ impl ApplePushNotificationService {
         let mut pkcs12_buffer = Vec::new();
         pkcs12_reader.read_to_end(&mut pkcs12_buffer)?;
 
-        println!("{:X?}", &pkcs12_buffer);
-        println!("{:?}", &pkcs12_buffer.len());
-        println!("{:?}", env::APPLE_WALLET_PASS_CERTIFICATE.as_str());
-        println!("{:?}", env::APPLE_WALLET_PASS_CERTIFICATE_PASSWORD.as_str());
-        let pkcs = Identity::from_pkcs12_der(&pkcs12_buffer, env::APPLE_WALLET_PASS_CERTIFICATE_PASSWORD.as_str())?;
+        let pkcs = Identity::from_pkcs12_der(
+            &pkcs12_buffer,
+            env::APPLE_WALLET_PASS_CERTIFICATE_PASSWORD.as_str(),
+        )?;
 
         let apns = load_x509(env::APPLE_WALLET_APNS_CERTIFICATE.as_str())?;
         let wwdr = load_x509(env::APPLE_WALLET_WWDR_CERTIFICATE.as_str())?;
@@ -42,7 +41,10 @@ impl ApplePushNotificationService {
 
     /// Send message over APNS client
     pub async fn send(&self, push_token: &str) -> ServiceResult<u16> {
-        let path = format!("https://api.sandbox.push.apple.com:443/3/device/{}", push_token);
+        let path = format!(
+            "https://api.sandbox.push.apple.com:443/3/device/{}",
+            push_token
+        );
         let builder = self
             .client
             .post(&path)
@@ -55,7 +57,7 @@ impl ApplePushNotificationService {
             .body(payload_json)
             .build()?;
 
-        let response = match self.client.execute(request).await  {
+        let response = match self.client.execute(request).await {
             Ok(v) => v,
             Err(e) => {
                 error!("{:?}", e);
