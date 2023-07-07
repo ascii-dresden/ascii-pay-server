@@ -189,7 +189,7 @@ async fn post_payment(
     let transaction = state.db.payment(payment, Utc::now(), true).await?;
     let account = state.db.get_account_by_id(id).await?;
     if let Some(account) = account {
-        tokio::task::spawn_local(async move {
+        tokio::task::spawn(async move {
             if let Err(e) = wallet::send_update_notification(&mut state.db, id).await {
                 error!("Could not send apns update! {:?}", e)
             }

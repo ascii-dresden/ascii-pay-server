@@ -85,5 +85,5 @@ lazy_static::lazy_static! {
     /// The team identifier that was used to register the pass type identifier by apple.
     ///
     /// Field name: `APPLE_WALLET_TEAM_IDENTIFIER`
-    pub static ref APPLE_WALLET_TEAM_IDENTIFIER: String = std::env::var("APPLE_WALLET_TEAM_IDENTIFIER").unwrap_or_else(|_| "QVU8H45PQ5".to_owned());
+    pub static ref APPLE_WALLET_TEAM_IDENTIFIER: String = std::env::var("APPLE_WALLET_TEAM_IDENTIFIER").unwrap_or_else(|_| "".to_owned());
 }

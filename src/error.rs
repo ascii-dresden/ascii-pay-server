@@ -62,8 +62,8 @@ impl From<openssl::error::ErrorStack> for ServiceError {
     }
 }
 
-impl From<awc::error::SendRequestError> for ServiceError {
-    fn from(error: awc::error::SendRequestError) -> Self {
+impl From<reqwest::Error> for ServiceError {
+    fn from(error: reqwest::Error) -> Self {
         ServiceError::InternalServerError(error.to_string())
     }
 }

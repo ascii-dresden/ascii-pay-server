@@ -7,6 +7,7 @@ services:
     image: asciipay/server:latest
     restart: always
     container_name: "ascii-pay-server"
+    env_file: .env
     environment:
       - API_HOST=0.0.0.0
       - API_PORT=3000

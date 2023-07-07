@@ -339,7 +339,7 @@ async fn update_account(
 
         let account = state.db.store_account(account).await?;
 
-        tokio::task::spawn_local(async move {
+        tokio::task::spawn(async move {
             if let Err(e) = wallet::send_update_notification(&mut state.db, id).await {
                 error!("Could not send apns update! {:?}", e)
             }

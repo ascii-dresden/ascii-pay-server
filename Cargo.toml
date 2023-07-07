@@ -36,7 +36,7 @@ env_logger = "0.10.0"
 chrono = { version="0.4.24", default-features = false, features=["clock"] }
 
 wallet-pass = "0.3.0"
-awc = { version="3.1.1", features=["openssl"] }
+reqwest = { version="0.11.16", features=["native-tls", "native-tls-alpn"] }
 openssl = "0.10.52"
 
 lettre = { version = "0.10.4", optional = true, default-features = false, features= ["smtp-transport", "rustls-tls", "builder"] }
