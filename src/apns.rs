@@ -42,7 +42,7 @@ impl ApplePushNotificationService {
     /// Send message over APNS client
     pub async fn send(&self, push_token: &str) -> ServiceResult<u16> {
         let path = format!(
-            "https://api.sandbox.push.apple.com:443/3/device/{}",
+            "https://api.push.apple.com:443/3/device/{}",
             push_token
         );
         let builder = self
