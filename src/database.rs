@@ -534,7 +534,7 @@ impl DatabaseConnection {
             GROUP BY a.id
         "#,
         )
-        .fetch(&mut self.connection);
+        .fetch(self.connection.as_mut());
 
         let mut out = Vec::new();
         while let Some(row) = r.next().await {
@@ -559,7 +559,7 @@ impl DatabaseConnection {
             GROUP BY a.id
         "#)
         .bind(i64::try_from(id).expect("account id is less than 2**63"))
-        .fetch_optional(&mut self.connection)
+        .fetch_optional(self.connection.as_mut())
         .await;
         let r = to_service_result(r)?;
 
@@ -584,7 +584,7 @@ impl DatabaseConnection {
             GROUP BY a.id
         "#)
         .bind(auth_method.login_key())
-        .fetch_optional(&mut self.connection)
+        .fetch_optional(self.connection.as_mut())
         .await;
         let r = to_service_result(r)?;
 
@@ -609,7 +609,7 @@ impl DatabaseConnection {
         .bind(AuthMethodTypeDto::from(auth_method))
         .bind(valid_until)
         .bind(is_single_use)
-        .fetch_one(&mut self.connection)
+        .fetch_one(self.connection.as_mut())
         .await;
         let r = to_service_result(r)?;
 
@@ -623,7 +623,7 @@ impl DatabaseConnection {
         "#,
         )
         .bind(session_token)
-        .execute(&mut self.connection)
+        .execute(self.connection.as_mut())
         .await;
         to_service_result(r)?;
         Ok(())
@@ -635,7 +635,7 @@ impl DatabaseConnection {
             DELETE FROM session WHERE valid_until < now()
         "#,
         )
-        .execute(&mut self.connection)
+        .execute(self.connection.as_mut())
         .await;
         to_service_result(r)?;
         Ok(())
@@ -662,7 +662,7 @@ impl DatabaseConnection {
             WHERE session.valid_until > now() AND session.uuid = CAST($1 as UUID)
         "#)
         .bind(session_token)
-        .fetch_optional(&mut self.connection)
+        .fetch_optional(self.connection.as_mut())
         .await;
 
         if let Ok(r) = r {
@@ -694,7 +694,7 @@ impl DatabaseConnection {
             WHERE session.valid_until > now() AND session.account_id = $1
         "#)
         .bind(account_id)
-        .fetch(&mut self.connection);
+        .fetch(self.connection.as_mut());
 
         let mut out = Vec::new();
         while let Some(row) = r.next().await {
@@ -737,7 +737,7 @@ impl DatabaseConnection {
             .bind(AccountRoleDto::from(account.role))
             .bind(account.enable_monthly_mail_report)
             .bind(account.enable_automatic_stamp_usage)
-            .fetch_one(&mut self.connection)
+            .fetch_one(self.connection.as_mut())
             .await;
         let r = to_service_result(r)?;
         let account_id = r.get::<i64, _>(0);
@@ -781,7 +781,7 @@ impl DatabaseConnection {
                 })
                 .collect::<Vec<_>>(),
         )
-        .execute(&mut self.connection)
+        .execute(self.connection.as_mut())
         .await;
         to_service_result(r)?;
 
@@ -795,7 +795,7 @@ impl DatabaseConnection {
         "#,
         )
         .bind(i64::try_from(id).expect("account id is less than 2**63"))
-        .execute(&mut self.connection)
+        .execute(self.connection.as_mut())
         .await;
         to_service_result(r)?;
         Ok(())
@@ -822,7 +822,7 @@ impl DatabaseConnection {
             FROM product
             "#,
         )
-        .fetch(&mut self.connection);
+        .fetch(self.connection.as_mut());
 
         let mut out = Vec::new();
         while let Some(row) = r.next().await {
@@ -857,7 +857,7 @@ impl DatabaseConnection {
             "#,
         )
         .bind(i64::try_from(id).expect("ids are less than 2**63"))
-        .fetch_optional(&mut self.connection)
+        .fetch_optional(self.connection.as_mut())
         .await;
 
         Ok(to_service_result(r)?.map(Product::from))
@@ -931,7 +931,7 @@ impl DatabaseConnection {
             .bind(&product.barcode)
             .bind(&product.category)
             .bind(&product.tags)
-            .fetch_one(&mut self.connection)
+            .fetch_one(self.connection.as_mut())
             .await;
         let r = to_service_result(r)?;
 
@@ -946,7 +946,7 @@ impl DatabaseConnection {
         let id = i64::try_from(id).expect("id is always less than 2**63");
         let r = sqlx::query(r#"DELETE FROM product WHERE id = $1"#)
             .bind(id)
-            .execute(&mut self.connection)
+            .execute(self.connection.as_mut())
             .await;
         let r = to_service_result(r)?;
         if r.rows_affected() != 1 {
@@ -961,7 +961,7 @@ impl DatabaseConnection {
             r#"SELECT image, image_mimetype FROM product WHERE id = $1"#,
         )
         .bind(id)
-        .fetch_optional(&mut self.connection)
+        .fetch_optional(self.connection.as_mut())
         .await;
         let r = to_service_result(r)?;
         Ok(r.and_then(From::from))
@@ -977,7 +977,7 @@ impl DatabaseConnection {
             .bind(id)
             .bind(image.data)
             .bind(image.mimetype)
-            .execute(&mut self.connection)
+            .execute(self.connection.as_mut())
             .await;
         let r = to_service_result(r)?;
         if r.rows_affected() != 1 {
@@ -991,7 +991,7 @@ impl DatabaseConnection {
         let r =
             sqlx::query(r#"UPDATE product SET image = NULL, image_mimetype = NULL WHERE id = $1"#)
                 .bind(id)
-                .execute(&mut self.connection)
+                .execute(self.connection.as_mut())
                 .await;
         let r = to_service_result(r)?;
         if r.rows_affected() != 1 {
@@ -1032,7 +1032,7 @@ impl DatabaseConnection {
                 ORDER BY item.timestamp ASC, item.transaction_id ASC
             "#,
         )
-        .fetch(&mut self.connection);
+        .fetch(self.connection.as_mut());
 
         let mut out: Vec<Transaction> = Vec::new();
         while let Some(row) = r.next().await {
@@ -1086,7 +1086,7 @@ impl DatabaseConnection {
             "#,
         )
         .bind(id)
-        .fetch(&mut self.connection);
+        .fetch(self.connection.as_mut());
 
         let mut out: Vec<Transaction> = Vec::new();
         while let Some(row) = r.next().await {
@@ -1138,7 +1138,7 @@ impl DatabaseConnection {
         "#,
         )
         .bind(id)
-        .fetch(&mut self.connection);
+        .fetch(self.connection.as_mut());
 
         let mut tx = None;
         while let Some(row) = r.next().await {
@@ -1211,7 +1211,7 @@ impl DatabaseConnection {
         "#,
             )
             .bind(i64::try_from(payment.account).expect("account id is less than 2**63"))
-            .fetch_optional(&mut transaction)
+            .fetch_optional(transaction.as_mut())
             .await;
 
             match to_service_result(r)? {
@@ -1360,7 +1360,7 @@ impl DatabaseConnection {
                 .authorization
                 .map(|ref session| AuthMethodTypeDto::from(session.auth_method)),
         )
-        .fetch_all(&mut transaction)
+        .fetch_all(transaction.as_mut())
         .await;
 
         to_service_result(transaction.commit().await)?;
@@ -1389,7 +1389,7 @@ impl DatabaseConnection {
             FROM register_history
             "#,
         )
-        .fetch(&mut self.connection);
+        .fetch(self.connection.as_mut());
 
         let mut out = Vec::new();
         while let Some(row) = r.next().await {
@@ -1416,7 +1416,7 @@ impl DatabaseConnection {
             "#,
         )
         .bind(i64::try_from(id).expect("ids are less than 2**63"))
-        .fetch_optional(&mut self.connection)
+        .fetch_optional(self.connection.as_mut())
         .await;
 
         Ok(to_service_result(r)?.map(models::RegisterHistory::from))
@@ -1461,7 +1461,7 @@ impl DatabaseConnection {
                 })
                 .expect("to json cannot fail"),
             )
-            .fetch_one(&mut self.connection)
+            .fetch_one(self.connection.as_mut())
             .await;
         let r = to_service_result(r)?;
 
@@ -1476,7 +1476,7 @@ impl DatabaseConnection {
         let id = i64::try_from(id).expect("id is always less than 2**63");
         let r = sqlx::query(r#"DELETE FROM register_history WHERE id = $1"#)
             .bind(id)
-            .execute(&mut self.connection)
+            .execute(self.connection.as_mut())
             .await;
         let r = to_service_result(r)?;
         if r.rows_affected() != 1 {
@@ -1505,7 +1505,7 @@ impl DatabaseConnection {
         )
         .bind(i64::try_from(account_id).expect("ids are less than 2**63"))
         .bind(pass_type_id)
-        .fetch_optional(&mut self.connection)
+        .fetch_optional(self.connection.as_mut())
         .await;
 
         Ok(to_service_result(r)?.map(models::AppleWalletPass::from))
@@ -1531,7 +1531,7 @@ impl DatabaseConnection {
         )
         .bind(pass_type_id)
         .bind(device_id)
-        .fetch(&mut self.connection);
+        .fetch(self.connection.as_mut());
 
         let mut out = Vec::new();
         while let Some(row) = r.next().await {
@@ -1571,7 +1571,7 @@ impl DatabaseConnection {
         .bind(&pass.pass_type_id)
         .bind(&pass.qr_code)
         .bind(i64::try_from(pass.updated_at).expect("ids are less than 2**63"))
-        .fetch_one(&mut self.connection)
+        .fetch_one(self.connection.as_mut())
         .await;
         let r = to_service_result(r)?;
 
@@ -1591,7 +1591,7 @@ impl DatabaseConnection {
         )
         .bind(account_id)
         .bind(pass_type_id)
-        .execute(&mut self.connection)
+        .execute(self.connection.as_mut())
         .await;
         let r = to_service_result(r)?;
         if r.rows_affected() != 1 {
@@ -1621,7 +1621,7 @@ impl DatabaseConnection {
         .bind(i64::try_from(account_id).expect("ids are less than 2**63"))
         .bind(pass_type_id)
         .bind(device_id)
-        .fetch_optional(&mut self.connection)
+        .fetch_optional(self.connection.as_mut())
         .await;
 
         Ok(to_service_result(r)?.map(models::AppleWalletRegistration::from))
@@ -1645,7 +1645,7 @@ impl DatabaseConnection {
         )
         .bind(i64::try_from(account_id).expect("ids are less than 2**63"))
         .bind(pass_type_id)
-        .fetch(&mut self.connection);
+        .fetch(self.connection.as_mut());
 
         let mut out = Vec::new();
         while let Some(row) = r.next().await {
@@ -1684,7 +1684,7 @@ impl DatabaseConnection {
         .bind(&registration.pass_type_id)
         .bind(&registration.device_id)
         .bind(&registration.push_token)
-        .fetch_one(&mut self.connection)
+        .fetch_one(self.connection.as_mut())
         .await;
         let r = to_service_result(r)?;
 
@@ -1702,7 +1702,7 @@ impl DatabaseConnection {
             .bind(account_id)
             .bind(pass_type_id)
             .bind(device_id)
-            .execute(&mut self.connection)
+            .execute(self.connection.as_mut())
             .await;
         let r = to_service_result(r)?;
         if r.rows_affected() != 1 {
