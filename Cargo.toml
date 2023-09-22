@@ -11,15 +11,15 @@ path = "src/main.rs"
 [dependencies]
 tokio = { version = "1.32.0", features = ["full"] }
 axum = { version="0.6.20", features=["multipart", "headers"] }
-tower-http = { version = "0.4.3", features = ["cors"] }
+tower-http = { version = "0.4.4", features = ["cors"] }
 sqlx = { version = "0.7.1", features = ["runtime-tokio-rustls", "postgres", "json", "chrono"] }
-serde = { version = "1.0.186", features = ["derive"] }
-serde_json = { version="1.0.105" }
+serde = { version = "1.0.188", features = ["derive"] }
+serde_json = { version="1.0.107" }
 argon2rs = { version="0.2.5", default-features = false }
-base64 = { version="0.21.2" }
+base64 = { version="0.21.4" }
 aide = { version="0.11.0", features=["redoc", "axum", "axum-multipart"] }
-schemars = { version = "0.8.12" }
-headers = "0.3.8"
+schemars = { version = "0.8.15" }
+headers = "0.3.9"
 lazy_static = "1.4.0"
 
 block-modes = "0.8"
@@ -33,11 +33,11 @@ futures = "0.3.28"
 dotenv = "0.15.0"
 log = "0.4.20"
 env_logger = "0.10.0"
-chrono = { version="0.4.26", default-features = false, features=["clock"] }
+chrono = { version="0.4.31", default-features = false, features=["clock"] }
 
 wallet-pass = "0.3.0"
 reqwest = { version="0.11.20", features=["native-tls", "native-tls-alpn"] }
-openssl = "0.10.56"
+openssl = "0.10.57"
 
 lettre = { version = "0.10.4", optional = true, default-features = false, features= ["smtp-transport", "rustls-tls", "builder"] }
 
