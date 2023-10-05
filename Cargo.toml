@@ -17,7 +17,7 @@ serde = { version = "1.0.188", features = ["derive"] }
 serde_json = { version="1.0.107" }
 argon2rs = { version="0.2.5", default-features = false }
 base64 = { version="0.21.4" }
-aide = { version="0.11.0", features=["redoc", "axum", "axum-multipart"] }
+aide = { version="0.12.0", features=["redoc", "axum", "axum-multipart"] }
 schemars = { version = "0.8.15" }
 headers = "0.3.9"
 lazy_static = "1.4.0"
@@ -35,7 +35,7 @@ log = "0.4.20"
 env_logger = "0.10.0"
 chrono = { version="0.4.31", default-features = false, features=["clock"] }
 
-wallet-pass = "0.3.0"
+wallet-pass = "0.4.0"
 reqwest = { version="0.11.20", features=["native-tls", "native-tls-alpn"] }
 openssl = "0.10.57"
 
