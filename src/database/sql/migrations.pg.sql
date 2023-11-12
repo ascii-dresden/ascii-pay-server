@@ -194,3 +194,35 @@ CREATE TABLE "apple_wallet_registration" (
             REFERENCES apple_wallet_pass(account_id, pass_type_id)
             ON DELETE CASCADE
 );
+
+--##19 Account status
+CREATE TABLE account_status (
+    id BIGINT NOT NULL
+        GENERATED ALWAYS AS IDENTITY
+        PRIMARY KEY,
+    name VARCHAR NOT NULL,
+    priority INT NOT NULL
+);
+
+ALTER TABLE account ADD COLUMN status_id BIGINT;
+ALTER TABLE account
+    ADD CONSTRAINT fk_account_status
+    FOREIGN KEY(status_id)
+        REFERENCES account_status(id)
+        ON DELETE SET NULL;
+
+CREATE TABLE product_status_price (
+    product_id BIGINT NOT NULL,
+    status_id BIGINT NOT NULL,
+    price_cents INT,
+    price_coffee_stamps INT,
+    price_bottle_stamps INT,
+    bonus_cents INT,
+    bonus_coffee_stamps INT,
+    bonus_bottle_stamps INT,
+    PRIMARY KEY (product_id, status_id),
+    CONSTRAINT fk_product_status_price
+        FOREIGN KEY(product_id)
+            REFERENCES product(id)
+            ON DELETE CASCADE
+);
