@@ -105,6 +105,14 @@ pub struct Account {
     pub auth_methods: Vec<AuthMethod>,
     pub enable_monthly_mail_report: bool,
     pub enable_automatic_stamp_usage: bool,
+    pub status: Option<AccountStatus>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct AccountStatus {
+    pub id: u64,
+    pub name: String,
+    pub priority: u64,
 }
 
 #[derive(PartialEq, Clone)]
@@ -152,6 +160,14 @@ pub struct Product {
     pub barcode: Option<String>,
     pub category: String,
     pub tags: Vec<String>,
+    pub status_price: Vec<ProductStatusPrice>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ProductStatusPrice {
+    pub status_id: u64,
+    pub price: CoinAmount,
+    pub bonus: CoinAmount,
 }
 
 #[derive(Debug, PartialEq, Clone)]
