@@ -16,9 +16,9 @@ use tokio::sync::Mutex;
 
 use crate::error::{ServiceError, ServiceResult};
 use crate::models::{
-    self, Account, AppleWalletPass, AppleWalletRegistration, AuthMethod, AuthMethodType, AuthNfc,
-    AuthPassword, AuthRequest, CardType, CoinAmount, CoinType, Image, PaymentItem, Product, Role,
-    Session, Transaction, TransactionItem,
+    self, Account, AccountStatus, AppleWalletPass, AppleWalletRegistration, AuthMethod,
+    AuthMethodType, AuthNfc, AuthPassword, AuthRequest, CardType, CoinAmount, CoinType, Image,
+    PaymentItem, Product, ProductStatusPrice, Role, Session, Transaction, TransactionItem,
 };
 
 const MINIMUM_PAYMENT_CENTS: i32 = 0;
@@ -81,10 +81,36 @@ struct AccountRow {
     auth_methods: Vec<Json<AccountAuthMethodData>>,
     enable_monthly_mail_report: bool,
     enable_automatic_stamp_usage: bool,
+    status_id: Option<i64>,
+    status_name: Option<String>,
+    status_priority: Option<i32>,
+}
+
+impl AccountRow {
+    fn get_status(self: &AccountRow) -> Option<AccountStatus> {
+        let Some(id) = self.status_id else {
+            return None;
+        };
+        let Some(ref name) = self.status_name else {
+            return None;
+        };
+        let Some(priority) = self.status_priority else {
+            return None;
+        };
+
+        Some(AccountStatus {
+            id: id.try_into().expect("id in database is always positive"),
+            name: name.clone(),
+            priority: priority
+                .try_into()
+                .expect("id in database is always positive"),
+        })
+    }
 }
 
 impl From<AccountRow> for Account {
     fn from(row: AccountRow) -> Self {
+        let status = row.get_status();
         Account {
             id: row
                 .id
@@ -101,6 +127,30 @@ impl From<AccountRow> for Account {
             auth_methods: row.auth_methods.into_iter().map(|j| j.0.into()).collect(),
             enable_monthly_mail_report: row.enable_monthly_mail_report,
             enable_automatic_stamp_usage: row.enable_automatic_stamp_usage,
+            status,
+        }
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct AccountStatusRow {
+    id: i64,
+    name: String,
+    priority: i32,
+}
+
+impl From<AccountStatusRow> for AccountStatus {
+    fn from(row: AccountStatusRow) -> Self {
+        AccountStatus {
+            id: row
+                .id
+                .try_into()
+                .expect("id in database is always positive"),
+            name: row.name,
+            priority: row
+                .priority
+                .try_into()
+                .expect("id in database is always positive"),
         }
     }
 }
@@ -392,10 +442,43 @@ struct ProductRow {
     barcode: Option<String>,
     category: String,
     tags: Vec<String>,
+    status_id: Vec<i64>,
+    status_name: Vec<String>,
+    status_priority: Vec<i32>,
+    status_price_cents: Vec<i32>,
+    status_price_coffee_stamps: Vec<i32>,
+    status_price_bottle_stamps: Vec<i32>,
+    status_bonus_cents: Vec<i32>,
+    status_bonus_coffee_stamps: Vec<i32>,
+    status_bonus_bottle_stamps: Vec<i32>,
 }
 
 impl From<ProductRow> for Product {
     fn from(value: ProductRow) -> Self {
+        let mut status_price: Vec<ProductStatusPrice> = Vec::new();
+        for i in 0..value.status_id.len() {
+            let entry = ProductStatusPrice {
+                status: AccountStatus {
+                    id: value.status_id[i].try_into().expect("IDs are non-negative"),
+                    name: value.status_name[i].clone(),
+                    priority: value.status_priority[i]
+                        .try_into()
+                        .expect("IDs are non-negative"),
+                },
+                price: to_coin_amount(&[
+                    (CoinType::Cent, Some(value.status_price_cents[i])),
+                    (CoinType::BottleStamp, Some(value.status_price_cents[i])),
+                    (CoinType::CoffeeStamp, Some(value.status_price_cents[i])),
+                ]),
+                bonus: to_coin_amount(&[
+                    (CoinType::Cent, Some(value.status_bonus_cents[i])),
+                    (CoinType::BottleStamp, Some(value.status_bonus_cents[i])),
+                    (CoinType::CoffeeStamp, Some(value.status_bonus_cents[i])),
+                ]),
+            };
+            status_price.push(entry);
+        }
+
         Product {
             id: value.id.try_into().expect("IDs are non-negative"),
             name: value.name,
@@ -414,6 +497,7 @@ impl From<ProductRow> for Product {
             barcode: value.barcode,
             category: value.category,
             tags: value.tags,
+            status_price,
         }
     }
 }
@@ -528,9 +612,13 @@ impl DatabaseConnection {
                 a.id, a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps,
                 a.name, a.email, a.role,
                 coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
-                a.enable_monthly_mail_report, a.enable_automatic_stamp_usage
+                a.enable_monthly_mail_report, a.enable_automatic_stamp_usage,
+                (array_agg(account_status.id))[0] as status_id,
+                (array_agg(account_status.name))[0] as status_name,
+                (array_agg(account_status.priority))[0] as status_priority
             FROM account AS a
-            LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
+                LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
+                LEFT OUTER JOIN account_status on a.status_id = account_status.id
             GROUP BY a.id
         "#,
         )
@@ -552,9 +640,13 @@ impl DatabaseConnection {
                 a.id, a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps,
                 a.name, a.email, a.role,
                 coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
-                a.enable_monthly_mail_report, a.enable_automatic_stamp_usage
+                a.enable_monthly_mail_report, a.enable_automatic_stamp_usage,
+                (array_agg(account_status.id))[0] as status_id,
+                (array_agg(account_status.name))[0] as status_name,
+                (array_agg(account_status.priority))[0] as status_priority
             FROM account AS a
-            LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
+                LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
+                LEFT OUTER JOIN account_status on a.status_id = account_status.id
             WHERE a.id = $1
             GROUP BY a.id
         "#)
@@ -578,9 +670,13 @@ impl DatabaseConnection {
                 a.id, a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps,
                 a.name, a.email, a.role,
                 coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
-                a.enable_monthly_mail_report, a.enable_automatic_stamp_usage
+                a.enable_monthly_mail_report, a.enable_automatic_stamp_usage,
+                (array_agg(account_status.id))[0] as status_id,
+                (array_agg(account_status.name))[0] as status_name,
+                (array_agg(account_status.priority))[0] as status_priority
             FROM account AS a INNER JOIN matching ON matching.account_id = a.id
-            LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
+                LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
+                LEFT OUTER JOIN account_status on a.status_id = account_status.id
             GROUP BY a.id
         "#)
         .bind(auth_method.login_key())
@@ -649,12 +745,16 @@ impl DatabaseConnection {
             WITH
                 fulL_account AS (
                     SELECT
-                    a.id, a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps,
-                    a.name, a.email, a.role,
-                    coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
-                    a.enable_monthly_mail_report, a.enable_automatic_stamp_usage
+                        a.id, a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps,
+                        a.name, a.email, a.role,
+                        coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
+                        a.enable_monthly_mail_report, a.enable_automatic_stamp_usage,
+                        (array_agg(account_status.id))[0] as status_id,
+                        (array_agg(account_status.name))[0] as status_name,
+                        (array_agg(account_status.priority))[0] as status_priority
                     FROM account AS a
-                    LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
+                        LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
+                        LEFT OUTER JOIN account_status on a.status_id = account_status.id
                     GROUP BY a.id
                 )
             SELECT CAST(session.uuid as TEXT) as uuid, session.auth_method, session.valid_until, session.is_single_use, full_account.*
@@ -681,12 +781,16 @@ impl DatabaseConnection {
             WITH
                 fulL_account AS (
                     SELECT
-                    a.id, a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps,
-                    a.name, a.email, a.role,
-                    coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
-                    a.enable_monthly_mail_report, a.enable_automatic_stamp_usage
+                        a.id, a.balance_cents, a.balance_coffee_stamps, a.balance_bottle_stamps,
+                        a.name, a.email, a.role,
+                        coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
+                        a.enable_monthly_mail_report, a.enable_automatic_stamp_usage,
+                        (array_agg(account_status.id))[0] as status_id,
+                        (array_agg(account_status.name))[0] as status_name,
+                        (array_agg(account_status.priority))[0] as status_priority
                     FROM account AS a
-                    LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
+                        LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
+                        LEFT OUTER JOIN account_status on a.status_id = account_status.id
                     GROUP BY a.id
                 )
             SELECT CAST(session.uuid as TEXT) as uuid, session.auth_method, session.valid_until, session.is_single_use, full_account.*
@@ -712,8 +816,8 @@ impl DatabaseConnection {
         let q = if account.id == 0 {
             sqlx::query(
                 r#"
-                INSERT INTO account (balance_cents, balance_coffee_stamps, balance_bottle_stamps, name, email, role, enable_monthly_mail_report, enable_automatic_stamp_usage)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                INSERT INTO account (balance_cents, balance_coffee_stamps, balance_bottle_stamps, name, email, role, enable_monthly_mail_report, enable_automatic_stamp_usage, status_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 RETURNING id
             "#,
             )
@@ -722,7 +826,7 @@ impl DatabaseConnection {
                 WITH
                     delete AS (DELETE FROM account_auth_method WHERE account_id = $1)
                 UPDATE account
-                SET balance_cents = $2, balance_coffee_stamps = $3, balance_bottle_stamps = $4, name = $5, email = $6, role = $7, enable_monthly_mail_report = $8, enable_automatic_stamp_usage = $9
+                SET balance_cents = $2, balance_coffee_stamps = $3, balance_bottle_stamps = $4, name = $5, email = $6, role = $7, enable_monthly_mail_report = $8, enable_automatic_stamp_usage = $9, status_id = $10
                 WHERE id = $1
                 RETURNING id
 
@@ -737,6 +841,12 @@ impl DatabaseConnection {
             .bind(AccountRoleDto::from(account.role))
             .bind(account.enable_monthly_mail_report)
             .bind(account.enable_automatic_stamp_usage)
+            .bind(
+                account
+                    .status
+                    .as_ref()
+                    .map(|s| i64::try_from(s.id).expect("status id is less than 2**63")),
+            )
             .fetch_one(self.connection.as_mut())
             .await;
         let r = to_service_result(r)?;
@@ -801,25 +911,124 @@ impl DatabaseConnection {
         Ok(())
     }
 
+    pub async fn get_all_account_status(&mut self) -> ServiceResult<Vec<models::AccountStatus>> {
+        let mut r = sqlx::query_as::<_, AccountStatusRow>(
+            r#"
+            SELECT
+                id, name, priority
+            FROM account_status
+            "#,
+        )
+        .fetch(self.connection.as_mut());
+
+        let mut out = Vec::new();
+        while let Some(row) = r.next().await {
+            let row = to_service_result(row)?;
+            out.push(row.into());
+        }
+
+        Ok(out)
+    }
+
+    pub async fn get_account_status_by_id(
+        &mut self,
+        id: u64,
+    ) -> ServiceResult<Option<models::AccountStatus>> {
+        let r = sqlx::query_as::<_, AccountStatusRow>(
+            r#"
+            SELECT
+                id, name, priority
+            FROM account_status
+            WHERE
+                p.id = $1
+            "#,
+        )
+        .bind(i64::try_from(id).expect("ids are less than 2**63"))
+        .fetch_optional(self.connection.as_mut())
+        .await;
+
+        Ok(to_service_result(r)?.map(AccountStatus::from))
+    }
+
+    pub async fn store_account_status(
+        &mut self,
+        mut account_status: models::AccountStatus,
+    ) -> ServiceResult<models::AccountStatus> {
+        let q = if account_status.id == 0 {
+            sqlx::query(
+                r#"
+            INSERT INTO account_status (
+                name,
+                priority
+            ) VALUES (
+                $1,
+                $2
+            ) RETURNING id
+            "#,
+            )
+        } else {
+            sqlx::query(
+                r#"
+                UPDATE account_status
+                SET
+                    name = $2,
+                    priority = $3
+                WHERE id = $1
+                RETURNING id
+            "#,
+            )
+            .bind(i64::try_from(account_status.id).expect("product id is less than 2**63"))
+        };
+        let r = q
+            .bind(&account_status.name)
+            .bind(i32::try_from(account_status.priority).expect("product id is less than 2**31"))
+            .fetch_one(self.connection.as_mut())
+            .await;
+        let r = to_service_result(r)?;
+        account_status.id = r
+            .get::<i64, _>(0)
+            .try_into()
+            .expect("id is always positive");
+
+        Ok(account_status)
+    }
+
+    pub async fn delete_account_status(&mut self, id: u64) -> ServiceResult<()> {
+        let id = i64::try_from(id).expect("id is always less than 2**63");
+        let r = sqlx::query(r#"DELETE FROM account_status WHERE id = $1"#)
+            .bind(id)
+            .execute(self.connection.as_mut())
+            .await;
+        let r = to_service_result(r)?;
+        if r.rows_affected() != 1 {
+            return Err(ServiceError::NotFound);
+        }
+        Ok(())
+    }
+
     pub async fn get_all_products(&mut self) -> ServiceResult<Vec<models::Product>> {
         let mut r = sqlx::query_as::<_, ProductRow>(
             r#"
             SELECT
-                id,
-                name,
-                price_cents,
-                price_coffee_stamps,
-                price_bottle_stamps,
-                bonus_cents,
-                bonus_coffee_stamps,
-                bonus_bottle_stamps,
-                nickname,
-                NULL AS image,
-                NULL AS image_mimetype,
-                barcode,
-                category,
-                tags
-            FROM product
+                p.id, p.name,
+                p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
+                p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
+                p.nickname,
+                NULL AS image, NULL AS image_mimetype,
+                p.barcode, p.category, p.tags,
+                (array_agg(account_status.id))[0] as status_id,
+                (array_agg(account_status.name))[0] as status_name,
+                (array_agg(account_status.priority))[0] as status_priority,
+                coalesce(array_agg(product_status_price.price_cents) FILTER (where product_status_price.price_cents IS NOT NULL), '{}') as status_price_cents,
+                coalesce(array_agg(product_status_price.price_bottle_stamps) FILTER (where product_status_price.price_bottle_stamps IS NOT NULL), '{}') as status_price_bottle_stamps,
+                coalesce(array_agg(product_status_price.price_coffee_stamps) FILTER (where product_status_price.price_coffee_stamps IS NOT NULL), '{}') as status_price_coffee_stamps,
+                coalesce(array_agg(product_status_price.bonus_cents) FILTER (where product_status_price.bonus_cents IS NOT NULL), '{}') as status_bonus_cents,
+                coalesce(array_agg(product_status_price.bonus_bottle_stamps) FILTER (where product_status_price.bonus_bottle_stamps IS NOT NULL), '{}') as status_bonus_bottle_stamps,
+                coalesce(array_agg(product_status_price.bonus_coffee_stamps) FILTER (where product_status_price.bonus_coffee_stamps IS NOT NULL), '{}') as status_bonus_coffee_stamps
+            FROM product AS p
+                    LEFT OUTER JOIN product_status_price ON p.id = product_status_price.product_id
+                    LEFT OUTER JOIN account_status on product_status_price.status_id = account_status.id
+            GROUP BY p.id
             "#,
         )
         .fetch(self.connection.as_mut());
@@ -837,23 +1046,27 @@ impl DatabaseConnection {
         let r = sqlx::query_as::<_, ProductRow>(
             r#"
             SELECT
-                id,
-                name,
-                price_cents,
-                price_coffee_stamps,
-                price_bottle_stamps,
-                bonus_cents,
-                bonus_coffee_stamps,
-                bonus_bottle_stamps,
-                nickname,
-                NULL AS image,
-                NULL AS image_mimetype,
-                barcode,
-                category,
-                tags
-            FROM product
+                p.id, p.name,
+                p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
+                p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
+                p.nickname,
+                NULL AS image, NULL AS image_mimetype,
+                p.barcode, p.category, p.tags,
+                (array_agg(account_status.id))[0] as status_id,
+                (array_agg(account_status.name))[0] as status_name,
+                (array_agg(account_status.priority))[0] as status_priority,
+                coalesce(array_agg(product_status_price.price_cents) FILTER (where product_status_price.price_cents IS NOT NULL), '{}') as status_price_cents,
+                coalesce(array_agg(product_status_price.price_bottle_stamps) FILTER (where product_status_price.price_bottle_stamps IS NOT NULL), '{}') as status_price_bottle_stamps,
+                coalesce(array_agg(product_status_price.price_coffee_stamps) FILTER (where product_status_price.price_coffee_stamps IS NOT NULL), '{}') as status_price_coffee_stamps,
+                coalesce(array_agg(product_status_price.bonus_cents) FILTER (where product_status_price.bonus_cents IS NOT NULL), '{}') as status_bonus_cents,
+                coalesce(array_agg(product_status_price.bonus_bottle_stamps) FILTER (where product_status_price.bonus_bottle_stamps IS NOT NULL), '{}') as status_bonus_bottle_stamps,
+                coalesce(array_agg(product_status_price.bonus_coffee_stamps) FILTER (where product_status_price.bonus_coffee_stamps IS NOT NULL), '{}') as status_bonus_coffee_stamps
+            FROM product AS p
+                    LEFT OUTER JOIN product_status_price ON p.id = product_status_price.product_id
+                    LEFT OUTER JOIN account_status on product_status_price.status_id = account_status.id
+            GROUP BY p.id
             WHERE
-                product.id = $1
+                p.id = $1
             "#,
         )
         .bind(i64::try_from(id).expect("ids are less than 2**63"))
@@ -900,6 +1113,8 @@ impl DatabaseConnection {
         } else {
             sqlx::query(
                 r#"
+                WITH
+                    delete AS (DELETE FROM product_status_price WHERE product_id = $1)
                 UPDATE product
                 SET
                     name = $2,
@@ -935,10 +1150,70 @@ impl DatabaseConnection {
             .await;
         let r = to_service_result(r)?;
 
-        product.id = r
-            .get::<i64, _>("id")
-            .try_into()
-            .expect("id is always positive");
+        let product_id = r.get::<i64, _>(0);
+        product.id = product_id.try_into().expect("id is always positive");
+
+        let r = sqlx::query(
+            r#"
+            INSERT INTO product_status_price (product_id, status_id, price_cents, price_coffee_stamps, price_bottle_stamps bonus_cents, bonus_coffee_stamps, bonus_bottle_stamps)
+            SELECT $1, status_id, price_cents, price_coffee_stamps, price_bottle_stamps, bonus_cents, bonus_coffee_stamps, bonus_bottle_stamps
+            FROM UNNEST($2, $3, $4, $5, $6, $7, $8) AS input (status_id, price_cents, price_coffee_stamps, price_bottle_stamps, bonus_cents, bonus_coffee_stamps, bonus_bottle_stamps)
+        "#,
+        )
+        .bind(product_id)
+        .bind(
+            product
+                .status_price
+                .iter()
+                .map(|p| i64::try_from(p.status.id).expect("product id is less than 2**63"))
+                .collect::<Vec<_>>(),
+        )
+        .bind(
+            product
+                .status_price
+                .iter()
+                .map(|p| *p.price.0.get(&CoinType::Cent).unwrap_or(&0))
+                .collect::<Vec<_>>(),
+        )
+        .bind(
+            product
+                .status_price
+                .iter()
+                .map(|p| *p.price.0.get(&CoinType::CoffeeStamp).unwrap_or(&0))
+                .collect::<Vec<_>>(),
+        )
+        .bind(
+            product
+                .status_price
+                .iter()
+                .map(|p| *p.price.0.get(&CoinType::BottleStamp).unwrap_or(&0))
+                .collect::<Vec<_>>(),
+        )
+        .bind(
+            product
+                .status_price
+                .iter()
+                .map(|p| *p.bonus.0.get(&CoinType::Cent).unwrap_or(&0))
+                .collect::<Vec<_>>(),
+        )
+        .bind(
+            product
+                .status_price
+                .iter()
+                .map(|p| *p.bonus.0.get(&CoinType::CoffeeStamp).unwrap_or(&0))
+                .collect::<Vec<_>>(),
+        )
+        .bind(
+            product
+                .status_price
+                .iter()
+                .map(|p| *p.bonus.0.get(&CoinType::BottleStamp).unwrap_or(&0))
+                .collect::<Vec<_>>(),
+        )
+        .execute(self.connection.as_mut())
+        .await;
+        to_service_result(r)?;
+
         Ok(product)
     }
 

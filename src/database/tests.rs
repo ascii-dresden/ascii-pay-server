@@ -33,6 +33,7 @@ async fn test_session_crud(pool: PgPool) {
         auth_methods: vec![john_pw.clone()],
         enable_monthly_mail_report: false,
         enable_automatic_stamp_usage: true,
+        status: None,
     };
     let acc1 = db.store_account(acc1).await.unwrap();
 
@@ -98,6 +99,7 @@ async fn test_account_crud(pool: PgPool) {
         auth_methods: vec![john_pw.clone()],
         enable_monthly_mail_report: false,
         enable_automatic_stamp_usage: true,
+        status: None,
     };
     let mut acc1_clone = acc1.clone();
     let mut acc1 = db.store_account(acc1).await.unwrap();
@@ -115,6 +117,7 @@ async fn test_account_crud(pool: PgPool) {
         auth_methods: vec![],
         enable_monthly_mail_report: false,
         enable_automatic_stamp_usage: true,
+        status: None,
     };
     let acc2 = db.store_account(acc2).await.unwrap();
 
@@ -176,6 +179,7 @@ pub fn test_product_crud(pool: PgPool) {
         nickname: Some("nick's test".to_string()),
         image: None,
         tags: vec![],
+        status_price: Vec::new(),
     };
 
     let product2 = Product {
@@ -192,6 +196,7 @@ pub fn test_product_crud(pool: PgPool) {
         name: "testMate".to_string(),
         image: None,
         tags: vec!["koffein".to_string()],
+        status_price: Vec::new(),
     };
 
     let product3 = Product {
@@ -208,6 +213,7 @@ pub fn test_product_crud(pool: PgPool) {
         nickname: None,
         image: None,
         tags: vec![],
+        status_price: Vec::new(),
     };
 
     let app_state = AppState::from_pool(pool).await;
@@ -303,6 +309,7 @@ pub fn test_transaction(pool: PgPool) {
             auth_methods: vec![],
             enable_monthly_mail_report: false,
             enable_automatic_stamp_usage: true,
+            status: None,
         })
         .await
         .unwrap();
@@ -321,6 +328,7 @@ pub fn test_transaction(pool: PgPool) {
             auth_methods: vec![],
             enable_monthly_mail_report: false,
             enable_automatic_stamp_usage: true,
+            status: None,
         })
         .await
         .unwrap();
@@ -339,6 +347,7 @@ pub fn test_transaction(pool: PgPool) {
                 mimetype: "image/png".to_string(),
             }),
             tags: vec![],
+            status_price: Vec::new(),
         })
         .await
         .unwrap();
@@ -358,6 +367,7 @@ pub fn test_transaction(pool: PgPool) {
             name: "testMate".to_string(),
             image: None,
             tags: vec!["koffein".to_string()],
+            status_price: Vec::new(),
         })
         .await
         .unwrap();

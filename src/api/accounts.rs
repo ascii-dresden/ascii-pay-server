@@ -299,6 +299,7 @@ async fn create_account(
         auth_methods: Vec::new(),
         enable_monthly_mail_report: form.enable_monthly_mail_report,
         enable_automatic_stamp_usage: form.enable_automatic_stamp_usage,
+        status: None,
     };
 
     let account = state.db.store_account(account).await?;
@@ -409,6 +410,7 @@ async fn create_admin_account(
         auth_methods: Vec::new(),
         enable_monthly_mail_report: false,
         enable_automatic_stamp_usage: true,
+        status: None,
     };
 
     account

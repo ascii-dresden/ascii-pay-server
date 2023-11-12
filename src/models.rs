@@ -165,7 +165,7 @@ pub struct Product {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ProductStatusPrice {
-    pub status_id: u64,
+    pub status: AccountStatus,
     pub price: CoinAmount,
     pub bonus: CoinAmount,
 }

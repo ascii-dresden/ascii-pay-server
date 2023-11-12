@@ -135,6 +135,7 @@ async fn create_product(
         category: form.category,
         tags: form.tags,
         image: None,
+        status_price: Vec::new(),
     };
 
     let product = state.db.store_product(product).await?;
