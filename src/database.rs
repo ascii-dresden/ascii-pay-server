@@ -467,13 +467,13 @@ impl From<ProductRow> for Product {
                 },
                 price: to_coin_amount(&[
                     (CoinType::Cent, Some(value.status_price_cents[i])),
-                    (CoinType::BottleStamp, Some(value.status_price_cents[i])),
-                    (CoinType::CoffeeStamp, Some(value.status_price_cents[i])),
+                    (CoinType::BottleStamp, Some(value.status_price_bottle_stamps[i])),
+                    (CoinType::CoffeeStamp, Some(value.status_price_coffee_stamps[i])),
                 ]),
                 bonus: to_coin_amount(&[
                     (CoinType::Cent, Some(value.status_bonus_cents[i])),
-                    (CoinType::BottleStamp, Some(value.status_bonus_cents[i])),
-                    (CoinType::CoffeeStamp, Some(value.status_bonus_cents[i])),
+                    (CoinType::BottleStamp, Some(value.status_bonus_bottle_stamps[i])),
+                    (CoinType::CoffeeStamp, Some(value.status_bonus_coffee_stamps[i])),
                 ]),
             };
             status_price.push(entry);
@@ -1016,9 +1016,9 @@ impl DatabaseConnection {
                 p.nickname,
                 NULL AS image, NULL AS image_mimetype,
                 p.barcode, p.category, p.tags,
-                (array_agg(account_status.id))[0] as status_id,
-                (array_agg(account_status.name))[0] as status_name,
-                (array_agg(account_status.priority))[0] as status_priority,
+                coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
+                coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
+                coalesce(array_agg(account_status.priority) FILTER (where account_status.priority IS NOT NULL), '{}') as status_priority,
                 coalesce(array_agg(product_status_price.price_cents) FILTER (where product_status_price.price_cents IS NOT NULL), '{}') as status_price_cents,
                 coalesce(array_agg(product_status_price.price_bottle_stamps) FILTER (where product_status_price.price_bottle_stamps IS NOT NULL), '{}') as status_price_bottle_stamps,
                 coalesce(array_agg(product_status_price.price_coffee_stamps) FILTER (where product_status_price.price_coffee_stamps IS NOT NULL), '{}') as status_price_coffee_stamps,
@@ -1052,9 +1052,9 @@ impl DatabaseConnection {
                 p.nickname,
                 NULL AS image, NULL AS image_mimetype,
                 p.barcode, p.category, p.tags,
-                (array_agg(account_status.id))[0] as status_id,
-                (array_agg(account_status.name))[0] as status_name,
-                (array_agg(account_status.priority))[0] as status_priority,
+                coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
+                coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
+                coalesce(array_agg(account_status.priority) FILTER (where account_status.priority IS NOT NULL), '{}') as status_priority,
                 coalesce(array_agg(product_status_price.price_cents) FILTER (where product_status_price.price_cents IS NOT NULL), '{}') as status_price_cents,
                 coalesce(array_agg(product_status_price.price_bottle_stamps) FILTER (where product_status_price.price_bottle_stamps IS NOT NULL), '{}') as status_price_bottle_stamps,
                 coalesce(array_agg(product_status_price.price_coffee_stamps) FILTER (where product_status_price.price_coffee_stamps IS NOT NULL), '{}') as status_price_coffee_stamps,
@@ -1064,9 +1064,9 @@ impl DatabaseConnection {
             FROM product AS p
                     LEFT OUTER JOIN product_status_price ON p.id = product_status_price.product_id
                     LEFT OUTER JOIN account_status on product_status_price.status_id = account_status.id
-            GROUP BY p.id
             WHERE
                 p.id = $1
+            GROUP BY p.id
             "#,
         )
         .bind(i64::try_from(id).expect("ids are less than 2**63"))
@@ -1155,7 +1155,7 @@ impl DatabaseConnection {
 
         let r = sqlx::query(
             r#"
-            INSERT INTO product_status_price (product_id, status_id, price_cents, price_coffee_stamps, price_bottle_stamps bonus_cents, bonus_coffee_stamps, bonus_bottle_stamps)
+            INSERT INTO product_status_price (product_id, status_id, price_cents, price_coffee_stamps, price_bottle_stamps, bonus_cents, bonus_coffee_stamps, bonus_bottle_stamps)
             SELECT $1, status_id, price_cents, price_coffee_stamps, price_bottle_stamps, bonus_cents, bonus_coffee_stamps, bonus_bottle_stamps
             FROM UNNEST($2, $3, $4, $5, $6, $7, $8) AS input (status_id, price_cents, price_coffee_stamps, price_bottle_stamps, bonus_cents, bonus_coffee_stamps, bonus_bottle_stamps)
         "#,
@@ -1300,10 +1300,28 @@ impl DatabaseConnection {
                     NULL as image_mimetype,
                     p.barcode as barcode,
                     p.category as category,
-                    p.tags as tags
+                    p.tags as tags,
+                    coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
+                    coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
+                    coalesce(array_agg(account_status.priority) FILTER (where account_status.priority IS NOT NULL), '{}') as status_priority,
+                    coalesce(array_agg(product_status_price.price_cents) FILTER (where product_status_price.price_cents IS NOT NULL), '{}') as status_price_cents,
+                    coalesce(array_agg(product_status_price.price_bottle_stamps) FILTER (where product_status_price.price_bottle_stamps IS NOT NULL), '{}') as status_price_bottle_stamps,
+                    coalesce(array_agg(product_status_price.price_coffee_stamps) FILTER (where product_status_price.price_coffee_stamps IS NOT NULL), '{}') as status_price_coffee_stamps,
+                    coalesce(array_agg(product_status_price.bonus_cents) FILTER (where product_status_price.bonus_cents IS NOT NULL), '{}') as status_bonus_cents,
+                    coalesce(array_agg(product_status_price.bonus_bottle_stamps) FILTER (where product_status_price.bonus_bottle_stamps IS NOT NULL), '{}') as status_bonus_bottle_stamps,
+                    coalesce(array_agg(product_status_price.bonus_coffee_stamps) FILTER (where product_status_price.bonus_coffee_stamps IS NOT NULL), '{}') as status_bonus_coffee_stamps
                 FROM
                     transaction_item item
-                    LEFT OUTER JOIN product p ON item.product_id = p.id
+                        LEFT OUTER JOIN product p ON item.product_id = p.id
+                        LEFT OUTER JOIN product_status_price ON p.id = product_status_price.product_id
+                        LEFT OUTER JOIN account_status on product_status_price.status_id = account_status.id
+                GROUP BY item.transaction_id, item.timestamp, item.account_id,
+                        item.effective_price_cents, item.effective_price_coffee_stamps, item.effective_price_bottle_stamps,
+                        item.authorized_by_account_id, item.authorized_with_method,
+                        p.id, p.name,
+                        p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
+                        p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
+                        p.nickname, p.barcode, p.category, p.tags
                 ORDER BY item.timestamp ASC, item.transaction_id ASC
             "#,
         )
@@ -1351,12 +1369,30 @@ impl DatabaseConnection {
                     NULL as image_mimetype,
                     p.barcode as barcode,
                     p.category as category,
-                    p.tags as tags
+                    p.tags as tags,
+                    coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
+                    coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
+                    coalesce(array_agg(account_status.priority) FILTER (where account_status.priority IS NOT NULL), '{}') as status_priority,
+                    coalesce(array_agg(product_status_price.price_cents) FILTER (where product_status_price.price_cents IS NOT NULL), '{}') as status_price_cents,
+                    coalesce(array_agg(product_status_price.price_bottle_stamps) FILTER (where product_status_price.price_bottle_stamps IS NOT NULL), '{}') as status_price_bottle_stamps,
+                    coalesce(array_agg(product_status_price.price_coffee_stamps) FILTER (where product_status_price.price_coffee_stamps IS NOT NULL), '{}') as status_price_coffee_stamps,
+                    coalesce(array_agg(product_status_price.bonus_cents) FILTER (where product_status_price.bonus_cents IS NOT NULL), '{}') as status_bonus_cents,
+                    coalesce(array_agg(product_status_price.bonus_bottle_stamps) FILTER (where product_status_price.bonus_bottle_stamps IS NOT NULL), '{}') as status_bonus_bottle_stamps,
+                    coalesce(array_agg(product_status_price.bonus_coffee_stamps) FILTER (where product_status_price.bonus_coffee_stamps IS NOT NULL), '{}') as status_bonus_coffee_stamps
                 FROM
                     transaction_item item
-                    LEFT OUTER JOIN product p ON item.product_id = p.id
+                        LEFT OUTER JOIN product p ON item.product_id = p.id
+                        LEFT OUTER JOIN product_status_price ON p.id = product_status_price.product_id
+                        LEFT OUTER JOIN account_status on product_status_price.status_id = account_status.id
                 WHERE
                     (item.account_id = $1) OR ($1 = 0 AND item.account_id IS NULL)
+                GROUP BY item.transaction_id, item.timestamp, item.account_id,
+                        item.effective_price_cents, item.effective_price_coffee_stamps, item.effective_price_bottle_stamps,
+                        item.authorized_by_account_id, item.authorized_with_method,
+                        p.id, p.name,
+                        p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
+                        p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
+                        p.nickname, p.barcode, p.category, p.tags
                 ORDER BY item.timestamp ASC, item.transaction_id ASC
             "#,
         )
