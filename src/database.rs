@@ -467,13 +467,25 @@ impl From<ProductRow> for Product {
                 },
                 price: to_coin_amount(&[
                     (CoinType::Cent, Some(value.status_price_cents[i])),
-                    (CoinType::BottleStamp, Some(value.status_price_bottle_stamps[i])),
-                    (CoinType::CoffeeStamp, Some(value.status_price_coffee_stamps[i])),
+                    (
+                        CoinType::BottleStamp,
+                        Some(value.status_price_bottle_stamps[i]),
+                    ),
+                    (
+                        CoinType::CoffeeStamp,
+                        Some(value.status_price_coffee_stamps[i]),
+                    ),
                 ]),
                 bonus: to_coin_amount(&[
                     (CoinType::Cent, Some(value.status_bonus_cents[i])),
-                    (CoinType::BottleStamp, Some(value.status_bonus_bottle_stamps[i])),
-                    (CoinType::CoffeeStamp, Some(value.status_bonus_coffee_stamps[i])),
+                    (
+                        CoinType::BottleStamp,
+                        Some(value.status_bonus_bottle_stamps[i]),
+                    ),
+                    (
+                        CoinType::CoffeeStamp,
+                        Some(value.status_bonus_coffee_stamps[i]),
+                    ),
                 ]),
             };
             status_price.push(entry);
@@ -497,7 +509,7 @@ impl From<ProductRow> for Product {
             barcode: value.barcode,
             category: value.category,
             tags: value.tags,
-            status_price,
+            status_prices: status_price,
         }
     }
 }
@@ -1163,49 +1175,49 @@ impl DatabaseConnection {
         .bind(product_id)
         .bind(
             product
-                .status_price
+                .status_prices
                 .iter()
                 .map(|p| i64::try_from(p.status.id).expect("product id is less than 2**63"))
                 .collect::<Vec<_>>(),
         )
         .bind(
             product
-                .status_price
+                .status_prices
                 .iter()
                 .map(|p| *p.price.0.get(&CoinType::Cent).unwrap_or(&0))
                 .collect::<Vec<_>>(),
         )
         .bind(
             product
-                .status_price
+                .status_prices
                 .iter()
                 .map(|p| *p.price.0.get(&CoinType::CoffeeStamp).unwrap_or(&0))
                 .collect::<Vec<_>>(),
         )
         .bind(
             product
-                .status_price
+                .status_prices
                 .iter()
                 .map(|p| *p.price.0.get(&CoinType::BottleStamp).unwrap_or(&0))
                 .collect::<Vec<_>>(),
         )
         .bind(
             product
-                .status_price
+                .status_prices
                 .iter()
                 .map(|p| *p.bonus.0.get(&CoinType::Cent).unwrap_or(&0))
                 .collect::<Vec<_>>(),
         )
         .bind(
             product
-                .status_price
+                .status_prices
                 .iter()
                 .map(|p| *p.bonus.0.get(&CoinType::CoffeeStamp).unwrap_or(&0))
                 .collect::<Vec<_>>(),
         )
         .bind(
             product
-                .status_price
+                .status_prices
                 .iter()
                 .map(|p| *p.bonus.0.get(&CoinType::BottleStamp).unwrap_or(&0))
                 .collect::<Vec<_>>(),

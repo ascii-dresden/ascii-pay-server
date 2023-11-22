@@ -17,6 +17,7 @@ use crate::error::{ServiceError, ServiceResult};
 use crate::request_state::RequestState;
 use crate::{models, wallet};
 
+use super::account_status::AccountStatusDto;
 use super::password_hash_create;
 
 pub fn router(app_state: AppState) -> ApiRouter {
@@ -46,7 +47,7 @@ pub fn router(app_state: AppState) -> ApiRouter {
         .with_state(app_state)
 }
 
-#[derive(Debug, PartialEq, Hash, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, Serialize, Deserialize, JsonSchema)]
 pub enum CoinTypeDto {
     Cent,
     CoffeeStamp,
@@ -89,6 +90,16 @@ impl From<CoinAmountDto> for models::CoinAmount {
             value
                 .into_iter()
                 .map(|(coin_type, amount)| (coin_type.into(), amount))
+                .collect(),
+        )
+    }
+}
+impl From<&CoinAmountDto> for models::CoinAmount {
+    fn from(value: &CoinAmountDto) -> Self {
+        models::CoinAmount(
+            value
+                .iter()
+                .map(|(coin_type, amount)| ((*coin_type).into(), *amount))
                 .collect(),
         )
     }
@@ -193,6 +204,7 @@ pub struct AccountDto {
     pub auth_methods: Vec<AuthMethodDto>,
     pub enable_monthly_mail_report: bool,
     pub enable_automatic_stamp_usage: bool,
+    pub status: Option<AccountStatusDto>,
 }
 
 impl From<&models::Account> for AccountDto {
@@ -203,9 +215,10 @@ impl From<&models::Account> for AccountDto {
             name: value.name.to_owned(),
             email: value.email.to_owned(),
             role: (&value.role).into(),
-            auth_methods: value.auth_methods.iter().map(|m| m.into()).collect(),
+            auth_methods: value.auth_methods.iter().map(AuthMethodDto::from).collect(),
             enable_monthly_mail_report: value.enable_monthly_mail_report,
             enable_automatic_stamp_usage: value.enable_automatic_stamp_usage,
+            status: value.status.as_ref().map(AccountStatusDto::from),
         }
     }
 }
@@ -280,6 +293,7 @@ pub struct SaveAccountDto {
     pub role: RoleDto,
     pub enable_monthly_mail_report: bool,
     pub enable_automatic_stamp_usage: bool,
+    pub status_id: Option<u64>,
 }
 
 async fn create_account(
@@ -290,6 +304,12 @@ async fn create_account(
 
     let form = form.0;
 
+    let status = if let Some(status_id) = form.status_id {
+        state.db.get_account_status_by_id(status_id).await?
+    } else {
+        None
+    };
+
     let account = models::Account {
         id: 0,
         balance: models::CoinAmount(HashMap::new()),
@@ -299,7 +319,7 @@ async fn create_account(
         auth_methods: Vec::new(),
         enable_monthly_mail_report: form.enable_monthly_mail_report,
         enable_automatic_stamp_usage: form.enable_automatic_stamp_usage,
-        status: None,
+        status,
     };
 
     let account = state.db.store_account(account).await?;
@@ -325,11 +345,18 @@ async fn update_account(
     let form = form.0;
     let account = state.db.get_account_by_id(id).await?;
 
+    let status = if let Some(status_id) = form.status_id {
+        state.db.get_account_status_by_id(status_id).await?
+    } else {
+        None
+    };
+
     if let Some(mut account) = account {
         account.name = form.name;
         account.email = form.email;
         account.enable_monthly_mail_report = form.enable_monthly_mail_report;
         account.enable_automatic_stamp_usage = form.enable_automatic_stamp_usage;
+        account.status = status;
 
         let new_role = form.role.into();
         if account.role != new_role {

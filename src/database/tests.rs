@@ -179,7 +179,7 @@ pub fn test_product_crud(pool: PgPool) {
         nickname: Some("nick's test".to_string()),
         image: None,
         tags: vec![],
-        status_price: Vec::new(),
+        status_prices: Vec::new(),
     };
 
     let product2 = Product {
@@ -196,7 +196,7 @@ pub fn test_product_crud(pool: PgPool) {
         name: "testMate".to_string(),
         image: None,
         tags: vec!["koffein".to_string()],
-        status_price: Vec::new(),
+        status_prices: Vec::new(),
     };
 
     let product3 = Product {
@@ -213,7 +213,7 @@ pub fn test_product_crud(pool: PgPool) {
         nickname: None,
         image: None,
         tags: vec![],
-        status_price: Vec::new(),
+        status_prices: Vec::new(),
     };
 
     let app_state = AppState::from_pool(pool).await;
@@ -347,7 +347,7 @@ pub fn test_transaction(pool: PgPool) {
                 mimetype: "image/png".to_string(),
             }),
             tags: vec![],
-            status_price: Vec::new(),
+            status_prices: Vec::new(),
         })
         .await
         .unwrap();
@@ -367,7 +367,7 @@ pub fn test_transaction(pool: PgPool) {
             name: "testMate".to_string(),
             image: None,
             tags: vec!["koffein".to_string()],
-            status_price: Vec::new(),
+            status_prices: Vec::new(),
         })
         .await
         .unwrap();

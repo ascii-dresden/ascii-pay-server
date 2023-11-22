@@ -23,6 +23,11 @@ pub fn api_docs(api: TransformOpenApi) -> TransformOpenApi {
             ..Default::default()
         })
         .tag(Tag {
+            name: "account_status".into(),
+            description: Some("Account status management".into()),
+            ..Default::default()
+        })
+        .tag(Tag {
             name: "products".into(),
             description: Some("Product management".into()),
             ..Default::default()

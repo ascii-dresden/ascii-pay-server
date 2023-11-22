@@ -15,6 +15,7 @@ use crate::error::{ServiceError, ServiceResult};
 use crate::models;
 use crate::request_state::RequestState;
 
+use super::account_status::AccountStatusDto;
 use super::accounts::CoinAmountDto;
 
 const SUPPORTED_IMAGE_TYPES: [&str; 6] = [
@@ -49,6 +50,23 @@ pub fn router(app_state: AppState) -> ApiRouter {
 }
 
 #[derive(Debug, PartialEq, Serialize, JsonSchema)]
+pub struct ProductStatusPriceDto {
+    pub status: AccountStatusDto,
+    pub price: CoinAmountDto,
+    pub bonus: CoinAmountDto,
+}
+
+impl From<&models::ProductStatusPrice> for ProductStatusPriceDto {
+    fn from(value: &models::ProductStatusPrice) -> Self {
+        Self {
+            status: (&value.status).into(),
+            price: (&value.price).into(),
+            bonus: (&value.bonus).into(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, JsonSchema)]
 pub struct ProductDto {
     pub id: u64,
     pub name: String,
@@ -58,6 +76,7 @@ pub struct ProductDto {
     pub barcode: Option<String>,
     pub category: String,
     pub tags: Vec<String>,
+    pub status_prices: Vec<ProductStatusPriceDto>,
 }
 
 impl From<&models::Product> for ProductDto {
@@ -71,6 +90,11 @@ impl From<&models::Product> for ProductDto {
             barcode: value.barcode.to_owned(),
             category: value.category.to_owned(),
             tags: value.tags.to_owned(),
+            status_prices: value
+                .status_prices
+                .iter()
+                .map(ProductStatusPriceDto::from)
+                .collect(),
         }
     }
 }
@@ -107,6 +131,13 @@ fn get_product_docs(op: TransformOperation) -> TransformOperation {
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
+pub struct SaveProductStatusPriceDto {
+    pub status_id: u64,
+    pub price: CoinAmountDto,
+    pub bonus: CoinAmountDto,
+}
+
+#[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 pub struct SaveProductDto {
     pub name: String,
     pub price: CoinAmountDto,
@@ -115,6 +146,7 @@ pub struct SaveProductDto {
     pub barcode: Option<String>,
     pub category: String,
     pub tags: Vec<String>,
+    pub status_prices: Vec<SaveProductStatusPriceDto>,
 }
 
 async fn create_product(
@@ -124,6 +156,8 @@ async fn create_product(
     state.session_require_admin()?;
 
     let form = form.0;
+
+    let status_prices = resolve_status_prices(&mut state, &form.status_prices).await?;
 
     let product = models::Product {
         id: 0,
@@ -135,7 +169,7 @@ async fn create_product(
         category: form.category,
         tags: form.tags,
         image: None,
-        status_price: Vec::new(),
+        status_prices,
     };
 
     let product = state.db.store_product(product).await?;
@@ -161,6 +195,8 @@ async fn update_product(
     let form = form.0;
     let product = state.db.get_product_by_id(id).await?;
 
+    let status_prices = resolve_status_prices(&mut state, &form.status_prices).await?;
+
     if let Some(mut product) = product {
         product.name = form.name;
         product.price = form.price.into();
@@ -169,6 +205,7 @@ async fn update_product(
         product.barcode = form.barcode;
         product.category = form.category;
         product.tags = form.tags;
+        product.status_prices = status_prices;
 
         let product = state.db.store_product(product).await?;
         return Ok(Json(ProductDto::from(&product)));
@@ -202,6 +239,28 @@ fn delete_product_docs(op: TransformOperation) -> TransformOperation {
         .response_with::<401, (), _>(|res| res.description("Missing login!"))
         .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
         .security_requirement_scopes("SessionToken", ["admin"])
+}
+
+async fn resolve_status_prices(
+    state: &mut RequestState,
+    status_prices_dto: &[SaveProductStatusPriceDto],
+) -> ServiceResult<Vec<models::ProductStatusPrice>> {
+    let mut status_prices: Vec<models::ProductStatusPrice> = Vec::new();
+    for status_price_dto in status_prices_dto {
+        if let Some(status) = state
+            .db
+            .get_account_status_by_id(status_price_dto.status_id)
+            .await?
+        {
+            status_prices.push(models::ProductStatusPrice {
+                status,
+                price: (&status_price_dto.price).into(),
+                bonus: (&status_price_dto.bonus).into(),
+            });
+        }
+    }
+
+    Ok(status_prices)
 }
 
 pub async fn get_product_image(

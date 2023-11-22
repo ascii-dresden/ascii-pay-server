@@ -5,6 +5,7 @@ use rand::RngCore;
 use crate::{database::AppState, error::ServiceResult};
 
 mod account_auth_methods;
+mod account_status;
 mod accounts;
 mod auth;
 mod nfc_id;
@@ -19,6 +20,7 @@ pub mod wallet_routes;
 pub fn init(app_state: AppState) -> ApiRouter {
     ApiRouter::new()
         .merge(account_auth_methods::router(app_state.clone()))
+        .merge(account_status::router(app_state.clone()))
         .merge(accounts::router(app_state.clone()))
         .merge(auth::router(app_state.clone()))
         .merge(products::router(app_state.clone()))

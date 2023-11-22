@@ -160,7 +160,7 @@ pub struct Product {
     pub barcode: Option<String>,
     pub category: String,
     pub tags: Vec<String>,
-    pub status_price: Vec<ProductStatusPrice>,
+    pub status_prices: Vec<ProductStatusPrice>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
