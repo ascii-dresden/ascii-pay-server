@@ -952,7 +952,7 @@ impl DatabaseConnection {
                 id, name, priority
             FROM account_status
             WHERE
-                p.id = $1
+                id = $1
             "#,
         )
         .bind(i64::try_from(id).expect("ids are less than 2**63"))

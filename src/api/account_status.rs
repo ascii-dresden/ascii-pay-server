@@ -16,13 +16,13 @@ use crate::{models, wallet};
 pub fn router(app_state: AppState) -> ApiRouter {
     ApiRouter::new()
         .api_route(
-            "/account_status/:id",
+            "/account-status/:id",
             get_with(get_account_status, get_account_status_docs)
                 .put_with(update_account_status, update_account_status_docs)
                 .delete_with(delete_account_status, delete_account_status_docs),
         )
         .api_route(
-            "/account_status",
+            "/account-status",
             get_with(list_account_status, list_account_status_docs)
                 .post_with(create_account_status, create_account_status_docs),
         )
