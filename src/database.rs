@@ -625,9 +625,9 @@ impl DatabaseConnection {
                 a.name, a.email, a.role,
                 coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
                 a.enable_monthly_mail_report, a.enable_automatic_stamp_usage,
-                (array_agg(account_status.id))[0] as status_id,
-                (array_agg(account_status.name))[0] as status_name,
-                (array_agg(account_status.priority))[0] as status_priority
+                (array_agg(account_status.id))[1] as status_id,
+                (array_agg(account_status.name))[1] as status_name,
+                (array_agg(account_status.priority))[1] as status_priority
             FROM account AS a
                 LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
                 LEFT OUTER JOIN account_status on a.status_id = account_status.id
@@ -653,9 +653,9 @@ impl DatabaseConnection {
                 a.name, a.email, a.role,
                 coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
                 a.enable_monthly_mail_report, a.enable_automatic_stamp_usage,
-                (array_agg(account_status.id))[0] as status_id,
-                (array_agg(account_status.name))[0] as status_name,
-                (array_agg(account_status.priority))[0] as status_priority
+                (array_agg(account_status.id))[1] as status_id,
+                (array_agg(account_status.name))[1] as status_name,
+                (array_agg(account_status.priority))[1] as status_priority
             FROM account AS a
                 LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
                 LEFT OUTER JOIN account_status on a.status_id = account_status.id
@@ -683,9 +683,9 @@ impl DatabaseConnection {
                 a.name, a.email, a.role,
                 coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
                 a.enable_monthly_mail_report, a.enable_automatic_stamp_usage,
-                (array_agg(account_status.id))[0] as status_id,
-                (array_agg(account_status.name))[0] as status_name,
-                (array_agg(account_status.priority))[0] as status_priority
+                (array_agg(account_status.id))[1] as status_id,
+                (array_agg(account_status.name))[1] as status_name,
+                (array_agg(account_status.priority))[1] as status_priority
             FROM account AS a INNER JOIN matching ON matching.account_id = a.id
                 LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
                 LEFT OUTER JOIN account_status on a.status_id = account_status.id
@@ -761,9 +761,9 @@ impl DatabaseConnection {
                         a.name, a.email, a.role,
                         coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
                         a.enable_monthly_mail_report, a.enable_automatic_stamp_usage,
-                        (array_agg(account_status.id))[0] as status_id,
-                        (array_agg(account_status.name))[0] as status_name,
-                        (array_agg(account_status.priority))[0] as status_priority
+                        (array_agg(account_status.id))[1] as status_id,
+                        (array_agg(account_status.name))[1] as status_name,
+                        (array_agg(account_status.priority))[1] as status_priority
                     FROM account AS a
                         LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
                         LEFT OUTER JOIN account_status on a.status_id = account_status.id
@@ -797,9 +797,9 @@ impl DatabaseConnection {
                         a.name, a.email, a.role,
                         coalesce(array_agg(account_auth_method.data ORDER BY account_auth_method.id ASC) FILTER (where account_auth_method.id IS NOT NULL), '{}') AS auth_methods,
                         a.enable_monthly_mail_report, a.enable_automatic_stamp_usage,
-                        (array_agg(account_status.id))[0] as status_id,
-                        (array_agg(account_status.name))[0] as status_name,
-                        (array_agg(account_status.priority))[0] as status_priority
+                        (array_agg(account_status.id))[1] as status_id,
+                        (array_agg(account_status.name))[1] as status_name,
+                        (array_agg(account_status.priority))[1] as status_priority
                     FROM account AS a
                         LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
                         LEFT OUTER JOIN account_status on a.status_id = account_status.id
