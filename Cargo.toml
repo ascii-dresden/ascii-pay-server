@@ -1,6 +1,6 @@
 [package]
 name = "ascii-pay-server"
-version = "2.1.0"
+version = "2.2.0"
 authors = ["Lars Westermann <lars-westermann@live.de>"]
 edition = "2021"
 
@@ -39,7 +39,7 @@ wallet-pass = "0.4.0"
 reqwest = { version="0.11.20", features=["native-tls", "native-tls-alpn"] }
 openssl = "0.10.57"
 
-lettre = { version = "0.10.4", optional = true, default-features = false, features= ["smtp-transport", "rustls-tls", "builder"] }
+lettre = { version = "0.11.2", optional = true, default-features = false, features= ["smtp-transport", "rustls-tls", "builder", "tokio1", "tokio1-rustls-tls"] }
 
 [features]
 mail = ["lettre"]

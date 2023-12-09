@@ -1,6 +1,6 @@
-FROM rust:alpine as build
+FROM rust:1.74-alpine3.18 as build
 
-RUN apk update && apk add musl-dev openssl-dev
+RUN apk update && apk add musl-dev openssl-dev openssl-libs-static
 
 WORKDIR /usr/src/ascii-pay-server
 ENV CARGO_TERM_COLOR always
@@ -14,7 +14,7 @@ RUN sed -i 's#dummy.rs#src/main.rs#' Cargo.toml
 COPY . .
 RUN cargo build --release
 
-FROM alpine:3.16 as dist
+FROM alpine:3.18 as dist
 
 RUN apk update && apk add libc6-compat libcrypto3 libssl3
 

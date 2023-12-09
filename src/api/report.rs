@@ -44,6 +44,7 @@ async fn report_account(mut state: RequestState, Path(id): Path<u64>) -> Service
         if !account.email.is_empty() {
             if let Err(e) =
                 crate::mail::send_monthly_report(&account, &transactions, start_date, end_date)
+                    .await
             {
                 log::warn!("Could not send mail: {:?}", e);
             }
@@ -89,6 +90,7 @@ async fn report_accounts(mut state: RequestState) -> ServiceResult<()> {
         if !account.email.is_empty() {
             if let Err(e) =
                 crate::mail::send_monthly_report(&account, &transactions, start_date, end_date)
+                    .await
             {
                 log::warn!("Could not send mail: {:?}", e);
             }

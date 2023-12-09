@@ -141,9 +141,14 @@ async fn create_password_reset_token(
 
         #[cfg(feature = "mail")]
         if !account.email.is_empty() {
-            if let Err(e) = crate::mail::send_invitation_link(&account, &token, &valid_until) {
-                log::warn!("Could not send mail: {:?}", e);
-            }
+            let mail_token = token.clone();
+            tokio::spawn(async move {
+                if let Err(e) =
+                    crate::mail::send_invitation_link(&account, &mail_token, &valid_until).await
+                {
+                    log::warn!("Could not send mail: {:?}", e);
+                }
+            });
         }
 
         return Ok(Json(PasswordResetTokenDto { token }));

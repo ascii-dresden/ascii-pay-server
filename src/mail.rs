@@ -4,7 +4,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use lettre::{
     message::{header::ContentType, Mailbox},
     transport::smtp::authentication::Credentials,
-    Address, Message, SmtpTransport, Transport,
+    Address, AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
 };
 use log::info;
 
@@ -14,7 +14,11 @@ use crate::{
     models::{Account, CoinType, Transaction},
 };
 
-pub fn send_standard_mail(account: &Account, subj: &str, message: String) -> ServiceResult<()> {
+pub async fn send_standard_mail(
+    account: &Account,
+    subj: &str,
+    message: String,
+) -> ServiceResult<()> {
     if account.email.is_empty() {
         return Err(ServiceError::InternalServerError(String::from(
             "A mail sending context was called, but no mail address was provided.",
@@ -42,18 +46,18 @@ pub fn send_standard_mail(account: &Account, subj: &str, message: String) -> Ser
     } else {
         let credentials = Credentials::new(env::MAIL_USER.clone(), env::MAIL_PASS.clone());
 
-        let mailer = SmtpTransport::relay(&env::MAIL_SERVER)
+        let mailer = AsyncSmtpTransport::<Tokio1Executor>::relay(&env::MAIL_SERVER)
             .unwrap()
             .credentials(credentials)
             .build();
 
-        mailer.send(&email)?;
+        mailer.send(email).await?;
     }
 
     Ok(())
 }
 
-pub fn send_invitation_link(
+pub async fn send_invitation_link(
     account: &Account,
     token: &str,
     valid_until: &DateTime<Utc>,
@@ -81,9 +85,10 @@ This mail has been automatically generated. Please do not reply.",
         "[ascii-pay] You have been invited to the ascii-pay service",
         mail_text,
     )
+    .await
 }
 
-pub fn send_monthly_report(
+pub async fn send_monthly_report(
     account: &Account,
     transactions: &[Transaction],
     start_date: DateTime<Utc>,
@@ -124,5 +129,5 @@ This mail has been automatically generated. Please do not reply.",
         total_up_cents = f64::from(total_up_cents) / 100.0,
     );
 
-    send_standard_mail(account, "[ascii-pay] Monthly report", mail_text)
+    send_standard_mail(account, "[ascii-pay] Monthly report", mail_text).await
 }
