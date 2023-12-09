@@ -13,6 +13,7 @@ pub enum ServiceError {
     Unauthorized(&'static str),
     Forbidden,
     PaymentError(Vec<String>),
+    BalanceNotZero,
 }
 
 impl std::fmt::Display for ServiceError {
@@ -114,7 +115,13 @@ impl IntoResponse for ServiceError {
                 StatusCode::CONFLICT,
                 Json(json!({
                     "error": "PaymentError",
-                    "cause": cause
+                    "cause": cause,
+                })),
+            ),
+            ServiceError::BalanceNotZero => (
+                StatusCode::CONFLICT,
+                Json(json!({
+                    "error": "BalanceNotZero",
                 })),
             ),
         }

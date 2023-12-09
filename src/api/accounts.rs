@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::database::AppState;
 use crate::error::{ServiceError, ServiceResult};
+use crate::models::CoinType;
 use crate::request_state::RequestState;
 use crate::{models, wallet};
 
@@ -391,6 +392,29 @@ fn update_account_docs(op: TransformOperation) -> TransformOperation {
 
 async fn delete_account(mut state: RequestState, Path(id): Path<u64>) -> ServiceResult<StatusCode> {
     state.session_require_admin_or_self(id)?;
+
+    let account = state.db.get_account_by_id(id).await?;
+    if let Some(account) = account {
+        let balance_cents = account.balance.0.get(&CoinType::Cent).copied().unwrap_or(0);
+        let balance_bottle_stamps = account
+            .balance
+            .0
+            .get(&CoinType::BottleStamp)
+            .copied()
+            .unwrap_or(0);
+        let balance_coffee_stamps = account
+            .balance
+            .0
+            .get(&CoinType::CoffeeStamp)
+            .copied()
+            .unwrap_or(0);
+
+        if balance_cents != 0 || balance_bottle_stamps != 0 || balance_coffee_stamps != 0 {
+            return Err(ServiceError::BalanceNotZero);
+        }
+    } else {
+        return Ok(StatusCode::NOT_FOUND);
+    }
 
     state.db.delete_account(id).await?;
     Ok(StatusCode::NO_CONTENT)
