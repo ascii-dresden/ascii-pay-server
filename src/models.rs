@@ -112,6 +112,7 @@ pub struct Account {
 pub struct AccountStatus {
     pub id: u64,
     pub name: String,
+    pub color: String,
     pub priority: u64,
 }
 

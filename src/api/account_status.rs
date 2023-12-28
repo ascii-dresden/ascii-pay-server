@@ -33,6 +33,7 @@ pub fn router(app_state: AppState) -> ApiRouter {
 pub struct AccountStatusDto {
     pub id: u64,
     pub name: String,
+    pub color: String,
     pub priority: u64,
 }
 
@@ -41,6 +42,7 @@ impl From<&models::AccountStatus> for AccountStatusDto {
         Self {
             id: value.id.to_owned(),
             name: value.name.to_owned(),
+            color: value.color.to_owned(),
             priority: value.priority.to_owned(),
         }
     }
@@ -51,8 +53,8 @@ async fn list_account_status(
 ) -> ServiceResult<Json<Vec<AccountStatusDto>>> {
     state.session_require_admin()?;
 
-    let accounts = state.db.get_all_account_status().await?;
-    Ok(Json(accounts.iter().map(|a| a.into()).collect()))
+    let account_status = state.db.get_all_account_status().await?;
+    Ok(Json(account_status.iter().map(|a| a.into()).collect()))
 }
 
 fn list_account_status_docs(op: TransformOperation) -> TransformOperation {
@@ -72,8 +74,8 @@ pub async fn get_account_status(
 
     let account_status = state.db.get_account_status_by_id(id).await?;
 
-    if let Some(account) = account_status {
-        return Ok(Json(AccountStatusDto::from(&account)));
+    if let Some(account_status) = account_status {
+        return Ok(Json(AccountStatusDto::from(&account_status)));
     }
 
     Err(ServiceError::NotFound)
@@ -94,6 +96,7 @@ fn get_account_status_docs(op: TransformOperation) -> TransformOperation {
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 pub struct SaveAccountStatusDto {
     pub name: String,
+    pub color: String,
     pub priority: u64,
 }
 
@@ -108,6 +111,7 @@ async fn create_account_status(
     let account_status = models::AccountStatus {
         id: 0,
         name: form.name,
+        color: form.color,
         priority: form.priority,
     };
 
@@ -134,11 +138,12 @@ async fn update_account_status(
     let form = form.0;
     let account_status = state.db.get_account_status_by_id(id).await?;
 
-    if let Some(mut account) = account_status {
-        account.name = form.name;
-        account.priority = form.priority;
+    if let Some(mut account_status) = account_status {
+        account_status.name = form.name;
+        account_status.color = form.color;
+        account_status.priority = form.priority;
 
-        let account_status = state.db.store_account_status(account).await?;
+        let account_status = state.db.store_account_status(account_status).await?;
 
         tokio::task::spawn(async move {
             if let Err(e) = wallet::send_update_notification(&mut state.db, id).await {

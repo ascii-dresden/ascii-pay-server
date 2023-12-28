@@ -226,3 +226,6 @@ CREATE TABLE product_status_price (
             REFERENCES product(id)
             ON DELETE CASCADE
 );
+
+--##20 Add account status color
+ALTER TABLE account_status ADD COLUMN color VARCHAR NOT NULL DEFAULT '';

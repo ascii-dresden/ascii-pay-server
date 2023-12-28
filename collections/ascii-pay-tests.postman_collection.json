@@ -732,7 +732,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Cofe\",\n    \"price\": {\n        \"Cent\": 140,\n        \"CoffeeStamp\": 10\n    },\n    \"bonus\": {\n        \"CoffeeStamp\": 1\n    },\n    \"nickname\": \"C\",\n    \"category\": \"Hot\",\n    \"tags\": [\"Vegan\"]\n}",
+							"raw": "{\n    \"name\": \"Cofe\",\n    \"price\": {\n        \"Cent\": 140,\n        \"CoffeeStamp\": 10\n    },\n    \"bonus\": {\n        \"CoffeeStamp\": 1\n    },\n    \"nickname\": \"C\",\n    \"category\": \"Hot\",\n    \"tags\": [\"Vegan\"],\n    \"status_prices\": []\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -773,7 +773,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Coffee\",\n    \"price\": {\n        \"Cent\": 150,\n        \"CoffeeStamp\": 10\n    },\n    \"bonus\": {\n        \"CoffeeStamp\": 1\n    },\n    \"nickname\": \"C\",\n    \"category\": \"Hot\",\n    \"tags\": [\"Bio\", \"Vegan\"]\n}",
+							"raw": "{\n    \"name\": \"Coffee\",\n    \"price\": {\n        \"Cent\": 150,\n        \"CoffeeStamp\": 10\n    },\n    \"bonus\": {\n        \"CoffeeStamp\": 1\n    },\n    \"nickname\": \"C\",\n    \"category\": \"Hot\",\n    \"tags\": [\"Bio\", \"Vegan\"],\n    \"status_prices\": []\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -1382,6 +1382,49 @@
 								"v1",
 								"auth",
 								"password"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reset Payment",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status test\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"items\": [\n       {\n            \"effective_price\": {\n                \"Cent\": 1750,\n                \"CoffeeStamp\": 1,\n                \"BottleStamp\": 2\n            }\n        }\n    ]\n}\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/account/{{admin_account_id}}/payment",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"account",
+								"{{admin_account_id}}",
+								"payment"
 							]
 						}
 					},

@@ -83,6 +83,7 @@ struct AccountRow {
     enable_automatic_stamp_usage: bool,
     status_id: Option<i64>,
     status_name: Option<String>,
+    status_color: Option<String>,
     status_priority: Option<i32>,
 }
 
@@ -94,6 +95,9 @@ impl AccountRow {
         let Some(ref name) = self.status_name else {
             return None;
         };
+        let Some(ref color) = self.status_color else {
+            return None;
+        };
         let Some(priority) = self.status_priority else {
             return None;
         };
@@ -101,6 +105,7 @@ impl AccountRow {
         Some(AccountStatus {
             id: id.try_into().expect("id in database is always positive"),
             name: name.clone(),
+            color: color.clone(),
             priority: priority
                 .try_into()
                 .expect("id in database is always positive"),
@@ -136,6 +141,7 @@ impl From<AccountRow> for Account {
 struct AccountStatusRow {
     id: i64,
     name: String,
+    color: String,
     priority: i32,
 }
 
@@ -147,6 +153,7 @@ impl From<AccountStatusRow> for AccountStatus {
                 .try_into()
                 .expect("id in database is always positive"),
             name: row.name,
+            color: row.color,
             priority: row
                 .priority
                 .try_into()
@@ -444,6 +451,7 @@ struct ProductRow {
     tags: Vec<String>,
     status_id: Vec<i64>,
     status_name: Vec<String>,
+    status_color: Vec<String>,
     status_priority: Vec<i32>,
     status_price_cents: Vec<i32>,
     status_price_coffee_stamps: Vec<i32>,
@@ -461,6 +469,7 @@ impl From<ProductRow> for Product {
                 status: AccountStatus {
                     id: value.status_id[i].try_into().expect("IDs are non-negative"),
                     name: value.status_name[i].clone(),
+                    color: value.status_color[i].clone(),
                     priority: value.status_priority[i]
                         .try_into()
                         .expect("IDs are non-negative"),
@@ -627,6 +636,7 @@ impl DatabaseConnection {
                 a.enable_monthly_mail_report, a.enable_automatic_stamp_usage,
                 (array_agg(account_status.id))[1] as status_id,
                 (array_agg(account_status.name))[1] as status_name,
+                (array_agg(account_status.color))[1] as status_color,
                 (array_agg(account_status.priority))[1] as status_priority
             FROM account AS a
                 LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
@@ -655,6 +665,7 @@ impl DatabaseConnection {
                 a.enable_monthly_mail_report, a.enable_automatic_stamp_usage,
                 (array_agg(account_status.id))[1] as status_id,
                 (array_agg(account_status.name))[1] as status_name,
+                (array_agg(account_status.color))[1] as status_color,
                 (array_agg(account_status.priority))[1] as status_priority
             FROM account AS a
                 LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
@@ -685,6 +696,7 @@ impl DatabaseConnection {
                 a.enable_monthly_mail_report, a.enable_automatic_stamp_usage,
                 (array_agg(account_status.id))[1] as status_id,
                 (array_agg(account_status.name))[1] as status_name,
+                (array_agg(account_status.color))[1] as status_color,
                 (array_agg(account_status.priority))[1] as status_priority
             FROM account AS a INNER JOIN matching ON matching.account_id = a.id
                 LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
@@ -763,6 +775,7 @@ impl DatabaseConnection {
                         a.enable_monthly_mail_report, a.enable_automatic_stamp_usage,
                         (array_agg(account_status.id))[1] as status_id,
                         (array_agg(account_status.name))[1] as status_name,
+                        (array_agg(account_status.color))[1] as status_color,
                         (array_agg(account_status.priority))[1] as status_priority
                     FROM account AS a
                         LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
@@ -799,6 +812,7 @@ impl DatabaseConnection {
                         a.enable_monthly_mail_report, a.enable_automatic_stamp_usage,
                         (array_agg(account_status.id))[1] as status_id,
                         (array_agg(account_status.name))[1] as status_name,
+                        (array_agg(account_status.color))[1] as status_color,
                         (array_agg(account_status.priority))[1] as status_priority
                     FROM account AS a
                         LEFT OUTER JOIN account_auth_method ON a.id = account_auth_method.account_id
@@ -927,7 +941,7 @@ impl DatabaseConnection {
         let mut r = sqlx::query_as::<_, AccountStatusRow>(
             r#"
             SELECT
-                id, name, priority
+                id, name, priority, color
             FROM account_status
             "#,
         )
@@ -949,7 +963,7 @@ impl DatabaseConnection {
         let r = sqlx::query_as::<_, AccountStatusRow>(
             r#"
             SELECT
-                id, name, priority
+                id, name, color, priority
             FROM account_status
             WHERE
                 id = $1
@@ -971,10 +985,12 @@ impl DatabaseConnection {
                 r#"
             INSERT INTO account_status (
                 name,
-                priority
+                color
+                priority,
             ) VALUES (
                 $1,
-                $2
+                $2,
+                $3
             ) RETURNING id
             "#,
             )
@@ -984,7 +1000,8 @@ impl DatabaseConnection {
                 UPDATE account_status
                 SET
                     name = $2,
-                    priority = $3
+                    color = $3,
+                    priority = $4
                 WHERE id = $1
                 RETURNING id
             "#,
@@ -993,6 +1010,7 @@ impl DatabaseConnection {
         };
         let r = q
             .bind(&account_status.name)
+            .bind(&account_status.color)
             .bind(i32::try_from(account_status.priority).expect("product id is less than 2**31"))
             .fetch_one(self.connection.as_mut())
             .await;
@@ -1030,6 +1048,7 @@ impl DatabaseConnection {
                 p.barcode, p.category, p.tags,
                 coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                 coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
+                coalesce(array_agg(account_status.color) FILTER (where account_status.color IS NOT NULL), '{}') as status_color,
                 coalesce(array_agg(account_status.priority) FILTER (where account_status.priority IS NOT NULL), '{}') as status_priority,
                 coalesce(array_agg(product_status_price.price_cents) FILTER (where product_status_price.price_cents IS NOT NULL), '{}') as status_price_cents,
                 coalesce(array_agg(product_status_price.price_bottle_stamps) FILTER (where product_status_price.price_bottle_stamps IS NOT NULL), '{}') as status_price_bottle_stamps,
@@ -1066,6 +1085,7 @@ impl DatabaseConnection {
                 p.barcode, p.category, p.tags,
                 coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                 coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
+                coalesce(array_agg(account_status.color) FILTER (where account_status.color IS NOT NULL), '{}') as status_color,
                 coalesce(array_agg(account_status.priority) FILTER (where account_status.priority IS NOT NULL), '{}') as status_priority,
                 coalesce(array_agg(product_status_price.price_cents) FILTER (where product_status_price.price_cents IS NOT NULL), '{}') as status_price_cents,
                 coalesce(array_agg(product_status_price.price_bottle_stamps) FILTER (where product_status_price.price_bottle_stamps IS NOT NULL), '{}') as status_price_bottle_stamps,
@@ -1315,6 +1335,7 @@ impl DatabaseConnection {
                     p.tags as tags,
                     coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                     coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
+                    coalesce(array_agg(account_status.color) FILTER (where account_status.color IS NOT NULL), '{}') as status_color,
                     coalesce(array_agg(account_status.priority) FILTER (where account_status.priority IS NOT NULL), '{}') as status_priority,
                     coalesce(array_agg(product_status_price.price_cents) FILTER (where product_status_price.price_cents IS NOT NULL), '{}') as status_price_cents,
                     coalesce(array_agg(product_status_price.price_bottle_stamps) FILTER (where product_status_price.price_bottle_stamps IS NOT NULL), '{}') as status_price_bottle_stamps,
@@ -1384,6 +1405,7 @@ impl DatabaseConnection {
                     p.tags as tags,
                     coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                     coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
+                    coalesce(array_agg(account_status.color) FILTER (where account_status.color IS NOT NULL), '{}') as status_color,
                     coalesce(array_agg(account_status.priority) FILTER (where account_status.priority IS NOT NULL), '{}') as status_priority,
                     coalesce(array_agg(product_status_price.price_cents) FILTER (where product_status_price.price_cents IS NOT NULL), '{}') as status_price_cents,
                     coalesce(array_agg(product_status_price.price_bottle_stamps) FILTER (where product_status_price.price_bottle_stamps IS NOT NULL), '{}') as status_price_bottle_stamps,
