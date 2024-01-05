@@ -229,3 +229,10 @@ CREATE TABLE product_status_price (
 
 --##20 Add account status color
 ALTER TABLE account_status ADD COLUMN color VARCHAR NOT NULL DEFAULT '';
+
+--#21 Add missing foreign key to product_status_price
+ALTER TABLE product_status_price
+    ADD CONSTRAINT fk_product_status_price_status
+    FOREIGN KEY(status_id)
+        REFERENCES account_status(id)
+        ON DELETE CASCADE;
