@@ -14,6 +14,7 @@ pub enum CoinType {
 pub enum Role {
     Basic,
     Member,
+    Purchaser,
     Admin,
 }
 

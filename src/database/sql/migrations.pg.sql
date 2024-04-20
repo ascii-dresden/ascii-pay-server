@@ -236,3 +236,7 @@ ALTER TABLE product_status_price
     FOREIGN KEY(status_id)
         REFERENCES account_status(id)
         ON DELETE CASCADE;
+
+
+--##22 Add role purchaser
+ALTER TYPE tp_account_role ADD VALUE 'purchaser' AFTER 'member';

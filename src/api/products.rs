@@ -153,7 +153,7 @@ async fn create_product(
     mut state: RequestState,
     form: Json<SaveProductDto>,
 ) -> ServiceResult<Json<ProductDto>> {
-    state.session_require_admin()?;
+    state.session_require_purchaser_or_admin()?;
 
     let form = form.0;
 
@@ -182,7 +182,7 @@ fn create_product_docs(op: TransformOperation) -> TransformOperation {
         .response::<200, Json<ProductDto>>()
         .response_with::<401, (), _>(|res| res.description("Missing login!"))
         .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
-        .security_requirement_scopes("SessionToken", ["admin"])
+        .security_requirement_scopes("SessionToken", ["purchaser", "admin"])
 }
 
 async fn update_product(
@@ -190,7 +190,7 @@ async fn update_product(
     Path(id): Path<u64>,
     form: Json<SaveProductDto>,
 ) -> ServiceResult<Json<ProductDto>> {
-    state.session_require_admin()?;
+    state.session_require_purchaser_or_admin()?;
 
     let form = form.0;
     let product = state.db.get_product_by_id(id).await?;
@@ -221,11 +221,11 @@ fn update_product_docs(op: TransformOperation) -> TransformOperation {
         .response_with::<404, (), _>(|res| res.description("The requested product does not exist!"))
         .response_with::<401, (), _>(|res| res.description("Missing login!"))
         .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
-        .security_requirement_scopes("SessionToken", ["admin"])
+        .security_requirement_scopes("SessionToken", ["purchaser", "admin"])
 }
 
 async fn delete_product(mut state: RequestState, Path(id): Path<u64>) -> ServiceResult<StatusCode> {
-    state.session_require_admin()?;
+    state.session_require_purchaser_or_admin()?;
 
     state.db.delete_product(id).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -238,7 +238,7 @@ fn delete_product_docs(op: TransformOperation) -> TransformOperation {
         .response_with::<404, (), _>(|res| res.description("The requested product does not exist!"))
         .response_with::<401, (), _>(|res| res.description("Missing login!"))
         .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
-        .security_requirement_scopes("SessionToken", ["admin"])
+        .security_requirement_scopes("SessionToken", ["purchaser", "admin"])
 }
 
 async fn resolve_status_prices(
@@ -295,7 +295,7 @@ async fn upload_product_image(
     Path(id): Path<u64>,
     mut multipart: Multipart,
 ) -> ServiceResult<StatusCode> {
-    state.session_require_admin()?;
+    state.session_require_purchaser_or_admin()?;
     while let Ok(Some(field)) = multipart.next_field().await {
         let content_type = field.content_type().unwrap_or("").to_lowercase();
         if SUPPORTED_IMAGE_TYPES.iter().any(|t| *t == content_type) {
@@ -322,14 +322,14 @@ fn upload_product_image_docs(op: TransformOperation) -> TransformOperation {
         .response_with::<404, (), _>(|res| res.description("The requested product does not exist!"))
         .response_with::<401, (), _>(|res| res.description("Missing login!"))
         .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
-        .security_requirement_scopes("SessionToken", ["admin"])
+        .security_requirement_scopes("SessionToken", ["purchaser", "admin"])
 }
 
 async fn delete_product_image(
     mut state: RequestState,
     Path(id): Path<u64>,
 ) -> ServiceResult<StatusCode> {
-    state.session_require_admin()?;
+    state.session_require_purchaser_or_admin()?;
 
     state.db.delete_product_image(id).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -344,7 +344,7 @@ fn delete_product_image_docs(op: TransformOperation) -> TransformOperation {
         .response_with::<404, (), _>(|res| res.description("The requested product does not exist!"))
         .response_with::<401, (), _>(|res| res.description("Missing login!"))
         .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
-        .security_requirement_scopes("SessionToken", ["admin"])
+        .security_requirement_scopes("SessionToken", ["purchaser", "admin"])
 }
 
 pub struct ImageResult {

@@ -80,6 +80,16 @@ impl RequestState {
         self.session.is_some()
     }
 
+    pub fn session_is_purchaser(&self) -> bool {
+        if let Some(ref session) = self.session {
+            if matches!(session.account.role, models::Role::Purchaser) {
+                return true;
+            }
+        }
+
+        false
+    }
+
     pub fn session_is_admin(&self) -> bool {
         if let Some(ref session) = self.session {
             if matches!(session.account.role, models::Role::Admin) {
@@ -118,6 +128,16 @@ impl RequestState {
         }
 
         if self.session_is_self(account_id) {
+            return Ok(account);
+        }
+
+        Err(ServiceError::Forbidden)
+    }
+
+    pub fn session_require_purchaser_or_admin(&self) -> ServiceResult<models::Account> {
+        let account = self.session_require_login()?;
+
+        if self.session_is_purchaser() || self.session_is_admin() {
             return Ok(account);
         }
 

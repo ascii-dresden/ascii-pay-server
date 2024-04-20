@@ -119,6 +119,7 @@ impl From<&CoinAmountDto> for models::CoinAmount {
 pub enum RoleDto {
     Basic,
     Member,
+    Purchaser,
     Admin,
 }
 impl From<&models::Role> for RoleDto {
@@ -126,6 +127,7 @@ impl From<&models::Role> for RoleDto {
         match value {
             models::Role::Basic => RoleDto::Basic,
             models::Role::Member => RoleDto::Member,
+            models::Role::Purchaser => RoleDto::Purchaser,
             models::Role::Admin => RoleDto::Admin,
         }
     }
@@ -135,6 +137,7 @@ impl From<RoleDto> for models::Role {
         match value {
             RoleDto::Basic => models::Role::Basic,
             RoleDto::Member => models::Role::Member,
+            RoleDto::Purchaser => models::Role::Purchaser,
             RoleDto::Admin => models::Role::Admin,
         }
     }

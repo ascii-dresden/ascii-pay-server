@@ -46,6 +46,7 @@ pub struct AppState {
 enum AccountRoleDto {
     Basic,
     Member,
+    Purchaser,
     Admin,
 }
 
@@ -54,6 +55,7 @@ impl From<AccountRoleDto> for Role {
         match value {
             AccountRoleDto::Basic => Role::Basic,
             AccountRoleDto::Member => Role::Member,
+            AccountRoleDto::Purchaser => Role::Purchaser,
             AccountRoleDto::Admin => Role::Admin,
         }
     }
@@ -64,6 +66,7 @@ impl From<Role> for AccountRoleDto {
         match value {
             Role::Basic => AccountRoleDto::Basic,
             Role::Member => AccountRoleDto::Member,
+            Role::Purchaser => AccountRoleDto::Purchaser,
             Role::Admin => AccountRoleDto::Admin,
         }
     }
