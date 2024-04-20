@@ -10,16 +10,17 @@ path = "src/main.rs"
 
 [dependencies]
 tokio = { version = "1.32.0", features = ["full"] }
-axum = { version="0.6.20", features=["multipart", "headers"] }
-tower-http = { version = "0.4.4", features = ["cors"] }
+axum = { version="0.7.5", features=["multipart"] }
+axum-extra = { version="0.9.3", features = ["typed-header"]}
+tower-http = { version = "0.5.2", features = ["cors"] }
 sqlx = { version = "0.7.1", features = ["runtime-tokio-rustls", "postgres", "json", "chrono"] }
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = { version="1.0.107" }
 argon2rs = { version="0.2.5", default-features = false }
-base64 = { version="0.21.4" }
-aide = { version="0.12.0", features=["redoc", "axum", "axum-multipart"] }
+base64 = { version="0.22.0" }
+aide = { version="0.13.4", features=["redoc", "axum", "axum-multipart"] }
 schemars = { version = "0.8.15" }
-headers = "0.3.9"
+headers = "0.4.0"
 lazy_static = "1.4.0"
 
 block-modes = "0.8"
@@ -32,11 +33,11 @@ futures = "0.3.28"
 
 dotenv = "0.15.0"
 log = "0.4.20"
-env_logger = "0.10.0"
+env_logger = "0.11.3"
 chrono = { version="0.4.31", default-features = false, features=["clock"] }
 
 wallet-pass = "0.4.0"
-reqwest = { version="0.11.20", features=["native-tls", "native-tls-alpn"] }
+reqwest = { version="0.12.4", features=["native-tls", "native-tls-alpn"] }
 openssl = "0.10.57"
 
 lettre = { version = "0.11.2", optional = true, default-features = false, features= ["smtp-transport", "rustls-tls", "builder", "tokio1", "tokio1-rustls-tls"] }

@@ -89,18 +89,10 @@ struct AccountRow {
 
 impl AccountRow {
     fn get_status(self: &AccountRow) -> Option<AccountStatus> {
-        let Some(id) = self.status_id else {
-            return None;
-        };
-        let Some(ref name) = self.status_name else {
-            return None;
-        };
-        let Some(ref color) = self.status_color else {
-            return None;
-        };
-        let Some(priority) = self.status_priority else {
-            return None;
-        };
+        let id = self.status_id?;
+        let name = self.status_name.as_ref()?;
+        let color = self.status_color.as_ref()?;
+        let priority = self.status_priority?;
 
         Some(AccountStatus {
             id: id.try_into().expect("id in database is always positive"),

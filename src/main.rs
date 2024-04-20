@@ -55,8 +55,9 @@ async fn main() {
     let addr = format!("{}:{}", env::API_HOST.as_str(), env::API_PORT.as_str());
     let addr = SocketAddr::from_str(&addr).unwrap();
     info!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
+
+    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+    axum::serve(listener, app.into_make_service())
         .with_graceful_shutdown(shutdown_signal())
         .await
         .unwrap();

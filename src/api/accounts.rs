@@ -78,11 +78,20 @@ impl From<CoinTypeDto> for models::CoinType {
 pub type CoinAmountDto = HashMap<CoinTypeDto, i32>;
 impl From<&models::CoinAmount> for CoinAmountDto {
     fn from(value: &models::CoinAmount) -> Self {
-        value
-            .0
-            .iter()
-            .map(|(coin_type, amount)| (coin_type.into(), *amount))
-            .collect()
+        let mut map = CoinAmountDto::new();
+        map.insert(
+            CoinTypeDto::Cent,
+            value.0.get(&CoinType::Cent).copied().unwrap_or(0),
+        );
+        map.insert(
+            CoinTypeDto::BottleStamp,
+            value.0.get(&CoinType::BottleStamp).copied().unwrap_or(0),
+        );
+        map.insert(
+            CoinTypeDto::CoffeeStamp,
+            value.0.get(&CoinType::CoffeeStamp).copied().unwrap_or(0),
+        );
+        map
     }
 }
 impl From<CoinAmountDto> for models::CoinAmount {
