@@ -2246,8 +2246,7 @@ impl DatabaseConnection {
 
         let r = sqlx::query_as::<_, PurchaseRow>(
             r#"
-                SELECT
-                    id, purchased_by_account_id, store, timestamp
+                SELECT id, purchased_by_account_id, store, timestamp
                 FROM purchase
                 WHERE id = $1
             "#,
@@ -2268,6 +2267,153 @@ impl DatabaseConnection {
         };
 
         Ok(out)
+    }
+
+    pub async fn get_purchases_by_product_id(
+        &mut self,
+        product_id: u64,
+    ) -> ServiceResult<Option<Vec<models::Purchase>>> {
+        if self.get_product_by_id(product_id).await?.is_none() {
+            return Ok(None);
+        }
+
+        let accounts = self.get_all_accounts().await?;
+
+        let mut r = sqlx::query_as::<_, PurchaseRow>(
+            r#"
+                SELECT purchase.id, purchased_by_account_id, store, timestamp
+                FROM purchase LEFT JOIN purchase_item
+                ON purchase.id = purchase_item.purchase_id
+                WHERE purchase_item.product_id = $1
+                GROUP BY purchase.id, purchased_by_account_id, store, timestamp
+            "#,
+        )
+        .bind(i64::try_from(product_id).expect("purchase id is less than 2**63"))
+        .fetch(self.connection.as_mut());
+
+        let mut out = Vec::new();
+        while let Some(row) = r.next().await {
+            let row = to_service_result(row)?;
+            out.push(row.into());
+        }
+
+        drop(r);
+
+        self.load_purchase_items(&mut out).await?;
+
+        Ok(Some(out))
+    }
+
+    pub async fn store_purchase(
+        &mut self,
+        mut purchase: models::Purchase,
+    ) -> ServiceResult<models::Purchase> {
+        let q = if purchase.id == 0 {
+            sqlx::query(
+                r#"
+            INSERT INTO purchase (
+                purchased_by_account_id,
+                store,
+                timestamp
+            ) VALUES (
+                $1,
+                $2,
+                $3,
+            ) RETURNING id
+            "#,
+            )
+        } else {
+            sqlx::query(
+                r#"
+                WITH
+                    delete AS (DELETE FROM purchase_item WHERE purchase_id = $1)
+                UPDATE purchase
+                SET
+                    purchased_by_account_id = $2,
+                    store = $3,
+                    timestamp = $4
+                WHERE id = $1
+                RETURNING id
+            "#,
+            )
+            .bind(i64::try_from(purchase.id).expect("product id is less than 2**63"))
+        };
+        let r = q
+            .bind(
+                purchase
+                    .purchased_by_account_id
+                    .map(|id| i64::try_from(id).expect("id less than 2**63")),
+            )
+            .bind(purchase.store.as_str())
+            .bind(purchase.timestamp)
+            .fetch_one(self.connection.as_mut())
+            .await;
+        let r = to_service_result(r)?;
+
+        let purchase_id = r.get::<i64, _>(0);
+        purchase.id = purchase_id.try_into().expect("id is always positive");
+
+        let r = sqlx::query(
+            r#"
+            INSERT INTO purchase_item (purchase_id, name, container_size, container_count, container_cents, product_id)
+            SELECT $1, name, container_size, container_count, container_cents, product_id
+            FROM UNNEST($2, $3, $4, $5, $6) AS input (purchase_id, name, container_size, container_count, container_cents, product_id)
+        "#,
+        )
+        .bind(purchase_id)
+        .bind(
+            purchase
+                .items
+                .iter()
+                .map(|p| p.name.as_str())
+                .collect::<Vec<_>>(),
+        )
+        .bind(
+            purchase
+                .items
+                .iter()
+                .map(|p| p.container_size)
+                .collect::<Vec<_>>(),
+        )
+        .bind(
+            purchase
+                .items
+                .iter()
+                .map(|p| p.container_count)
+                .collect::<Vec<_>>(),
+        )
+        .bind(
+            purchase
+                .items
+                .iter()
+                .map(|p| p.container_cents)
+                .collect::<Vec<_>>(),
+        )
+        .bind(
+            purchase
+                .items
+                .iter()
+                .map(|p| p.product.as_ref().map(|p| i64::try_from(p.id).expect("id less than 2**63")))
+                .collect::<Vec<_>>(),
+        )
+        .execute(self.connection.as_mut())
+        .await;
+        to_service_result(r)?;
+
+        Ok(purchase)
+    }
+
+    pub async fn delete_purchase(&mut self, id: u64) -> ServiceResult<()> {
+        let id = i64::try_from(id).expect("id is always less than 2**63");
+        let r = sqlx::query(r#"DELETE FROM purchase WHERE id = $1"#)
+            .bind(id)
+            .execute(self.connection.as_mut())
+            .await;
+        let r = to_service_result(r)?;
+        if r.rows_affected() != 1 {
+            return Err(ServiceError::NotFound);
+        }
+        Ok(())
     }
 }
 

@@ -69,6 +69,12 @@ impl From<reqwest::Error> for ServiceError {
     }
 }
 
+impl From<chrono::ParseError> for ServiceError {
+    fn from(error: chrono::ParseError) -> Self {
+        ServiceError::InternalServerError(error.to_string())
+    }
+}
+
 #[cfg(feature = "mail")]
 impl From<lettre::transport::smtp::Error> for ServiceError {
     fn from(error: lettre::transport::smtp::Error) -> Self {
