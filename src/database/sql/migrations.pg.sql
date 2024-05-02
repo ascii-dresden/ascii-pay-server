@@ -230,7 +230,7 @@ CREATE TABLE product_status_price (
 --##20 Add account status color
 ALTER TABLE account_status ADD COLUMN color VARCHAR NOT NULL DEFAULT '';
 
---#21 Add missing foreign key to product_status_price
+--##21 Add missing foreign key to product_status_price
 ALTER TABLE product_status_price
     ADD CONSTRAINT fk_product_status_price_status
     FOREIGN KEY(status_id)
@@ -240,3 +240,36 @@ ALTER TABLE product_status_price
 
 --##22 Add role purchaser
 ALTER TYPE tp_account_role ADD VALUE 'purchaser' AFTER 'member';
+
+--##23 Add purchase
+CREATE TABLE purchase (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    purchased_by_account_id BIGINT,
+    store VARCHAR NOT NULL,
+    timestamp TIMESTAMP WITH TIME ZONE,
+
+    CONSTRAINT fk_purchase_account
+        FOREIGN KEY(purchased_by_account_id)
+            REFERENCES account(id)
+            ON DELETE SET NULL
+);
+
+CREATE TABLE purchase_item (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    purchase_id BIGINT NOT NULL,
+    product_id BIGINT,
+    name TEXT NOT NULL,
+    container_size INT NOT NULL,
+    container_count INT NOT NULL,
+    container_cents INT NOT NULL,
+
+    CONSTRAINT fk_purchase_item_purchase
+        FOREIGN KEY(purchase_id)
+            REFERENCES purchase(id)
+            ON DELETE CASCADE,
+
+    CONSTRAINT fk_purchase_item_product
+        FOREIGN KEY(product_id)
+            REFERENCES product(id)
+            ON DELETE SET NULL
+);

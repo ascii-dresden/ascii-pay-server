@@ -52,6 +52,11 @@ pub fn api_docs(api: TransformOpenApi) -> TransformOpenApi {
             description: Some("Register history management".into()),
             ..Default::default()
         })
+        .tag(Tag {
+            name: "purchases".into(),
+            description: Some("Product purchase management".into()),
+            ..Default::default()
+        })
         .security_scheme(
             "SessionToken",
             aide::openapi::SecurityScheme::Http {

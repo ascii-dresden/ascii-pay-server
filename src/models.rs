@@ -262,3 +262,22 @@ pub struct AppleWalletRegistration {
     pub device_id: String,
     pub push_token: String,
 }
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Purchase {
+    pub id: u64,
+    pub store: String,
+    pub timestamp: DateTime<Utc>,
+    pub purchased_by_account_id: Option<u64>,
+    pub items: Vec<PurchaseItem>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct PurchaseItem {
+    pub id: u64,
+    pub name: String,
+    pub container_size: i32,
+    pub container_count: i32,
+    pub container_cents: i32,
+    pub product: Option<Product>,
+}

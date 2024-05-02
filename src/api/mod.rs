@@ -11,6 +11,7 @@ mod auth;
 mod nfc_id;
 mod nfc_mifare;
 mod products;
+mod purchases;
 mod register;
 mod report;
 mod transactions;
@@ -26,6 +27,7 @@ pub fn init(app_state: AppState) -> ApiRouter {
         .merge(products::router(app_state.clone()))
         .merge(register::router(app_state.clone()))
         .merge(transactions::router(app_state.clone()))
+        .merge(purchases::router(app_state.clone()))
         .merge(report::router(app_state))
 }
 

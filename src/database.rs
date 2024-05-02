@@ -620,6 +620,41 @@ impl From<models::RegisterHistoryState> for RegisterHistoryRowDataState {
     }
 }
 
+#[derive(sqlx::FromRow)]
+struct PurchaseRow {
+    #[sqlx(try_from = "i64")]
+    id: u64,
+    purchased_by_account_id: Option<i64>,
+    store: String,
+    timestamp: DateTime<Utc>,
+}
+
+impl From<PurchaseRow> for models::Purchase {
+    fn from(value: PurchaseRow) -> Self {
+        models::Purchase {
+            id: value.id,
+            timestamp: value.timestamp,
+            store: value.store,
+            purchased_by_account_id: value
+                .purchased_by_account_id
+                .map(|id| id.try_into().expect("IDs are non-negative")),
+            items: Vec::new(),
+        }
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct PurchaseItemRow {
+    #[sqlx(try_from = "i64")]
+    purchase_item_id: u64,
+    #[sqlx(try_from = "i64")]
+    purchase_item_purchase_id: u64,
+    purchase_item_name: String,
+    purchase_item_container_size: i32,
+    purchase_item_container_count: i32,
+    purchase_item_container_cents: i32,
+}
+
 impl DatabaseConnection {
     pub async fn get_all_accounts(&mut self) -> ServiceResult<Vec<models::Account>> {
         let mut r = sqlx::query_as::<_, AccountRow>(
@@ -2089,6 +2124,150 @@ impl DatabaseConnection {
             return Err(ServiceError::NotFound);
         }
         Ok(())
+    }
+
+    async fn load_purchase_items(
+        &mut self,
+        purchases: &mut [models::Purchase],
+    ) -> ServiceResult<()> {
+        let purchase_ids: Vec<i64> = purchases
+            .iter()
+            .map(|p| i64::try_from(p.id).expect("id is always less than 2**63"))
+            .collect();
+
+        let mut r = sqlx::query(
+            r#"
+                SELECT
+                    item.id as purchase_item_id,
+                    item.purchase_id as purchase_item_purchase_id,
+                    item.name as purchase_item_name,
+                    item.container_size as purchase_item_container_size,
+                    item.container_count as purchase_item_container_count,
+                    item.container_cents as purchase_item_container_cents,
+                    p.id as id,
+                    p.name as name,
+                    p.price_cents as price_cents,
+                    p.price_coffee_stamps as price_coffee_stamps,
+                    p.price_bottle_stamps as price_bottle_stamps,
+                    p.bonus_cents as bonus_cents,
+                    p.bonus_coffee_stamps as bonus_coffee_stamps,
+                    p.bonus_bottle_stamps as bonus_bottle_stamps,
+                    p.nickname as nickname,
+                    NULL as image,
+                    NULL as image_mimetype,
+                    p.barcode as barcode,
+                    p.category as category,
+                    p.tags as tags,
+                    coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
+                    coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
+                    coalesce(array_agg(account_status.color) FILTER (where account_status.color IS NOT NULL), '{}') as status_color,
+                    coalesce(array_agg(account_status.priority) FILTER (where account_status.priority IS NOT NULL), '{}') as status_priority,
+                    coalesce(array_agg(product_status_price.price_cents) FILTER (where product_status_price.price_cents IS NOT NULL), '{}') as status_price_cents,
+                    coalesce(array_agg(product_status_price.price_bottle_stamps) FILTER (where product_status_price.price_bottle_stamps IS NOT NULL), '{}') as status_price_bottle_stamps,
+                    coalesce(array_agg(product_status_price.price_coffee_stamps) FILTER (where product_status_price.price_coffee_stamps IS NOT NULL), '{}') as status_price_coffee_stamps,
+                    coalesce(array_agg(product_status_price.bonus_cents) FILTER (where product_status_price.bonus_cents IS NOT NULL), '{}') as status_bonus_cents,
+                    coalesce(array_agg(product_status_price.bonus_bottle_stamps) FILTER (where product_status_price.bonus_bottle_stamps IS NOT NULL), '{}') as status_bonus_bottle_stamps,
+                    coalesce(array_agg(product_status_price.bonus_coffee_stamps) FILTER (where product_status_price.bonus_coffee_stamps IS NOT NULL), '{}') as status_bonus_coffee_stamps
+                FROM
+                    purchase_item item
+                        LEFT OUTER JOIN product p ON item.product_id = p.id
+                        LEFT OUTER JOIN product_status_price ON p.id = product_status_price.product_id
+                        LEFT OUTER JOIN account_status on product_status_price.status_id = account_status.id
+                WHERE
+                    item.purchase_id = ANY($1::BIGINT[])
+                GROUP BY
+                    item.id, item.purchase_id, item.name,
+                    item.container_size, item.container_count, item.container_cents,
+                    p.id, p.name,
+                    p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
+                    p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
+                    p.nickname, p.barcode, p.category, p.tags
+            "#,
+        )
+        .bind(purchase_ids)
+        .fetch(self.connection.as_mut());
+
+        while let Some(row) = r.next().await {
+            let row = to_service_result(row)?;
+            let purchase_item_row = to_service_result(PurchaseItemRow::from_row(&row))?;
+            let mut purchase_item = models::PurchaseItem {
+                id: purchase_item_row.purchase_item_id,
+                name: purchase_item_row.purchase_item_name,
+                container_cents: purchase_item_row.purchase_item_container_cents,
+                container_count: purchase_item_row.purchase_item_container_count,
+                container_size: purchase_item_row.purchase_item_container_size,
+                product: None,
+            };
+
+            let product_id: Option<i64> = row.get("id");
+            if product_id.is_some() {
+                purchase_item.product = Some(to_service_result(ProductRow::from_row(&row))?.into());
+            }
+
+            let purchase = purchases
+                .iter_mut()
+                .find(|p| p.id == purchase_item_row.purchase_item_purchase_id);
+
+            if let Some(purchase) = purchase {
+                purchase.items.push(purchase_item);
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn get_purchases(&mut self) -> ServiceResult<Vec<models::Purchase>> {
+        let accounts = self.get_all_accounts().await?;
+
+        let mut r = sqlx::query_as::<_, PurchaseRow>(
+            r#"
+                SELECT
+                    id, purchased_by_account_id, store, timestamp
+                FROM purchase
+            "#,
+        )
+        .fetch(self.connection.as_mut());
+
+        let mut out = Vec::new();
+        while let Some(row) = r.next().await {
+            let row = to_service_result(row)?;
+            out.push(row.into());
+        }
+
+        drop(r);
+
+        self.load_purchase_items(&mut out).await?;
+
+        Ok(out)
+    }
+
+    pub async fn get_purchase_by_id(&mut self, id: u64) -> ServiceResult<Option<models::Purchase>> {
+        let accounts = self.get_all_accounts().await?;
+
+        let r = sqlx::query_as::<_, PurchaseRow>(
+            r#"
+                SELECT
+                    id, purchased_by_account_id, store, timestamp
+                FROM purchase
+                WHERE id = $1
+            "#,
+        )
+        .bind(i64::try_from(id).expect("purchase id is less than 2**63"))
+        .fetch_optional(self.connection.as_mut())
+        .await;
+
+        let r = to_service_result(r)?;
+
+        let out = if let Some(row) = r {
+            let purchase_row: models::Purchase = row.into();
+            let mut purchases = vec![purchase_row];
+            self.load_purchase_items(&mut purchases).await?;
+            purchases.pop()
+        } else {
+            None
+        };
+
+        Ok(out)
     }
 }
 
