@@ -136,7 +136,6 @@ fn get_purchase_docs(op: TransformOperation) -> TransformOperation {
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 pub struct SavePurchaseDto {
-    pub id: u64,
     pub store: String,
     pub timestamp: String,
     pub purchased_by_account_id: Option<u64>,
@@ -145,7 +144,6 @@ pub struct SavePurchaseDto {
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 pub struct SavePurchaseItemDto {
-    pub id: u64,
     pub name: String,
     pub container_size: i32,
     pub container_count: i32,

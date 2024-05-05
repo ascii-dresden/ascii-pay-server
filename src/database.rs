@@ -2318,7 +2318,7 @@ impl DatabaseConnection {
             ) VALUES (
                 $1,
                 $2,
-                $3,
+                $3
             ) RETURNING id
             "#,
             )
@@ -2357,7 +2357,7 @@ impl DatabaseConnection {
             r#"
             INSERT INTO purchase_item (purchase_id, name, container_size, container_count, container_cents, product_id)
             SELECT $1, name, container_size, container_count, container_cents, product_id
-            FROM UNNEST($2, $3, $4, $5, $6) AS input (purchase_id, name, container_size, container_count, container_cents, product_id)
+            FROM UNNEST($2, $3, $4, $5, $6) AS input (name, container_size, container_count, container_cents, product_id)
         "#,
         )
         .bind(purchase_id)
