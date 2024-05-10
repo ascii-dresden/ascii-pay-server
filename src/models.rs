@@ -157,6 +157,7 @@ pub struct Product {
     pub name: String,
     pub price: CoinAmount,
     pub bonus: CoinAmount,
+    pub purchase_tax: i32,
     pub nickname: Option<String>,
     pub image: Option<Image>,
     pub barcode: Option<String>,

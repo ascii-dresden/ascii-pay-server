@@ -273,3 +273,6 @@ CREATE TABLE purchase_item (
             REFERENCES product(id)
             ON DELETE SET NULL
 );
+
+--##24 Add purchase tax to product
+ALTER TABLE product ADD COLUMN purchase_tax INT NOT NULL DEFAULT 19;

@@ -438,6 +438,7 @@ struct ProductRow {
     bonus_cents: i32,
     bonus_coffee_stamps: i32,
     bonus_bottle_stamps: i32,
+    purchase_tax: i32,
     nickname: Option<String>,
     #[sqlx(flatten)]
     image: ProductImageRow,
@@ -509,6 +510,7 @@ impl From<ProductRow> for Product {
                 (CoinType::CoffeeStamp, Some(value.bonus_coffee_stamps)),
             ]),
             nickname: value.nickname,
+            purchase_tax: value.purchase_tax,
             image: value.image.into(),
             barcode: value.barcode,
             category: value.category,
@@ -1073,7 +1075,7 @@ impl DatabaseConnection {
                 p.id, p.name,
                 p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
                 p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                p.nickname,
+                p.nickname, p.purchase_tax,
                 NULL AS image, NULL AS image_mimetype,
                 p.barcode, p.category, p.tags,
                 coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
@@ -1110,7 +1112,7 @@ impl DatabaseConnection {
                 p.id, p.name,
                 p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
                 p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                p.nickname,
+                p.nickname, p.purchase_tax,
                 NULL AS image, NULL AS image_mimetype,
                 p.barcode, p.category, p.tags,
                 coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
@@ -1154,6 +1156,7 @@ impl DatabaseConnection {
                 bonus_coffee_stamps,
                 bonus_bottle_stamps,
                 nickname,
+                purchase_tax,
                 barcode,
                 category,
                 tags
@@ -1168,7 +1171,8 @@ impl DatabaseConnection {
                 $8,
                 $9,
                 $10,
-                $11
+                $11,
+                $12
             ) RETURNING id
             "#,
             )
@@ -1187,9 +1191,10 @@ impl DatabaseConnection {
                     bonus_coffee_stamps = $7,
                     bonus_bottle_stamps = $8,
                     nickname = $9,
-                    barcode = $10,
-                    category = $11,
-                    tags = $12
+                    purchase_tax = $10,
+                    barcode = $11,
+                    category = $12,
+                    tags = $13
                 WHERE id = $1
                 RETURNING id
             "#,
@@ -1205,6 +1210,7 @@ impl DatabaseConnection {
             .bind(product.bonus.0.get(&CoinType::CoffeeStamp).unwrap_or(&0))
             .bind(product.bonus.0.get(&CoinType::BottleStamp).unwrap_or(&0))
             .bind(&product.nickname)
+            .bind(product.purchase_tax)
             .bind(&product.barcode)
             .bind(&product.category)
             .bind(&product.tags)
@@ -1358,6 +1364,7 @@ impl DatabaseConnection {
                     p.bonus_coffee_stamps as bonus_coffee_stamps,
                     p.bonus_bottle_stamps as bonus_bottle_stamps,
                     p.nickname as nickname,
+                    p.purchase_tax as purchase_tax,
                     NULL as image,
                     NULL as image_mimetype,
                     p.barcode as barcode,
@@ -1384,7 +1391,7 @@ impl DatabaseConnection {
                         p.id, p.name,
                         p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
                         p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                        p.nickname, p.barcode, p.category, p.tags
+                        p.nickname, p.purchase_tax p.barcode, p.category, p.tags
                 ORDER BY item.timestamp ASC, item.transaction_id ASC
             "#,
         )
@@ -1428,6 +1435,7 @@ impl DatabaseConnection {
                     p.bonus_coffee_stamps as bonus_coffee_stamps,
                     p.bonus_bottle_stamps as bonus_bottle_stamps,
                     p.nickname as nickname,
+                    p.purchase_tax as purchase_tax,
                     NULL as image,
                     NULL as image_mimetype,
                     p.barcode as barcode,
@@ -1456,7 +1464,7 @@ impl DatabaseConnection {
                         p.id, p.name,
                         p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
                         p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                        p.nickname, p.barcode, p.category, p.tags
+                        p.nickname, p.purchase_tax, p.barcode, p.category, p.tags
                 ORDER BY item.timestamp ASC, item.transaction_id ASC
             "#,
         )
@@ -1501,6 +1509,7 @@ impl DatabaseConnection {
                 p.bonus_coffee_stamps as bonus_coffee_stamps,
                 p.bonus_bottle_stamps as bonus_bottle_stamps,
                 p.nickname as nickname,
+                p.purchase_tax as purchase_tax,
                 NULL as image,
                 NULL as image_mimetype,
                 p.barcode as barcode,
@@ -1528,7 +1537,7 @@ impl DatabaseConnection {
                     p.id, p.name,
                     p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
                     p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                    p.nickname, p.barcode, p.category, p.tags
+                    p.nickname, p.purchase_tax, p.barcode, p.category, p.tags
         "#,
         )
         .bind(id)
@@ -1717,6 +1726,7 @@ impl DatabaseConnection {
                 p.bonus_coffee_stamps as bonus_coffee_stamps,
                 p.bonus_bottle_stamps as bonus_bottle_stamps,
                 p.nickname as nickname,
+                p.purchase_tax as purchase_tax,
                 NULL as image,
                 NULL as image_mimetype,
                 p.barcode as barcode,
@@ -1743,7 +1753,7 @@ impl DatabaseConnection {
                     p.id, p.name,
                     p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
                     p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                    p.nickname, p.barcode, p.category, p.tags
+                    p.nickname, p.purchase_tax, p.barcode, p.category, p.tags
             "#,
         )
         .bind(timestamp)
@@ -2153,6 +2163,7 @@ impl DatabaseConnection {
                     p.bonus_coffee_stamps as bonus_coffee_stamps,
                     p.bonus_bottle_stamps as bonus_bottle_stamps,
                     p.nickname as nickname,
+                    p.purchase_tax as purchase_tax,
                     NULL as image,
                     NULL as image_mimetype,
                     p.barcode as barcode,
@@ -2181,7 +2192,7 @@ impl DatabaseConnection {
                     p.id, p.name,
                     p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
                     p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                    p.nickname, p.barcode, p.category, p.tags
+                    p.nickname, p.purchase_tax, p.barcode, p.category, p.tags
             "#,
         )
         .bind(purchase_ids)

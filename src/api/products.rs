@@ -72,6 +72,7 @@ pub struct ProductDto {
     pub name: String,
     pub price: CoinAmountDto,
     pub bonus: CoinAmountDto,
+    pub purchase_tax: i32,
     pub nickname: Option<String>,
     pub barcode: Option<String>,
     pub category: String,
@@ -86,6 +87,7 @@ impl From<&models::Product> for ProductDto {
             name: value.name.to_owned(),
             price: (&value.price).into(),
             bonus: (&value.bonus).into(),
+            purchase_tax: value.purchase_tax,
             nickname: value.nickname.to_owned(),
             barcode: value.barcode.to_owned(),
             category: value.category.to_owned(),
@@ -142,6 +144,7 @@ pub struct SaveProductDto {
     pub name: String,
     pub price: CoinAmountDto,
     pub bonus: CoinAmountDto,
+    pub purchase_tax: i32,
     pub nickname: Option<String>,
     pub barcode: Option<String>,
     pub category: String,
@@ -164,6 +167,7 @@ async fn create_product(
         name: form.name,
         price: form.price.into(),
         bonus: form.bonus.into(),
+        purchase_tax: form.purchase_tax,
         nickname: form.nickname,
         barcode: form.barcode,
         category: form.category,
@@ -202,6 +206,7 @@ async fn update_product(
         product.price = form.price.into();
         product.bonus = form.bonus.into();
         product.nickname = form.nickname;
+        product.purchase_tax = form.purchase_tax;
         product.barcode = form.barcode;
         product.category = form.category;
         product.tags = form.tags;
