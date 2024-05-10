@@ -8,27 +8,17 @@
     };
 
     flake-utils.url = "github:numtide/flake-utils";
-
-    rust-overlay = {
-      url = "github:oxalica/rust-overlay";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
-      };
-    };
   };
 
-  outputs = inputs@{ self, nixpkgs, flake-utils, crane, rust-overlay }:
+  outputs = inputs@{ self, nixpkgs, flake-utils, crane }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ (import rust-overlay) ];
         };
         lib = pkgs.lib;
-        rust = pkgs.rust-bin.nightly.latest.default.override { };
 
-        craneLib = (crane.mkLib pkgs).overrideToolchain rust;
+        craneLib = crane.lib.${system};
         package = pkgs.callPackage ./derivation.nix { craneLib = craneLib; };
       in rec {
         doCheck = false;
