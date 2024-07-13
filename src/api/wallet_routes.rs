@@ -120,6 +120,7 @@ pub async fn register_device(
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct RegisterDevicePath {
     pub device_id: String,
     pub pass_type_id: String,
@@ -186,6 +187,7 @@ pub async fn update_passes(
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct UpdatePassesPath {
     pub device_id: String,
     pub pass_type_id: String,
@@ -267,6 +269,7 @@ pub async fn unregister_device(
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct UnregisterDevicePath {
     pub device_id: String,
     pub pass_type_id: String,
@@ -355,6 +358,7 @@ pub async fn create_pass(mut state: RequestState) -> ServiceResult<PassResult> {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct PassDeliveryPath {
     pub pass_type_id: String,
     pub serial_number: String,

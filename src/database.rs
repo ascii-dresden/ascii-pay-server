@@ -1391,7 +1391,7 @@ impl DatabaseConnection {
                         p.id, p.name,
                         p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
                         p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                        p.nickname, p.purchase_tax p.barcode, p.category, p.tags
+                        p.nickname, p.purchase_tax, p.barcode, p.category, p.tags
                 ORDER BY item.timestamp ASC, item.transaction_id ASC
             "#,
         )
