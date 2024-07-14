@@ -400,7 +400,7 @@ async fn update_nfc_authentication(
         for method in account.auth_methods.iter_mut() {
             if let models::AuthMethod::NfcBased(nfc_based) = method {
                 if nfc_based.card_id == card_id {
-                    nfc_based.name = form.name.clone();
+                    nfc_based.name.clone_from(&form.name);
                 }
             }
         }

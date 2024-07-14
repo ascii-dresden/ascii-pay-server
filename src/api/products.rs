@@ -76,6 +76,7 @@ pub struct ProductDto {
     pub nickname: Option<String>,
     pub barcode: Option<String>,
     pub category: String,
+    pub print_lists: Vec<String>,
     pub tags: Vec<String>,
     pub status_prices: Vec<ProductStatusPriceDto>,
 }
@@ -91,6 +92,7 @@ impl From<&models::Product> for ProductDto {
             nickname: value.nickname.to_owned(),
             barcode: value.barcode.to_owned(),
             category: value.category.to_owned(),
+            print_lists: value.print_lists.to_owned(),
             tags: value.tags.to_owned(),
             status_prices: value
                 .status_prices
@@ -148,6 +150,7 @@ pub struct SaveProductDto {
     pub nickname: Option<String>,
     pub barcode: Option<String>,
     pub category: String,
+    pub print_lists: Vec<String>,
     pub tags: Vec<String>,
     pub status_prices: Vec<SaveProductStatusPriceDto>,
 }
@@ -171,6 +174,7 @@ async fn create_product(
         nickname: form.nickname,
         barcode: form.barcode,
         category: form.category,
+        print_lists: form.print_lists,
         tags: form.tags,
         image: None,
         status_prices,
@@ -209,6 +213,7 @@ async fn update_product(
         product.purchase_tax = form.purchase_tax;
         product.barcode = form.barcode;
         product.category = form.category;
+        product.print_lists = form.print_lists;
         product.tags = form.tags;
         product.status_prices = status_prices;
 

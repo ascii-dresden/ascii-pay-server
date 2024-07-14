@@ -444,6 +444,7 @@ struct ProductRow {
     image: ProductImageRow,
     barcode: Option<String>,
     category: String,
+    print_lists: Vec<String>,
     tags: Vec<String>,
     status_id: Vec<i64>,
     status_name: Vec<String>,
@@ -514,6 +515,7 @@ impl From<ProductRow> for Product {
             image: value.image.into(),
             barcode: value.barcode,
             category: value.category,
+            print_lists: value.print_lists,
             tags: value.tags,
             status_prices: status_price,
         }
@@ -1077,7 +1079,7 @@ impl DatabaseConnection {
                 p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
                 p.nickname, p.purchase_tax,
                 NULL AS image, NULL AS image_mimetype,
-                p.barcode, p.category, p.tags,
+                p.barcode, p.category, p.print_lists, p.tags,
                 coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                 coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
                 coalesce(array_agg(account_status.color) FILTER (where account_status.color IS NOT NULL), '{}') as status_color,
@@ -1114,7 +1116,7 @@ impl DatabaseConnection {
                 p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
                 p.nickname, p.purchase_tax,
                 NULL AS image, NULL AS image_mimetype,
-                p.barcode, p.category, p.tags,
+                p.barcode, p.category, p.print_lists, p.tags,
                 coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                 coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
                 coalesce(array_agg(account_status.color) FILTER (where account_status.color IS NOT NULL), '{}') as status_color,
@@ -1159,6 +1161,7 @@ impl DatabaseConnection {
                 purchase_tax,
                 barcode,
                 category,
+                print_lists,
                 tags
             ) VALUES (
                 $1,
@@ -1172,7 +1175,8 @@ impl DatabaseConnection {
                 $9,
                 $10,
                 $11,
-                $12
+                $12,
+                $13
             ) RETURNING id
             "#,
             )
@@ -1194,7 +1198,8 @@ impl DatabaseConnection {
                     purchase_tax = $10,
                     barcode = $11,
                     category = $12,
-                    tags = $13
+                    print_lists = $13,
+                    tags = $14
                 WHERE id = $1
                 RETURNING id
             "#,
@@ -1213,6 +1218,7 @@ impl DatabaseConnection {
             .bind(product.purchase_tax)
             .bind(&product.barcode)
             .bind(&product.category)
+            .bind(&product.print_lists)
             .bind(&product.tags)
             .fetch_one(self.connection.as_mut())
             .await;
@@ -1369,6 +1375,7 @@ impl DatabaseConnection {
                     NULL as image_mimetype,
                     p.barcode as barcode,
                     p.category as category,
+                    p.print_lists as print_lists,
                     p.tags as tags,
                     coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                     coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
@@ -1391,7 +1398,7 @@ impl DatabaseConnection {
                         p.id, p.name,
                         p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
                         p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                        p.nickname, p.purchase_tax, p.barcode, p.category, p.tags
+                        p.nickname, p.purchase_tax, p.barcode, p.category, p.print_lists, p.tags
                 ORDER BY item.timestamp ASC, item.transaction_id ASC
             "#,
         )
@@ -1440,6 +1447,7 @@ impl DatabaseConnection {
                     NULL as image_mimetype,
                     p.barcode as barcode,
                     p.category as category,
+                    p.print_lists as print_lists,
                     p.tags as tags,
                     coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                     coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
@@ -1464,7 +1472,7 @@ impl DatabaseConnection {
                         p.id, p.name,
                         p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
                         p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                        p.nickname, p.purchase_tax, p.barcode, p.category, p.tags
+                        p.nickname, p.purchase_tax, p.barcode, p.category, p.print_lists, p.tags
                 ORDER BY item.timestamp ASC, item.transaction_id ASC
             "#,
         )
@@ -1514,6 +1522,7 @@ impl DatabaseConnection {
                 NULL as image_mimetype,
                 p.barcode as barcode,
                 p.category as category,
+                p.print_lists as print_lists,
                 p.tags as tags,
                 coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                 coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
@@ -1537,7 +1546,7 @@ impl DatabaseConnection {
                     p.id, p.name,
                     p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
                     p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                    p.nickname, p.purchase_tax, p.barcode, p.category, p.tags
+                    p.nickname, p.purchase_tax, p.barcode, p.category, p.print_lists, p.tags
         "#,
         )
         .bind(id)
@@ -1731,6 +1740,7 @@ impl DatabaseConnection {
                 NULL as image_mimetype,
                 p.barcode as barcode,
                 p.category as category,
+                p.print_lists as print_lists,
                 p.tags as tags,
                 coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                 coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
@@ -1753,7 +1763,7 @@ impl DatabaseConnection {
                     p.id, p.name,
                     p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
                     p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                    p.nickname, p.purchase_tax, p.barcode, p.category, p.tags
+                    p.nickname, p.purchase_tax, p.barcode, p.category, p.print_lists, p.tags
             "#,
         )
         .bind(timestamp)
@@ -2168,6 +2178,7 @@ impl DatabaseConnection {
                     NULL as image_mimetype,
                     p.barcode as barcode,
                     p.category as category,
+                    p.print_lists as print_lists,
                     p.tags as tags,
                     coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                     coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
@@ -2192,7 +2203,7 @@ impl DatabaseConnection {
                     p.id, p.name,
                     p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
                     p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                    p.nickname, p.purchase_tax, p.barcode, p.category, p.tags
+                    p.nickname, p.purchase_tax, p.barcode, p.category,p.print_lists, p.tags
             "#,
         )
         .bind(purchase_ids)

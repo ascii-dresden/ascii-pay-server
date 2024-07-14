@@ -179,6 +179,7 @@ pub fn test_product_crud(pool: PgPool) {
         nickname: Some("nick's test".to_string()),
         purchase_tax: 19,
         image: None,
+        print_lists: vec![],
         tags: vec![],
         status_prices: Vec::new(),
     };
@@ -197,6 +198,7 @@ pub fn test_product_crud(pool: PgPool) {
         name: "testMate".to_string(),
         purchase_tax: 19,
         image: None,
+        print_lists: vec![],
         tags: vec!["koffein".to_string()],
         status_prices: Vec::new(),
     };
@@ -215,6 +217,7 @@ pub fn test_product_crud(pool: PgPool) {
         nickname: None,
         purchase_tax: 19,
         image: None,
+        print_lists: vec![],
         tags: vec![],
         status_prices: Vec::new(),
     };
@@ -350,6 +353,7 @@ pub fn test_transaction(pool: PgPool) {
                 data: vec![0x1, 0x2, 0x3],
                 mimetype: "image/png".to_string(),
             }),
+            print_lists: vec![],
             tags: vec![],
             status_prices: Vec::new(),
         })
@@ -371,6 +375,7 @@ pub fn test_transaction(pool: PgPool) {
             name: "testMate".to_string(),
             purchase_tax: 19,
             image: None,
+            print_lists: vec![],
             tags: vec!["koffein".to_string()],
             status_prices: Vec::new(),
         })

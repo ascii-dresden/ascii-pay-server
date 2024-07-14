@@ -162,6 +162,7 @@ pub struct Product {
     pub image: Option<Image>,
     pub barcode: Option<String>,
     pub category: String,
+    pub print_lists: Vec<String>,
     pub tags: Vec<String>,
     pub status_prices: Vec<ProductStatusPrice>,
 }

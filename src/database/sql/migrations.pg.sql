@@ -276,3 +276,6 @@ CREATE TABLE purchase_item (
 
 --##24 Add purchase tax to product
 ALTER TABLE product ADD COLUMN purchase_tax INT NOT NULL DEFAULT 19;
+
+--##25 Add print lists
+ALTER TABLE product ADD COLUMN print_lists TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
