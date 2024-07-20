@@ -732,7 +732,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Cofe\",\n    \"price\": {\n        \"Cent\": 140,\n        \"CoffeeStamp\": 10\n    },\n    \"bonus\": {\n        \"CoffeeStamp\": 1\n    },\n    \"nickname\": \"C\", \"purchase_tax\": 19, \n    \"category\": \"Hot\",\n    \"tags\": [\"Vegan\"],\n    \"status_prices\": []\n}",
+							"raw": "{\n    \"name\": \"Cofe\",\n    \"price\": {\n        \"Cent\": 140,\n        \"CoffeeStamp\": 10\n    },\n    \"bonus\": {\n        \"CoffeeStamp\": 1\n    },\n    \"nickname\": \"C\", \"purchase_tax\": 19, \n    \"category\": \"Hot\",\n    \"print_lists\": [],\n    \"tags\": [\"Vegan\"],\n    \"status_prices\": []\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -773,7 +773,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Coffee\",\n    \"price\": {\n        \"Cent\": 150,\n        \"CoffeeStamp\": 10\n    },\n    \"bonus\": {\n        \"CoffeeStamp\": 1\n    },\n    \"nickname\": \"C\",\"purchase_tax\": 19,\n    \"category\": \"Hot\",\n    \"tags\": [\"Bio\", \"Vegan\"],\n    \"status_prices\": []\n}",
+							"raw": "{\n    \"name\": \"Coffee\",\n    \"price\": {\n        \"Cent\": 150,\n        \"CoffeeStamp\": 10\n    },\n    \"bonus\": {\n        \"CoffeeStamp\": 1\n    },\n    \"nickname\": \"C\",\"purchase_tax\": 19,\n    \"category\": \"Hot\",\n    \"print_lists\": [],\n    \"tags\": [\"Bio\", \"Vegan\"],\n    \"status_prices\": []\n}",
 							"options": {
 								"raw": {
 									"language": "json"
