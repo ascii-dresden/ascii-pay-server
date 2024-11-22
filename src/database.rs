@@ -1392,13 +1392,7 @@ impl DatabaseConnection {
                         LEFT OUTER JOIN product p ON item.product_id = p.id
                         LEFT OUTER JOIN product_status_price ON p.id = product_status_price.product_id
                         LEFT OUTER JOIN account_status on product_status_price.status_id = account_status.id
-                GROUP BY item.transaction_id, item.timestamp, item.account_id,
-                        item.effective_price_cents, item.effective_price_coffee_stamps, item.effective_price_bottle_stamps,
-                        item.authorized_by_account_id, item.authorized_with_method,
-                        p.id, p.name,
-                        p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
-                        p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                        p.nickname, p.purchase_tax, p.barcode, p.category, p.print_lists, p.tags
+                GROUP BY item.id, p.id
                 ORDER BY item.timestamp ASC, item.transaction_id ASC
             "#,
         )
@@ -1466,13 +1460,7 @@ impl DatabaseConnection {
                         LEFT OUTER JOIN account_status on product_status_price.status_id = account_status.id
                 WHERE
                     (item.account_id = $1) OR ($1 = 0 AND item.account_id IS NULL)
-                GROUP BY item.transaction_id, item.timestamp, item.account_id,
-                        item.effective_price_cents, item.effective_price_coffee_stamps, item.effective_price_bottle_stamps,
-                        item.authorized_by_account_id, item.authorized_with_method,
-                        p.id, p.name,
-                        p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
-                        p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                        p.nickname, p.purchase_tax, p.barcode, p.category, p.print_lists, p.tags
+                GROUP BY item.id, p.id
                 ORDER BY item.timestamp ASC, item.transaction_id ASC
             "#,
         )
@@ -1540,14 +1528,8 @@ impl DatabaseConnection {
                     LEFT OUTER JOIN product_status_price ON p.id = product_status_price.product_id
                     LEFT OUTER JOIN account_status on product_status_price.status_id = account_status.id
             WHERE item.transaction_id = $1
-            GROUP BY item.transaction_id, item.timestamp, item.account_id,
-                    item.effective_price_cents, item.effective_price_coffee_stamps, item.effective_price_bottle_stamps,
-                    item.authorized_by_account_id, item.authorized_with_method,
-                    p.id, p.name,
-                    p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
-                    p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                    p.nickname, p.purchase_tax, p.barcode, p.category, p.print_lists, p.tags
-        "#,
+            GROUP BY item.id, p.id
+            "#,
         )
         .bind(id)
         .fetch(self.connection.as_mut());
@@ -1714,6 +1696,7 @@ impl DatabaseConnection {
                             product_id
                         )
                     RETURNING
+                        id AS transaction_item_id,
                         transaction_id,
                         effective_price_cents,
                         effective_price_bottle_stamps,
@@ -1757,7 +1740,7 @@ impl DatabaseConnection {
                     LEFT OUTER JOIN product p ON inserted.product_id = p.id
                     LEFT OUTER JOIN product_status_price ON p.id = product_status_price.product_id
                     LEFT OUTER JOIN account_status on product_status_price.status_id = account_status.id
-            GROUP BY inserted.product_id, inserted.transaction_id, inserted.timestamp, inserted.account_id,
+            GROUP BY inserted.transaction_item_id, inserted.product_id, inserted.transaction_id, inserted.timestamp, inserted.account_id,
                     inserted.effective_price_cents, inserted.effective_price_coffee_stamps, inserted.effective_price_bottle_stamps,
                     inserted.authorized_by_account_id, inserted.authorized_with_method,
                     p.id, p.name,
@@ -2197,13 +2180,7 @@ impl DatabaseConnection {
                         LEFT OUTER JOIN account_status on product_status_price.status_id = account_status.id
                 WHERE
                     item.purchase_id = ANY($1::BIGINT[])
-                GROUP BY
-                    item.id, item.purchase_id, item.name,
-                    item.container_size, item.container_count, item.container_cents,
-                    p.id, p.name,
-                    p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
-                    p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                    p.nickname, p.purchase_tax, p.barcode, p.category,p.print_lists, p.tags
+                GROUP BY item.id, p.id
             "#,
         )
         .bind(purchase_ids)
