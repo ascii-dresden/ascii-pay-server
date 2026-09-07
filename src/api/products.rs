@@ -1,4 +1,4 @@
-use aide::axum::routing::get_with;
+use aide::axum::routing::{get_with, put_with};
 use aide::axum::ApiRouter;
 use aide::transform::TransformOperation;
 use aide::OperationOutput;
@@ -46,6 +46,14 @@ pub fn router(app_state: AppState) -> ApiRouter {
             get_with(list_products, list_products_docs)
                 .post_with(create_product, create_product_docs),
         )
+        .api_route(
+            "/products/by-barcode/:barcode",
+            get_with(get_product_by_barcode, get_product_by_barcode_docs),
+        )
+        .api_route(
+            "/products/inventory",
+            put_with(update_products_inventory, update_products_inventory_docs),
+        )
         .with_state(app_state)
 }
 
@@ -79,6 +87,8 @@ pub struct ProductDto {
     pub print_lists: Vec<String>,
     pub tags: Vec<String>,
     pub status_prices: Vec<ProductStatusPriceDto>,
+    pub stocked: bool,
+    pub target_quantity: i32,
 }
 
 impl From<&models::Product> for ProductDto {
@@ -99,6 +109,8 @@ impl From<&models::Product> for ProductDto {
                 .iter()
                 .map(ProductStatusPriceDto::from)
                 .collect(),
+            stocked: value.stocked,
+            target_quantity: value.target_quantity,
         }
     }
 }
@@ -153,6 +165,10 @@ pub struct SaveProductDto {
     pub print_lists: Vec<String>,
     pub tags: Vec<String>,
     pub status_prices: Vec<SaveProductStatusPriceDto>,
+    #[serde(default)]
+    pub stocked: bool,
+    #[serde(default)]
+    pub target_quantity: i32,
 }
 
 async fn create_product(
@@ -178,6 +194,8 @@ async fn create_product(
         tags: form.tags,
         image: None,
         status_prices,
+        stocked: form.stocked,
+        target_quantity: form.target_quantity,
     };
 
     let product = state.db.store_product(product).await?;
@@ -216,6 +234,8 @@ async fn update_product(
         product.print_lists = form.print_lists;
         product.tags = form.tags;
         product.status_prices = status_prices;
+        product.stocked = form.stocked;
+        product.target_quantity = form.target_quantity;
 
         let product = state.db.store_product(product).await?;
         return Ok(Json(ProductDto::from(&product)));
@@ -246,6 +266,59 @@ fn delete_product_docs(op: TransformOperation) -> TransformOperation {
         .tag("products")
         .response_with::<204, (), _>(|res| res.description("The product was successfully deleted!"))
         .response_with::<404, (), _>(|res| res.description("The requested product does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["purchaser", "admin"])
+}
+
+pub async fn get_product_by_barcode(
+    mut state: RequestState,
+    Path(barcode): Path<String>,
+) -> ServiceResult<Json<ProductDto>> {
+    let product = state.db.get_product_by_barcode(barcode.trim()).await?;
+
+    if let Some(product) = product {
+        return Ok(Json(ProductDto::from(&product)));
+    }
+
+    Err(ServiceError::NotFound)
+}
+
+fn get_product_by_barcode_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Find a product by its barcode (exact match after trimming whitespace).")
+        .tag("products")
+        .response::<200, Json<ProductDto>>()
+        .response_with::<404, (), _>(|res| res.description("No product has this barcode!"))
+}
+
+#[derive(Debug, PartialEq, Deserialize, JsonSchema)]
+pub struct UpdateInventoryProductDto {
+    pub product_id: u64,
+    pub stocked: bool,
+    pub target_quantity: i32,
+}
+
+async fn update_products_inventory(
+    mut state: RequestState,
+    form: Json<Vec<UpdateInventoryProductDto>>,
+) -> ServiceResult<StatusCode> {
+    state.session_require_purchaser_or_admin()?;
+
+    let updates: Vec<(u64, bool, i32)> = form
+        .0
+        .iter()
+        .map(|u| (u.product_id, u.stocked, u.target_quantity))
+        .collect();
+
+    state.db.update_products_inventory(&updates).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+fn update_products_inventory_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Bulk-update the inventory fields (stocked, target quantity) of products. Nothing is applied if any product id is unknown.")
+        .tag("products")
+        .response_with::<204, (), _>(|res| res.description("The products were updated!"))
+        .response_with::<404, (), _>(|res| res.description("A referenced product does not exist!"))
         .response_with::<401, (), _>(|res| res.description("Missing login!"))
         .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
         .security_requirement_scopes("SessionToken", ["purchaser", "admin"])
@@ -370,5 +443,163 @@ impl IntoResponse for ImageResult {
         let mut header = HeaderMap::new();
         header.insert(header::CONTENT_TYPE, self.content_type);
         (StatusCode::OK, header, self.body).into_response()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use chrono::{Duration, Utc};
+    use sqlx::PgPool;
+
+    use super::*;
+    use crate::database::{AppState, DatabaseConnection};
+    use crate::models::{Account, AuthMethodType, CoinAmount, CoinType, Role, Session};
+
+    async fn request_state(app_state: &AppState, account: Option<Account>) -> RequestState {
+        let session = account.map(|account| Session {
+            account,
+            token: "test".to_string(),
+            auth_method: AuthMethodType::PasswordBased,
+            valid_until: Utc::now() + Duration::minutes(30),
+            is_single_use: false,
+        });
+        RequestState {
+            db: DatabaseConnection {
+                connection: app_state.pool.acquire().await.unwrap(),
+            },
+            session,
+            challenge_storage: app_state.ascii_mifare_challenge.clone(),
+        }
+    }
+
+    fn product(name: &str, barcode: Option<&str>) -> models::Product {
+        models::Product {
+            id: 0,
+            name: name.to_string(),
+            price: CoinAmount([(CoinType::Cent, 100)].into_iter().collect()),
+            bonus: CoinAmount(HashMap::new()),
+            purchase_tax: 19,
+            nickname: None,
+            image: None,
+            barcode: barcode.map(str::to_string),
+            category: "cat".to_string(),
+            print_lists: vec![],
+            tags: vec![],
+            status_prices: vec![],
+            stocked: false,
+            target_quantity: 0,
+        }
+    }
+
+    #[sqlx::test]
+    async fn by_barcode_trims_and_404s(pool: PgPool) {
+        let app_state = AppState::from_pool(pool).await;
+        let mut db = DatabaseConnection {
+            connection: app_state.pool.acquire().await.unwrap(),
+        };
+        let first = db
+            .store_product(product("First", Some("4711")))
+            .await
+            .unwrap();
+        let _second = db
+            .store_product(product("Second", Some("4711")))
+            .await
+            .unwrap();
+
+        let state = request_state(&app_state, None).await;
+        let found = get_product_by_barcode(state, Path("4711".to_string()))
+            .await
+            .unwrap();
+        assert_eq!(found.0.id, first.id);
+
+        let state = request_state(&app_state, None).await;
+        let found = get_product_by_barcode(state, Path("  4711\n".to_string()))
+            .await
+            .unwrap();
+        assert_eq!(found.0.id, first.id);
+
+        let state = request_state(&app_state, None).await;
+        assert_eq!(
+            get_product_by_barcode(state, Path("471".to_string()))
+                .await
+                .err(),
+            Some(ServiceError::NotFound)
+        );
+    }
+
+    #[sqlx::test]
+    async fn bulk_inventory_update(pool: PgPool) {
+        let app_state = AppState::from_pool(pool).await;
+        let mut db = DatabaseConnection {
+            connection: app_state.pool.acquire().await.unwrap(),
+        };
+        let admin = db
+            .store_account(Account {
+                id: 0,
+                balance: CoinAmount(HashMap::new()),
+                name: "admin".to_string(),
+                email: "admin@example.org".to_string(),
+                role: Role::Admin,
+                auth_methods: vec![],
+                enable_monthly_mail_report: false,
+                enable_automatic_stamp_usage: false,
+                status: None,
+            })
+            .await
+            .unwrap();
+        let p1 = db.store_product(product("P1", None)).await.unwrap();
+        let p2 = db.store_product(product("P2", None)).await.unwrap();
+
+        let updates = |unknown: bool| {
+            let mut v = vec![
+                UpdateInventoryProductDto {
+                    product_id: p1.id,
+                    stocked: true,
+                    target_quantity: 7,
+                },
+                UpdateInventoryProductDto {
+                    product_id: p2.id,
+                    stocked: true,
+                    target_quantity: 3,
+                },
+            ];
+            if unknown {
+                v.push(UpdateInventoryProductDto {
+                    product_id: 424242,
+                    stocked: true,
+                    target_quantity: 1,
+                });
+            }
+            v
+        };
+
+        let state = request_state(&app_state, None).await;
+        assert_eq!(
+            update_products_inventory(state, Json(updates(false)))
+                .await
+                .err(),
+            Some(ServiceError::Unauthorized("Missing login!"))
+        );
+
+        let state = request_state(&app_state, Some(admin.clone())).await;
+        assert_eq!(
+            update_products_inventory(state, Json(updates(true)))
+                .await
+                .err(),
+            Some(ServiceError::NotFound)
+        );
+        assert!(!db.get_product_by_id(p1.id).await.unwrap().unwrap().stocked);
+
+        let state = request_state(&app_state, Some(admin.clone())).await;
+        assert_eq!(
+            update_products_inventory(state, Json(updates(false))).await,
+            Ok(StatusCode::NO_CONTENT)
+        );
+        let p1 = db.get_product_by_id(p1.id).await.unwrap().unwrap();
+        let p2 = db.get_product_by_id(p2.id).await.unwrap().unwrap();
+        assert_eq!((p1.stocked, p1.target_quantity), (true, 7));
+        assert_eq!((p2.stocked, p2.target_quantity), (true, 3));
     }
 }

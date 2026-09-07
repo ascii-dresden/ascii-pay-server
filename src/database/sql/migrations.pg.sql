@@ -279,3 +279,60 @@ ALTER TABLE product ADD COLUMN purchase_tax INT NOT NULL DEFAULT 19;
 
 --##25 Add print lists
 ALTER TABLE product ADD COLUMN print_lists TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
+
+--##26 Purchase state
+CREATE TYPE tp_purchase_state AS ENUM ('draft', 'finalized');
+ALTER TABLE purchase ADD COLUMN state tp_purchase_state NOT NULL DEFAULT 'draft';
+UPDATE purchase SET state = 'finalized';
+ALTER TABLE purchase ADD COLUMN name TEXT NOT NULL DEFAULT '';
+ALTER TABLE purchase ADD COLUMN finalized_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE purchase ADD COLUMN finalized_by_account_id BIGINT REFERENCES account(id) ON DELETE SET NULL;
+UPDATE purchase SET finalized_at = timestamp;
+
+--##27 Purchase item details
+ALTER TABLE purchase_item ADD COLUMN best_before DATE;
+ALTER TABLE purchase_item ADD COLUMN barcode TEXT;
+ALTER TABLE purchase_item ADD COLUMN collected BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE purchase_item ADD COLUMN created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now();
+
+--##28 Product inventory fields
+ALTER TABLE product ADD COLUMN stocked BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE product ADD COLUMN target_quantity INT NOT NULL DEFAULT 0;
+CREATE INDEX idx_product_barcode ON product(barcode);
+
+--##29 Inventory checks
+CREATE TYPE tp_inventory_check_state AS ENUM ('draft', 'completed');
+CREATE TABLE inventory_check (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  state tp_inventory_check_state NOT NULL DEFAULT 'draft',
+  started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  completed_at TIMESTAMP WITH TIME ZONE,
+  started_by_account_id BIGINT REFERENCES account(id) ON DELETE SET NULL,
+  completed_by_account_id BIGINT REFERENCES account(id) ON DELETE SET NULL,
+  generated_purchase_id BIGINT REFERENCES purchase(id) ON DELETE SET NULL,
+  note TEXT NOT NULL DEFAULT ''
+);
+
+--##30 Inventory check items
+CREATE TABLE inventory_check_item (
+  check_id BIGINT NOT NULL REFERENCES inventory_check(id) ON DELETE CASCADE,
+  product_id BIGINT NOT NULL REFERENCES product(id) ON DELETE CASCADE,
+  target_quantity INT NOT NULL,
+  counted_quantity INT,
+  PRIMARY KEY (check_id, product_id)
+);
+
+--##31 Shopping list
+CREATE TABLE shopping_list_item (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name TEXT NOT NULL,
+  quantity INT NOT NULL DEFAULT 1,
+  note TEXT NOT NULL DEFAULT '',
+  product_id BIGINT REFERENCES product(id) ON DELETE SET NULL,
+  created_by_account_id BIGINT REFERENCES account(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  done_at TIMESTAMP WITH TIME ZONE,
+  done_by_account_id BIGINT REFERENCES account(id) ON DELETE SET NULL,
+  purchase_id BIGINT REFERENCES purchase(id) ON DELETE SET NULL
+);
+CREATE INDEX idx_shopping_list_item_open ON shopping_list_item(created_at) WHERE done_at IS NULL;

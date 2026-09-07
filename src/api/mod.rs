@@ -8,12 +8,14 @@ mod account_auth_methods;
 mod account_status;
 mod accounts;
 mod auth;
+mod inventory;
 mod nfc_id;
 mod nfc_mifare;
 mod products;
 mod purchases;
 mod register;
 mod report;
+mod shopping_list;
 mod transactions;
 
 pub mod wallet_routes;
@@ -28,6 +30,8 @@ pub fn init(app_state: AppState) -> ApiRouter {
         .merge(register::router(app_state.clone()))
         .merge(transactions::router(app_state.clone()))
         .merge(purchases::router(app_state.clone()))
+        .merge(inventory::router(app_state.clone()))
+        .merge(shopping_list::router(app_state.clone()))
         .merge(report::router(app_state))
 }
 
