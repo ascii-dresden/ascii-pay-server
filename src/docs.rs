@@ -57,6 +57,21 @@ pub fn api_docs(api: TransformOpenApi) -> TransformOpenApi {
             description: Some("Product purchase management".into()),
             ..Default::default()
         })
+        .tag(Tag {
+            name: "inventory".into(),
+            description: Some("Inventory and inventory check management".into()),
+            ..Default::default()
+        })
+        .tag(Tag {
+            name: "shopping-list".into(),
+            description: Some("Shared shopping list (Einkaufsliste)".into()),
+            ..Default::default()
+        })
+        .tag(Tag {
+            name: "reports".into(),
+            description: Some("Reports".into()),
+            ..Default::default()
+        })
         .security_scheme(
             "SessionToken",
             aide::openapi::SecurityScheme::Http {

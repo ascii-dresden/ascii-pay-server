@@ -1,7 +1,7 @@
 #![allow(unused)]
 use std::{collections::HashMap, fmt::Debug, time::Instant};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone, Copy)]
 pub enum CoinType {
@@ -165,6 +165,8 @@ pub struct Product {
     pub print_lists: Vec<String>,
     pub tags: Vec<String>,
     pub status_prices: Vec<ProductStatusPrice>,
+    pub stocked: bool,
+    pub target_quantity: i32,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -265,12 +267,22 @@ pub struct AppleWalletRegistration {
     pub push_token: String,
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum PurchaseState {
+    Draft,
+    Finalized,
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Purchase {
     pub id: u64,
+    pub name: String,
     pub store: String,
     pub timestamp: DateTime<Utc>,
+    pub state: PurchaseState,
     pub purchased_by_account_id: Option<u64>,
+    pub finalized_at: Option<DateTime<Utc>>,
+    pub finalized_by_account_id: Option<u64>,
     pub items: Vec<PurchaseItem>,
 }
 
@@ -281,5 +293,88 @@ pub struct PurchaseItem {
     pub container_size: i32,
     pub container_count: i32,
     pub container_cents: i32,
+    pub best_before: Option<NaiveDate>,
+    pub barcode: Option<String>,
+    pub collected: bool,
     pub product: Option<Product>,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum InventoryCheckState {
+    Draft,
+    Completed,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct InventoryCheck {
+    pub id: u64,
+    pub state: InventoryCheckState,
+    pub started_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub started_by_account_id: Option<u64>,
+    pub completed_by_account_id: Option<u64>,
+    pub generated_purchase_id: Option<u64>,
+    pub note: String,
+    pub item_count: u64,
+    pub counted_count: u64,
+    /// Only populated when a single check is loaded, empty for list queries.
+    pub items: Vec<InventoryCheckItem>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct InventoryCheckItem {
+    pub product: Product,
+    pub target_quantity: i32,
+    pub counted_quantity: Option<i32>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct InventoryLastPurchase {
+    pub purchase_id: u64,
+    pub timestamp: DateTime<Utc>,
+    pub container_size: i32,
+    pub container_cents: i32,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct InventoryRow {
+    pub product: Product,
+    pub target_quantity: i32,
+    pub last_counted_quantity: Option<i32>,
+    pub last_counted_at: Option<DateTime<Utc>>,
+    pub estimated_quantity: Option<i64>,
+    pub last_purchase: Option<InventoryLastPurchase>,
+}
+
+/// Parameters for completing an inventory check.
+#[derive(Debug, PartialEq, Clone)]
+pub struct InventoryCheckCompletion {
+    pub completed_by_account_id: Option<u64>,
+    pub generate_purchase: bool,
+    pub purchase_store: String,
+    pub purchase_name: String,
+}
+
+/// Filter for shopping list queries.
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum ShoppingListState {
+    Open,
+    Done,
+    All,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ShoppingListItem {
+    pub id: u64,
+    pub name: String,
+    pub quantity: i32,
+    pub note: String,
+    pub product: Option<Product>,
+    pub created_by_account_id: Option<u64>,
+    /// Display name of the creating account (resolved on read, ignored on write).
+    pub created_by_name: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub done_at: Option<DateTime<Utc>>,
+    pub done_by_account_id: Option<u64>,
+    pub purchase_id: Option<u64>,
 }

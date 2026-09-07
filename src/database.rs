@@ -25,7 +25,10 @@ const MINIMUM_PAYMENT_CENTS: i32 = 0;
 const MINIMUM_PAYMENT_BOTTLE_STAMPS: i32 = 0;
 const MINIMUM_PAYMENT_COFFEE_STAMPS: i32 = 0;
 
+mod inventory;
 mod migration;
+mod purchases;
+mod shopping_list;
 #[cfg(test)]
 mod tests;
 
@@ -68,6 +71,56 @@ impl From<Role> for AccountRoleDto {
             Role::Member => AccountRoleDto::Member,
             Role::Purchaser => AccountRoleDto::Purchaser,
             Role::Admin => AccountRoleDto::Admin,
+        }
+    }
+}
+
+#[derive(sqlx::Type, Debug, Clone, Copy, PartialEq)]
+#[sqlx(type_name = "tp_purchase_state", rename_all = "lowercase")]
+enum PurchaseStateDto {
+    Draft,
+    Finalized,
+}
+
+impl From<PurchaseStateDto> for models::PurchaseState {
+    fn from(value: PurchaseStateDto) -> Self {
+        match value {
+            PurchaseStateDto::Draft => models::PurchaseState::Draft,
+            PurchaseStateDto::Finalized => models::PurchaseState::Finalized,
+        }
+    }
+}
+
+impl From<models::PurchaseState> for PurchaseStateDto {
+    fn from(value: models::PurchaseState) -> Self {
+        match value {
+            models::PurchaseState::Draft => PurchaseStateDto::Draft,
+            models::PurchaseState::Finalized => PurchaseStateDto::Finalized,
+        }
+    }
+}
+
+#[derive(sqlx::Type, Debug, Clone, Copy, PartialEq)]
+#[sqlx(type_name = "tp_inventory_check_state", rename_all = "lowercase")]
+enum InventoryCheckStateDto {
+    Draft,
+    Completed,
+}
+
+impl From<InventoryCheckStateDto> for models::InventoryCheckState {
+    fn from(value: InventoryCheckStateDto) -> Self {
+        match value {
+            InventoryCheckStateDto::Draft => models::InventoryCheckState::Draft,
+            InventoryCheckStateDto::Completed => models::InventoryCheckState::Completed,
+        }
+    }
+}
+
+impl From<models::InventoryCheckState> for InventoryCheckStateDto {
+    fn from(value: models::InventoryCheckState) -> Self {
+        match value {
+            models::InventoryCheckState::Draft => InventoryCheckStateDto::Draft,
+            models::InventoryCheckState::Completed => InventoryCheckStateDto::Completed,
         }
     }
 }
@@ -428,6 +481,47 @@ impl From<ProductImageRow> for Option<Image> {
     }
 }
 
+/// Column list that maps into `ProductRow`.
+///
+/// Expects the product table to be aliased as `p` and the joins from `PRODUCT_STATUS_JOINS`
+/// to be present. Queries using it must `GROUP BY p.id` (plus any other non-product columns).
+const PRODUCT_COLUMNS: &str = r#"
+    p.id as id,
+    p.name as name,
+    p.price_cents as price_cents,
+    p.price_coffee_stamps as price_coffee_stamps,
+    p.price_bottle_stamps as price_bottle_stamps,
+    p.bonus_cents as bonus_cents,
+    p.bonus_coffee_stamps as bonus_coffee_stamps,
+    p.bonus_bottle_stamps as bonus_bottle_stamps,
+    p.nickname as nickname,
+    p.purchase_tax as purchase_tax,
+    NULL as image,
+    NULL as image_mimetype,
+    p.barcode as barcode,
+    p.category as category,
+    p.print_lists as print_lists,
+    p.tags as tags,
+    p.stocked as stocked,
+    p.target_quantity as target_quantity,
+    coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
+    coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
+    coalesce(array_agg(account_status.color) FILTER (where account_status.color IS NOT NULL), '{}') as status_color,
+    coalesce(array_agg(account_status.priority) FILTER (where account_status.priority IS NOT NULL), '{}') as status_priority,
+    coalesce(array_agg(product_status_price.price_cents) FILTER (where product_status_price.price_cents IS NOT NULL), '{}') as status_price_cents,
+    coalesce(array_agg(product_status_price.price_bottle_stamps) FILTER (where product_status_price.price_bottle_stamps IS NOT NULL), '{}') as status_price_bottle_stamps,
+    coalesce(array_agg(product_status_price.price_coffee_stamps) FILTER (where product_status_price.price_coffee_stamps IS NOT NULL), '{}') as status_price_coffee_stamps,
+    coalesce(array_agg(product_status_price.bonus_cents) FILTER (where product_status_price.bonus_cents IS NOT NULL), '{}') as status_bonus_cents,
+    coalesce(array_agg(product_status_price.bonus_bottle_stamps) FILTER (where product_status_price.bonus_bottle_stamps IS NOT NULL), '{}') as status_bonus_bottle_stamps,
+    coalesce(array_agg(product_status_price.bonus_coffee_stamps) FILTER (where product_status_price.bonus_coffee_stamps IS NOT NULL), '{}') as status_bonus_coffee_stamps
+"#;
+
+/// Joins required by `PRODUCT_COLUMNS` (product table aliased as `p`).
+const PRODUCT_STATUS_JOINS: &str = r#"
+    LEFT OUTER JOIN product_status_price ON p.id = product_status_price.product_id
+    LEFT OUTER JOIN account_status on product_status_price.status_id = account_status.id
+"#;
+
 #[derive(sqlx::FromRow)]
 struct ProductRow {
     id: i64,
@@ -456,6 +550,8 @@ struct ProductRow {
     status_bonus_cents: Vec<i32>,
     status_bonus_coffee_stamps: Vec<i32>,
     status_bonus_bottle_stamps: Vec<i32>,
+    stocked: bool,
+    target_quantity: i32,
 }
 
 impl From<ProductRow> for Product {
@@ -518,6 +614,8 @@ impl From<ProductRow> for Product {
             print_lists: value.print_lists,
             tags: value.tags,
             status_prices: status_price,
+            stocked: value.stocked,
+            target_quantity: value.target_quantity,
         }
     }
 }
@@ -622,41 +720,6 @@ impl From<models::RegisterHistoryState> for RegisterHistoryRowDataState {
             note5: value.note5,
         }
     }
-}
-
-#[derive(sqlx::FromRow)]
-struct PurchaseRow {
-    #[sqlx(try_from = "i64")]
-    id: u64,
-    purchased_by_account_id: Option<i64>,
-    store: String,
-    timestamp: DateTime<Utc>,
-}
-
-impl From<PurchaseRow> for models::Purchase {
-    fn from(value: PurchaseRow) -> Self {
-        models::Purchase {
-            id: value.id,
-            timestamp: value.timestamp,
-            store: value.store,
-            purchased_by_account_id: value
-                .purchased_by_account_id
-                .map(|id| id.try_into().expect("IDs are non-negative")),
-            items: Vec::new(),
-        }
-    }
-}
-
-#[derive(sqlx::FromRow)]
-struct PurchaseItemRow {
-    #[sqlx(try_from = "i64")]
-    purchase_item_id: u64,
-    #[sqlx(try_from = "i64")]
-    purchase_item_purchase_id: u64,
-    purchase_item_name: String,
-    purchase_item_container_size: i32,
-    purchase_item_container_count: i32,
-    purchase_item_container_cents: i32,
 }
 
 impl DatabaseConnection {
@@ -1079,7 +1142,7 @@ impl DatabaseConnection {
                 p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
                 p.nickname, p.purchase_tax,
                 NULL AS image, NULL AS image_mimetype,
-                p.barcode, p.category, p.print_lists, p.tags,
+                p.barcode, p.category, p.print_lists, p.tags, p.stocked, p.target_quantity,
                 coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                 coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
                 coalesce(array_agg(account_status.color) FILTER (where account_status.color IS NOT NULL), '{}') as status_color,
@@ -1116,7 +1179,7 @@ impl DatabaseConnection {
                 p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
                 p.nickname, p.purchase_tax,
                 NULL AS image, NULL AS image_mimetype,
-                p.barcode, p.category, p.print_lists, p.tags,
+                p.barcode, p.category, p.print_lists, p.tags, p.stocked, p.target_quantity,
                 coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                 coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
                 coalesce(array_agg(account_status.color) FILTER (where account_status.color IS NOT NULL), '{}') as status_color,
@@ -1162,7 +1225,9 @@ impl DatabaseConnection {
                 barcode,
                 category,
                 print_lists,
-                tags
+                tags,
+                stocked,
+                target_quantity
             ) VALUES (
                 $1,
                 $2,
@@ -1176,7 +1241,9 @@ impl DatabaseConnection {
                 $10,
                 $11,
                 $12,
-                $13
+                $13,
+                $14,
+                $15
             ) RETURNING id
             "#,
             )
@@ -1199,7 +1266,9 @@ impl DatabaseConnection {
                     barcode = $11,
                     category = $12,
                     print_lists = $13,
-                    tags = $14
+                    tags = $14,
+                    stocked = $15,
+                    target_quantity = $16
                 WHERE id = $1
                 RETURNING id
             "#,
@@ -1220,6 +1289,8 @@ impl DatabaseConnection {
             .bind(&product.category)
             .bind(&product.print_lists)
             .bind(&product.tags)
+            .bind(product.stocked)
+            .bind(product.target_quantity)
             .fetch_one(self.connection.as_mut())
             .await;
         let r = to_service_result(r)?;
@@ -1304,6 +1375,56 @@ impl DatabaseConnection {
         Ok(())
     }
 
+    /// Finds the product with the given barcode (exact match, lowest id wins).
+    pub async fn get_product_by_barcode(
+        &mut self,
+        barcode: &str,
+    ) -> ServiceResult<Option<models::Product>> {
+        let r = sqlx::query_as::<_, ProductRow>(&format!(
+            r#"
+            SELECT {PRODUCT_COLUMNS}
+            FROM product p
+                {PRODUCT_STATUS_JOINS}
+            WHERE p.barcode = $1
+            GROUP BY p.id
+            ORDER BY p.id ASC
+            LIMIT 1
+            "#
+        ))
+        .bind(barcode)
+        .fetch_optional(self.connection.as_mut())
+        .await;
+
+        Ok(to_service_result(r)?.map(Product::from))
+    }
+
+    /// Bulk-updates the inventory fields of products in one transaction.
+    ///
+    /// Fails with `NotFound` (and applies nothing) if any product id is unknown.
+    pub async fn update_products_inventory(
+        &mut self,
+        updates: &[(u64, bool, i32)],
+    ) -> ServiceResult<()> {
+        let mut tx = self.connection.begin().await?;
+
+        for (product_id, stocked, target_quantity) in updates {
+            let r = sqlx::query(
+                r#"UPDATE product SET stocked = $2, target_quantity = $3 WHERE id = $1"#,
+            )
+            .bind(i64::try_from(*product_id).expect("id is always less than 2**63"))
+            .bind(stocked)
+            .bind(target_quantity)
+            .execute(tx.as_mut())
+            .await;
+            if to_service_result(r)?.rows_affected() != 1 {
+                return Err(ServiceError::NotFound);
+            }
+        }
+
+        to_service_result(tx.commit().await)?;
+        Ok(())
+    }
+
     pub async fn get_product_image(&mut self, id: u64) -> ServiceResult<Option<models::Image>> {
         let id = i64::try_from(id).expect("id is always less than 2**63");
         let r = sqlx::query_as::<_, ProductImageRow>(
@@ -1377,6 +1498,8 @@ impl DatabaseConnection {
                     p.category as category,
                     p.print_lists as print_lists,
                     p.tags as tags,
+                    p.stocked as stocked,
+                    p.target_quantity as target_quantity,
                     coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                     coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
                     coalesce(array_agg(account_status.color) FILTER (where account_status.color IS NOT NULL), '{}') as status_color,
@@ -1443,6 +1566,8 @@ impl DatabaseConnection {
                     p.category as category,
                     p.print_lists as print_lists,
                     p.tags as tags,
+                    p.stocked as stocked,
+                    p.target_quantity as target_quantity,
                     coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                     coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
                     coalesce(array_agg(account_status.color) FILTER (where account_status.color IS NOT NULL), '{}') as status_color,
@@ -1512,6 +1637,8 @@ impl DatabaseConnection {
                 p.category as category,
                 p.print_lists as print_lists,
                 p.tags as tags,
+                p.stocked as stocked,
+                p.target_quantity as target_quantity,
                 coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                 coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
                 coalesce(array_agg(account_status.color) FILTER (where account_status.color IS NOT NULL), '{}') as status_color,
@@ -1725,6 +1852,8 @@ impl DatabaseConnection {
                 p.category as category,
                 p.print_lists as print_lists,
                 p.tags as tags,
+                p.stocked as stocked,
+                p.target_quantity as target_quantity,
                 coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
                 coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
                 coalesce(array_agg(account_status.color) FILTER (where account_status.color IS NOT NULL), '{}') as status_color,
@@ -1746,7 +1875,8 @@ impl DatabaseConnection {
                     p.id, p.name,
                     p.price_cents, p.price_coffee_stamps, p.price_bottle_stamps,
                     p.bonus_cents, p.bonus_coffee_stamps, p.bonus_bottle_stamps,
-                    p.nickname, p.purchase_tax, p.barcode, p.category, p.print_lists, p.tags
+                    p.nickname, p.purchase_tax, p.barcode, p.category, p.print_lists, p.tags, p.stocked, p.target_quantity
+            ORDER BY inserted.transaction_item_id ASC
             "#,
         )
         .bind(timestamp)
@@ -2120,292 +2250,6 @@ impl DatabaseConnection {
             .bind(account_id)
             .bind(pass_type_id)
             .bind(device_id)
-            .execute(self.connection.as_mut())
-            .await;
-        let r = to_service_result(r)?;
-        if r.rows_affected() != 1 {
-            return Err(ServiceError::NotFound);
-        }
-        Ok(())
-    }
-
-    async fn load_purchase_items(
-        &mut self,
-        purchases: &mut [models::Purchase],
-    ) -> ServiceResult<()> {
-        let purchase_ids: Vec<i64> = purchases
-            .iter()
-            .map(|p| i64::try_from(p.id).expect("id is always less than 2**63"))
-            .collect();
-
-        let mut r = sqlx::query(
-            r#"
-                SELECT
-                    item.id as purchase_item_id,
-                    item.purchase_id as purchase_item_purchase_id,
-                    item.name as purchase_item_name,
-                    item.container_size as purchase_item_container_size,
-                    item.container_count as purchase_item_container_count,
-                    item.container_cents as purchase_item_container_cents,
-                    p.id as id,
-                    p.name as name,
-                    p.price_cents as price_cents,
-                    p.price_coffee_stamps as price_coffee_stamps,
-                    p.price_bottle_stamps as price_bottle_stamps,
-                    p.bonus_cents as bonus_cents,
-                    p.bonus_coffee_stamps as bonus_coffee_stamps,
-                    p.bonus_bottle_stamps as bonus_bottle_stamps,
-                    p.nickname as nickname,
-                    p.purchase_tax as purchase_tax,
-                    NULL as image,
-                    NULL as image_mimetype,
-                    p.barcode as barcode,
-                    p.category as category,
-                    p.print_lists as print_lists,
-                    p.tags as tags,
-                    coalesce(array_agg(account_status.id) FILTER (where account_status.id IS NOT NULL), '{}') as status_id,
-                    coalesce(array_agg(account_status.name) FILTER (where account_status.name IS NOT NULL), '{}') as status_name,
-                    coalesce(array_agg(account_status.color) FILTER (where account_status.color IS NOT NULL), '{}') as status_color,
-                    coalesce(array_agg(account_status.priority) FILTER (where account_status.priority IS NOT NULL), '{}') as status_priority,
-                    coalesce(array_agg(product_status_price.price_cents) FILTER (where product_status_price.price_cents IS NOT NULL), '{}') as status_price_cents,
-                    coalesce(array_agg(product_status_price.price_bottle_stamps) FILTER (where product_status_price.price_bottle_stamps IS NOT NULL), '{}') as status_price_bottle_stamps,
-                    coalesce(array_agg(product_status_price.price_coffee_stamps) FILTER (where product_status_price.price_coffee_stamps IS NOT NULL), '{}') as status_price_coffee_stamps,
-                    coalesce(array_agg(product_status_price.bonus_cents) FILTER (where product_status_price.bonus_cents IS NOT NULL), '{}') as status_bonus_cents,
-                    coalesce(array_agg(product_status_price.bonus_bottle_stamps) FILTER (where product_status_price.bonus_bottle_stamps IS NOT NULL), '{}') as status_bonus_bottle_stamps,
-                    coalesce(array_agg(product_status_price.bonus_coffee_stamps) FILTER (where product_status_price.bonus_coffee_stamps IS NOT NULL), '{}') as status_bonus_coffee_stamps
-                FROM
-                    purchase_item item
-                        LEFT OUTER JOIN product p ON item.product_id = p.id
-                        LEFT OUTER JOIN product_status_price ON p.id = product_status_price.product_id
-                        LEFT OUTER JOIN account_status on product_status_price.status_id = account_status.id
-                WHERE
-                    item.purchase_id = ANY($1::BIGINT[])
-                GROUP BY item.id, p.id
-            "#,
-        )
-        .bind(purchase_ids)
-        .fetch(self.connection.as_mut());
-
-        while let Some(row) = r.next().await {
-            let row = to_service_result(row)?;
-            let purchase_item_row = to_service_result(PurchaseItemRow::from_row(&row))?;
-            let mut purchase_item = models::PurchaseItem {
-                id: purchase_item_row.purchase_item_id,
-                name: purchase_item_row.purchase_item_name,
-                container_cents: purchase_item_row.purchase_item_container_cents,
-                container_count: purchase_item_row.purchase_item_container_count,
-                container_size: purchase_item_row.purchase_item_container_size,
-                product: None,
-            };
-
-            let product_id: Option<i64> = row.get("id");
-            if product_id.is_some() {
-                purchase_item.product = Some(to_service_result(ProductRow::from_row(&row))?.into());
-            }
-
-            let purchase = purchases
-                .iter_mut()
-                .find(|p| p.id == purchase_item_row.purchase_item_purchase_id);
-
-            if let Some(purchase) = purchase {
-                purchase.items.push(purchase_item);
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn get_purchases(&mut self) -> ServiceResult<Vec<models::Purchase>> {
-        let accounts = self.get_all_accounts().await?;
-
-        let mut r = sqlx::query_as::<_, PurchaseRow>(
-            r#"
-                SELECT
-                    id, purchased_by_account_id, store, timestamp
-                FROM purchase
-            "#,
-        )
-        .fetch(self.connection.as_mut());
-
-        let mut out = Vec::new();
-        while let Some(row) = r.next().await {
-            let row = to_service_result(row)?;
-            out.push(row.into());
-        }
-
-        drop(r);
-
-        self.load_purchase_items(&mut out).await?;
-
-        Ok(out)
-    }
-
-    pub async fn get_purchase_by_id(&mut self, id: u64) -> ServiceResult<Option<models::Purchase>> {
-        let accounts = self.get_all_accounts().await?;
-
-        let r = sqlx::query_as::<_, PurchaseRow>(
-            r#"
-                SELECT id, purchased_by_account_id, store, timestamp
-                FROM purchase
-                WHERE id = $1
-            "#,
-        )
-        .bind(i64::try_from(id).expect("purchase id is less than 2**63"))
-        .fetch_optional(self.connection.as_mut())
-        .await;
-
-        let r = to_service_result(r)?;
-
-        let out = if let Some(row) = r {
-            let purchase_row: models::Purchase = row.into();
-            let mut purchases = vec![purchase_row];
-            self.load_purchase_items(&mut purchases).await?;
-            purchases.pop()
-        } else {
-            None
-        };
-
-        Ok(out)
-    }
-
-    pub async fn get_purchases_by_product_id(
-        &mut self,
-        product_id: u64,
-    ) -> ServiceResult<Option<Vec<models::Purchase>>> {
-        if self.get_product_by_id(product_id).await?.is_none() {
-            return Ok(None);
-        }
-
-        let accounts = self.get_all_accounts().await?;
-
-        let mut r = sqlx::query_as::<_, PurchaseRow>(
-            r#"
-                SELECT purchase.id, purchased_by_account_id, store, timestamp
-                FROM purchase LEFT JOIN purchase_item
-                ON purchase.id = purchase_item.purchase_id
-                WHERE purchase_item.product_id = $1
-                GROUP BY purchase.id, purchased_by_account_id, store, timestamp
-            "#,
-        )
-        .bind(i64::try_from(product_id).expect("purchase id is less than 2**63"))
-        .fetch(self.connection.as_mut());
-
-        let mut out = Vec::new();
-        while let Some(row) = r.next().await {
-            let row = to_service_result(row)?;
-            out.push(row.into());
-        }
-
-        drop(r);
-
-        self.load_purchase_items(&mut out).await?;
-
-        Ok(Some(out))
-    }
-
-    pub async fn store_purchase(
-        &mut self,
-        mut purchase: models::Purchase,
-    ) -> ServiceResult<models::Purchase> {
-        let q = if purchase.id == 0 {
-            sqlx::query(
-                r#"
-            INSERT INTO purchase (
-                purchased_by_account_id,
-                store,
-                timestamp
-            ) VALUES (
-                $1,
-                $2,
-                $3
-            ) RETURNING id
-            "#,
-            )
-        } else {
-            sqlx::query(
-                r#"
-                WITH
-                    delete AS (DELETE FROM purchase_item WHERE purchase_id = $1)
-                UPDATE purchase
-                SET
-                    purchased_by_account_id = $2,
-                    store = $3,
-                    timestamp = $4
-                WHERE id = $1
-                RETURNING id
-            "#,
-            )
-            .bind(i64::try_from(purchase.id).expect("product id is less than 2**63"))
-        };
-        let r = q
-            .bind(
-                purchase
-                    .purchased_by_account_id
-                    .map(|id| i64::try_from(id).expect("id less than 2**63")),
-            )
-            .bind(purchase.store.as_str())
-            .bind(purchase.timestamp)
-            .fetch_one(self.connection.as_mut())
-            .await;
-        let r = to_service_result(r)?;
-
-        let purchase_id = r.get::<i64, _>(0);
-        purchase.id = purchase_id.try_into().expect("id is always positive");
-
-        let r = sqlx::query(
-            r#"
-            INSERT INTO purchase_item (purchase_id, name, container_size, container_count, container_cents, product_id)
-            SELECT $1, name, container_size, container_count, container_cents, product_id
-            FROM UNNEST($2, $3, $4, $5, $6) AS input (name, container_size, container_count, container_cents, product_id)
-        "#,
-        )
-        .bind(purchase_id)
-        .bind(
-            purchase
-                .items
-                .iter()
-                .map(|p| p.name.as_str())
-                .collect::<Vec<_>>(),
-        )
-        .bind(
-            purchase
-                .items
-                .iter()
-                .map(|p| p.container_size)
-                .collect::<Vec<_>>(),
-        )
-        .bind(
-            purchase
-                .items
-                .iter()
-                .map(|p| p.container_count)
-                .collect::<Vec<_>>(),
-        )
-        .bind(
-            purchase
-                .items
-                .iter()
-                .map(|p| p.container_cents)
-                .collect::<Vec<_>>(),
-        )
-        .bind(
-            purchase
-                .items
-                .iter()
-                .map(|p| p.product.as_ref().map(|p| i64::try_from(p.id).expect("id less than 2**63")))
-                .collect::<Vec<_>>(),
-        )
-        .execute(self.connection.as_mut())
-        .await;
-        to_service_result(r)?;
-
-        Ok(purchase)
-    }
-
-    pub async fn delete_purchase(&mut self, id: u64) -> ServiceResult<()> {
-        let id = i64::try_from(id).expect("id is always less than 2**63");
-        let r = sqlx::query(r#"DELETE FROM purchase WHERE id = $1"#)
-            .bind(id)
             .execute(self.connection.as_mut())
             .await;
         let r = to_service_result(r)?;

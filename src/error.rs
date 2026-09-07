@@ -14,6 +14,8 @@ pub enum ServiceError {
     Forbidden,
     PaymentError(Vec<String>),
     BalanceNotZero,
+    Conflict(&'static str),
+    BadRequest(String),
 }
 
 impl std::fmt::Display for ServiceError {
@@ -71,7 +73,7 @@ impl From<reqwest::Error> for ServiceError {
 
 impl From<chrono::ParseError> for ServiceError {
     fn from(error: chrono::ParseError) -> Self {
-        ServiceError::InternalServerError(error.to_string())
+        ServiceError::BadRequest(error.to_string())
     }
 }
 
@@ -128,6 +130,20 @@ impl IntoResponse for ServiceError {
                 StatusCode::CONFLICT,
                 Json(json!({
                     "error": "BalanceNotZero",
+                })),
+            ),
+            ServiceError::Conflict(cause) => (
+                StatusCode::CONFLICT,
+                Json(json!({
+                    "error": "Conflict",
+                    "cause": cause,
+                })),
+            ),
+            ServiceError::BadRequest(ref cause) => (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "BadRequest",
+                    "cause": cause,
                 })),
             ),
         }
