@@ -1,1508 +1,1891 @@
 {
-	"info": {
-		"_postman_id": "fc2636af-43c8-47f4-a357-c4ecd77e9b65",
-		"name": "ascii-pay-tests",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "18706744"
-	},
-	"item": [
-		{
-			"name": "Setup",
-			"item": [
-				{
-					"name": "Create init admin account",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"const jsonResponse = pm.response.json();",
-									"pm.globals.set(\"admin_account_id\", jsonResponse.id);",
-									"",
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Admin account\",\n    \"email\": \"admin@example.com\",\n    \"username\": \"admin\",\n    \"password\": \"password\"\n}\n",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/create-admin-account",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"create-admin-account"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Create second admin account should fail",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(404);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Admin2 account\",\n    \"email\": \"admin2@example.com\",\n    \"username\": \"admin2\",\n    \"password\": \"password2\"\n}\n",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/create-admin-account",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"create-admin-account"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "Account management",
-			"item": [
-				{
-					"name": "Login admin account",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"const jsonResponse = pm.response.json();",
-									"pm.globals.set(\"auth_token\", jsonResponse.token);",
-									"",
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password\"\n}\n",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/auth/password",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"auth",
-								"password"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Create member account",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"const jsonResponse = pm.response.json();",
-									"pm.globals.set(\"member_account_id\", jsonResponse.id);",
-									"",
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Member account\",\n    \"email\": \"\",\n    \"role\": \"Member\",\n    \"enable_monthly_mail_report\": false,\n    \"enable_automatic_stamp_usage\": false\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/accounts",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"accounts"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Update member account",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "PUT",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Member account\",\n    \"email\": \"member@example.com\",\n    \"role\": \"Member\",\n    \"enable_monthly_mail_report\": true,\n    \"enable_automatic_stamp_usage\": false\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/account/{{member_account_id}}",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"account",
-								"{{member_account_id}}"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Create password reset token for member account",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"const jsonResponse = pm.response.json();",
-									"pm.globals.set(\"password_reset_token\", jsonResponse.token);",
-									"",
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/account/{{member_account_id}}/password-reset-token",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"account",
-								"{{member_account_id}}",
-								"password-reset-token"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "List accounts",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/accounts",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"accounts"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Logout",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.globals.unset(\"auth_token\");",
-									"",
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(204);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/auth",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"auth"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Set password for member account with reset token",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{password_reset_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"username\": \"member1\",\n    \"password\": \"password2\"\n}\n",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/account-password-reset",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"account-password-reset"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Set second password for member account with reset token should fail",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.globals.unset(\"password_reset_token\");",
-									"",
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(401);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{password_reset_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"username\": \"member3\",\n    \"password\": \"password2\"\n}\n",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/account-password-reset",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"account-password-reset"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Login member account",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"const jsonResponse = pm.response.json();",
-									"pm.globals.set(\"auth_token\", jsonResponse.token);",
-									"",
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"username\": \"member1\",\n    \"password\": \"password2\"\n}\n",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/auth/password",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"auth",
-								"password"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get self",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/auth/account",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"auth",
-								"account"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Update member password login",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "PUT",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"username\": \"member2\",\n    \"password\": \"password2\"\n}\n",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/account/{{member_account_id}}/password-authentication",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"account",
-								"{{member_account_id}}",
-								"password-authentication"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get self",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/auth/account",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"auth",
-								"account"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Delete member account",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.globals.unset(\"member_account_id\");",
-									"",
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(204);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/account/{{member_account_id}}",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"account",
-								"{{member_account_id}}"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get self",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(401);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/auth/account",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"auth",
-								"account"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "Product management",
-			"item": [
-				{
-					"name": "Login admin account",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"const jsonResponse = pm.response.json();",
-									"pm.globals.set(\"auth_token\", jsonResponse.token);",
-									"",
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password\"\n}\n",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/auth/password",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"auth",
-								"password"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Create product",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"const jsonResponse = pm.response.json();",
-									"pm.globals.set(\"product_id\", jsonResponse.id);",
-									"",
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Cofe\",\n    \"price\": {\n        \"Cent\": 140,\n        \"CoffeeStamp\": 10\n    },\n    \"bonus\": {\n        \"CoffeeStamp\": 1\n    },\n    \"nickname\": \"C\", \"purchase_tax\": 19, \n    \"category\": \"Hot\",\n    \"print_lists\": [],\n    \"tags\": [\"Vegan\"],\n    \"status_prices\": []\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/products",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"products"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Update product",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "PUT",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Coffee\",\n    \"price\": {\n        \"Cent\": 150,\n        \"CoffeeStamp\": 10\n    },\n    \"bonus\": {\n        \"CoffeeStamp\": 1\n    },\n    \"nickname\": \"C\",\"purchase_tax\": 19,\n    \"category\": \"Hot\",\n    \"print_lists\": [],\n    \"tags\": [\"Bio\", \"Vegan\"],\n    \"status_prices\": []\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/product/{{product_id}}",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"product",
-								"{{product_id}}"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "List products",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/products",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"products"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get image should fail",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(404);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/product/{{product_id}}/image",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"product",
-								"{{product_id}}",
-								"image"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Set image",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(204);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "PUT",
-						"header": [],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{
-									"key": "image",
-									"type": "file",
-									"src": "logo.svg"
-								}
-							]
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/product/{{product_id}}/image",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"product",
-								"{{product_id}}",
-								"image"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get image",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/product/{{product_id}}/image",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"product",
-								"{{product_id}}",
-								"image"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Unset image",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(204);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/product/{{product_id}}/image",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"product",
-								"{{product_id}}",
-								"image"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get image should fail",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(404);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/product/{{product_id}}/image",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"product",
-								"{{product_id}}",
-								"image"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Delete product",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(204);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/product/{{product_id}}",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"product",
-								"{{product_id}}"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get product should fail",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.globals.unset(\"member_account_id\");",
-									"",
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(404);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/product/{{product_id}}",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"product",
-								"{{product_id}}"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Logout",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.globals.unset(\"auth_token\");",
-									"",
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(204);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/auth",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"auth"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "Transactions",
-			"item": [
-				{
-					"name": "Login admin account",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"const jsonResponse = pm.response.json();",
-									"pm.globals.set(\"auth_token\", jsonResponse.token);",
-									"",
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password\"\n}\n",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/auth/password",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"auth",
-								"password"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "List transactions",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/account/{{admin_account_id}}/transactions",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"account",
-								"{{admin_account_id}}",
-								"transactions"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Payment",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"items\": [\n        {\n            \"effective_price\": {\n                \"Cent\": 150\n            }\n        },\n        {\n            \"effective_price\": {\n                \"Cent\": 100,\n                \"CoffeeStamp\": -1\n            }\n        },\n        {\n            \"effective_price\": {\n                \"BottleStamp\": -2\n            }\n        },\n        {\n            \"effective_price\": {\n                \"Cent\": -2000\n            }\n        }\n    ]\n}\n",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/account/{{admin_account_id}}/payment",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"account",
-								"{{admin_account_id}}",
-								"payment"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "List transactions",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/account/{{admin_account_id}}/transactions",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"account",
-								"{{admin_account_id}}",
-								"transactions"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get self",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/auth/account",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"auth",
-								"account"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Logout",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.globals.unset(\"auth_token\");",
-									"",
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(204);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/auth",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"auth"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "Teardown",
-			"item": [
-				{
-					"name": "Login admin account",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"const jsonResponse = pm.response.json();",
-									"pm.globals.set(\"auth_token\", jsonResponse.token);",
-									"",
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password\"\n}\n",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/auth/password",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"auth",
-								"password"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Reset Payment",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"items\": [\n       {\n            \"effective_price\": {\n                \"Cent\": 1750,\n                \"CoffeeStamp\": 1,\n                \"BottleStamp\": 2\n            }\n        }\n    ]\n}\n",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/account/{{admin_account_id}}/payment",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"account",
-								"{{admin_account_id}}",
-								"payment"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Delete admin account",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.globals.unset(\"admin_account_id\");",
-									"",
-									"pm.test(\"Status test\", function () {",
-									"    pm.response.to.have.status(204);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/api/v1/account/{{admin_account_id}}",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"v1",
-								"account",
-								"{{admin_account_id}}"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		}
-	],
-	"auth": {
-		"type": "bearer",
-		"bearer": [
-			{
-				"key": "token",
-				"value": "{{auth_token}}",
-				"type": "string"
-			}
-		]
-	},
-	"event": [
-		{
-			"listen": "prerequest",
-			"script": {
-				"type": "text/javascript",
-				"exec": [
-					""
-				]
-			}
-		},
-		{
-			"listen": "test",
-			"script": {
-				"type": "text/javascript",
-				"exec": [
-					""
-				]
-			}
-		}
-	],
-	"variable": [
-		{
-			"key": "base_url",
-			"value": "http://localhost:3000",
-			"type": "string"
-		}
-	]
+ "info": {
+  "_postman_id": "fc2636af-43c8-47f4-a357-c4ecd77e9b65",
+  "name": "ascii-pay-tests",
+  "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+  "_exporter_id": "18706744"
+ },
+ "item": [
+  {
+   "name": "Setup",
+   "item": [
+    {
+     "name": "Create init admin account",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "const jsonResponse = pm.response.json();",
+         "pm.globals.set(\"admin_account_id\", jsonResponse.id);",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"name\": \"Admin account\",\n    \"email\": \"admin@example.com\",\n    \"username\": \"admin\",\n    \"password\": \"password\"\n}\n",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/create-admin-account",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "create-admin-account"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Create second admin account should fail",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"name\": \"Admin2 account\",\n    \"email\": \"admin2@example.com\",\n    \"username\": \"admin2\",\n    \"password\": \"password2\"\n}\n",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/create-admin-account",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "create-admin-account"
+       ]
+      }
+     },
+     "response": []
+    }
+   ]
+  },
+  {
+   "name": "Account management",
+   "item": [
+    {
+     "name": "Login admin account",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "const jsonResponse = pm.response.json();",
+         "pm.globals.set(\"auth_token\", jsonResponse.token);",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password\"\n}\n",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/auth/password",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "auth",
+        "password"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Create member account",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "const jsonResponse = pm.response.json();",
+         "pm.globals.set(\"member_account_id\", jsonResponse.id);",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"name\": \"Member account\",\n    \"email\": \"\",\n    \"role\": \"Member\",\n    \"enable_monthly_mail_report\": false,\n    \"enable_automatic_stamp_usage\": false\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/accounts",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "accounts"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Update member account",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "PUT",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"name\": \"Member account\",\n    \"email\": \"member@example.com\",\n    \"role\": \"Member\",\n    \"enable_monthly_mail_report\": true,\n    \"enable_automatic_stamp_usage\": false\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/account/{{member_account_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "account",
+        "{{member_account_id}}"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Create password reset token for member account",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "const jsonResponse = pm.response.json();",
+         "pm.globals.set(\"password_reset_token\", jsonResponse.token);",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/account/{{member_account_id}}/password-reset-token",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "account",
+        "{{member_account_id}}",
+        "password-reset-token"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "List accounts",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/accounts",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "accounts"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Logout",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.globals.unset(\"auth_token\");",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(204);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/auth",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "auth"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Set password for member account with reset token",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "auth": {
+       "type": "bearer",
+       "bearer": [
+        {
+         "key": "token",
+         "value": "{{password_reset_token}}",
+         "type": "string"
+        }
+       ]
+      },
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"username\": \"member1\",\n    \"password\": \"password2\"\n}\n",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/account-password-reset",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "account-password-reset"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Set second password for member account with reset token should fail",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.globals.unset(\"password_reset_token\");",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(401);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "auth": {
+       "type": "bearer",
+       "bearer": [
+        {
+         "key": "token",
+         "value": "{{password_reset_token}}",
+         "type": "string"
+        }
+       ]
+      },
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"username\": \"member3\",\n    \"password\": \"password2\"\n}\n",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/account-password-reset",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "account-password-reset"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Login member account",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "const jsonResponse = pm.response.json();",
+         "pm.globals.set(\"auth_token\", jsonResponse.token);",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"username\": \"member1\",\n    \"password\": \"password2\"\n}\n",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/auth/password",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "auth",
+        "password"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Get self",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/auth/account",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "auth",
+        "account"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Update member password login",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "PUT",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"username\": \"member2\",\n    \"password\": \"password2\"\n}\n",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/account/{{member_account_id}}/password-authentication",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "account",
+        "{{member_account_id}}",
+        "password-authentication"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Get self",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/auth/account",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "auth",
+        "account"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Delete member account",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.globals.unset(\"member_account_id\");",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(204);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/account/{{member_account_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "account",
+        "{{member_account_id}}"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Get self",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(401);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/auth/account",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "auth",
+        "account"
+       ]
+      }
+     },
+     "response": []
+    }
+   ]
+  },
+  {
+   "name": "Product management",
+   "item": [
+    {
+     "name": "Login admin account",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "const jsonResponse = pm.response.json();",
+         "pm.globals.set(\"auth_token\", jsonResponse.token);",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password\"\n}\n",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/auth/password",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "auth",
+        "password"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Create product",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "const jsonResponse = pm.response.json();",
+         "pm.globals.set(\"product_id\", jsonResponse.id);",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"Barcode stored\", function () {",
+         "    pm.expect(jsonResponse.barcodes.length).to.eql(1);",
+         "    pm.expect(jsonResponse.barcodes[0].code).to.eql(\"4260000000001\");",
+         "    pm.expect(jsonResponse.barcodes[0].container_size).to.eql(1);",
+         "    pm.expect(jsonResponse.barcode).to.eql(\"4260000000001\");",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"name\": \"Cofe\",\n    \"price\": {\n        \"Cent\": 140,\n        \"CoffeeStamp\": 10\n    },\n    \"bonus\": {\n        \"CoffeeStamp\": 1\n    },\n    \"nickname\": \"C\",\n    \"purchase_tax\": 19,\n    \"category\": \"Hot\",\n    \"print_lists\": [],\n    \"tags\": [\n        \"Vegan\"\n    ],\n    \"status_prices\": [],\n    \"barcodes\": [\n        {\n            \"code\": \"4260000000001\",\n            \"container_size\": 1,\n            \"label\": \"Einzelflasche\"\n        }\n    ]\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/products",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "products"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Update product",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"Update without barcodes keeps them\", function () {",
+         "    const jsonResponse = pm.response.json();",
+         "    pm.expect(jsonResponse.barcodes.length).to.eql(1);",
+         "    pm.expect(jsonResponse.barcodes[0].code).to.eql(\"4260000000001\");",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "PUT",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"name\": \"Coffee\",\n    \"price\": {\n        \"Cent\": 150,\n        \"CoffeeStamp\": 10\n    },\n    \"bonus\": {\n        \"CoffeeStamp\": 1\n    },\n    \"nickname\": \"C\",\"purchase_tax\": 19,\n    \"category\": \"Hot\",\n    \"print_lists\": [],\n    \"tags\": [\"Bio\", \"Vegan\"],\n    \"status_prices\": []\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/product/{{product_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "product",
+        "{{product_id}}"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Add product barcode",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "const jsonResponse = pm.response.json();",
+         "pm.globals.set(\"barcode_id\", jsonResponse.id);",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(201);",
+         "});",
+         "",
+         "pm.test(\"Trimmed and sized\", function () {",
+         "    pm.expect(jsonResponse.code).to.eql(\"4260000000002\");",
+         "    pm.expect(jsonResponse.container_size).to.eql(20);",
+         "    pm.expect(jsonResponse.label).to.eql(\"Kasten 20x0,5l\");",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/product/{{product_id}}/barcodes",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "product",
+        "{{product_id}}",
+        "barcodes"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"code\": \" 4260000000002 \",\n    \"container_size\": 20,\n    \"label\": \"Kasten 20x0,5l\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Add duplicate product barcode should fail",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(409);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/product/{{product_id}}/barcodes",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "product",
+        "{{product_id}}",
+        "barcodes"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"code\": \"4260000000002\",\n    \"container_size\": 20\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Get product by barcode",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "const jsonResponse = pm.response.json();",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"Both variants of one product\", function () {",
+         "    pm.expect(jsonResponse.id).to.eql(pm.globals.get(\"product_id\"));",
+         "    pm.expect(jsonResponse.barcodes.length).to.eql(2);",
+         "    pm.expect(jsonResponse.barcodes[1].container_size).to.eql(20);",
+         "    pm.expect(jsonResponse.barcode).to.eql(\"4260000000001\");",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/products/by-barcode/4260000000002",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "products",
+        "by-barcode",
+        "4260000000002"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Get product by unknown barcode should fail",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/products/by-barcode/0000000000000",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "products",
+        "by-barcode",
+        "0000000000000"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Get barcode conflicts",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "const jsonResponse = pm.response.json();",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"Reports the owning product\", function () {",
+         "    pm.expect(jsonResponse.length).to.eql(1);",
+         "    pm.expect(jsonResponse[0].product_id).to.eql(pm.globals.get(\"product_id\"));",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/products/by-barcode/4260000000002/conflicts",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "products",
+        "by-barcode",
+        "4260000000002",
+        "conflicts"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Replace product barcodes",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "const jsonResponse = pm.response.json();",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"List replaced and normalized\", function () {",
+         "    pm.expect(jsonResponse.barcodes.length).to.eql(1);",
+         "    pm.expect(jsonResponse.barcodes[0].code).to.eql(\"4260000000002\");",
+         "    pm.expect(jsonResponse.barcodes[0].container_size).to.eql(24);",
+         "});",
+         "",
+         "pm.globals.set(\"barcode_id\", jsonResponse.barcodes[0].id);"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "PUT",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/product/{{product_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "product",
+        "{{product_id}}"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"name\": \"Coffee\",\n    \"price\": {\n        \"Cent\": 150,\n        \"CoffeeStamp\": 10\n    },\n    \"bonus\": {\n        \"CoffeeStamp\": 1\n    },\n    \"nickname\": \"C\",\n    \"purchase_tax\": 19,\n    \"category\": \"Hot\",\n    \"print_lists\": [],\n    \"tags\": [\n        \"Bio\",\n        \"Vegan\"\n    ],\n    \"status_prices\": [],\n    \"barcodes\": [\n        {\n            \"code\": \"4260000000002\",\n            \"container_size\": 24,\n            \"label\": \"Kasten\"\n        },\n        {\n            \"code\": \"4260000000002\",\n            \"container_size\": 9,\n            \"label\": \"duplicate\"\n        },\n        {\n            \"code\": \"   \",\n            \"container_size\": 1,\n            \"label\": \"empty\"\n        }\n    ]\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Delete product barcode",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(204);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/product/{{product_id}}/barcode/{{barcode_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "product",
+        "{{product_id}}",
+        "barcode",
+        "{{barcode_id}}"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Delete product barcode should fail",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/product/{{product_id}}/barcode/{{barcode_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "product",
+        "{{product_id}}",
+        "barcode",
+        "{{barcode_id}}"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Get product by deleted barcode should fail",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/products/by-barcode/4260000000002",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "products",
+        "by-barcode",
+        "4260000000002"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "List products",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/products",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "products"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Get image should fail",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/product/{{product_id}}/image",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "product",
+        "{{product_id}}",
+        "image"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Set image",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(204);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "PUT",
+      "header": [],
+      "body": {
+       "mode": "formdata",
+       "formdata": [
+        {
+         "key": "image",
+         "type": "file",
+         "src": "logo.svg"
+        }
+       ]
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/product/{{product_id}}/image",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "product",
+        "{{product_id}}",
+        "image"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Get image",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/product/{{product_id}}/image",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "product",
+        "{{product_id}}",
+        "image"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Unset image",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(204);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/product/{{product_id}}/image",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "product",
+        "{{product_id}}",
+        "image"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Get image should fail",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/product/{{product_id}}/image",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "product",
+        "{{product_id}}",
+        "image"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Delete product",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(204);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/product/{{product_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "product",
+        "{{product_id}}"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Get product should fail",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.globals.unset(\"member_account_id\");",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/product/{{product_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "product",
+        "{{product_id}}"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Logout",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.globals.unset(\"auth_token\");",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(204);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/auth",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "auth"
+       ]
+      }
+     },
+     "response": []
+    }
+   ]
+  },
+  {
+   "name": "Transactions",
+   "item": [
+    {
+     "name": "Login admin account",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "const jsonResponse = pm.response.json();",
+         "pm.globals.set(\"auth_token\", jsonResponse.token);",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password\"\n}\n",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/auth/password",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "auth",
+        "password"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "List transactions",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/account/{{admin_account_id}}/transactions",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "account",
+        "{{admin_account_id}}",
+        "transactions"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Payment",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"items\": [\n        {\n            \"effective_price\": {\n                \"Cent\": 150\n            }\n        },\n        {\n            \"effective_price\": {\n                \"Cent\": 100,\n                \"CoffeeStamp\": -1\n            }\n        },\n        {\n            \"effective_price\": {\n                \"BottleStamp\": -2\n            }\n        },\n        {\n            \"effective_price\": {\n                \"Cent\": -2000\n            }\n        }\n    ]\n}\n",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/account/{{admin_account_id}}/payment",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "account",
+        "{{admin_account_id}}",
+        "payment"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "List transactions",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/account/{{admin_account_id}}/transactions",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "account",
+        "{{admin_account_id}}",
+        "transactions"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Get self",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/auth/account",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "auth",
+        "account"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Logout",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.globals.unset(\"auth_token\");",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(204);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/auth",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "auth"
+       ]
+      }
+     },
+     "response": []
+    }
+   ]
+  },
+  {
+   "name": "Teardown",
+   "item": [
+    {
+     "name": "Login admin account",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "const jsonResponse = pm.response.json();",
+         "pm.globals.set(\"auth_token\", jsonResponse.token);",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password\"\n}\n",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/auth/password",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "auth",
+        "password"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Reset Payment",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"items\": [\n       {\n            \"effective_price\": {\n                \"Cent\": 1750,\n                \"CoffeeStamp\": 1,\n                \"BottleStamp\": 2\n            }\n        }\n    ]\n}\n",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{base_url}}/api/v1/account/{{admin_account_id}}/payment",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "account",
+        "{{admin_account_id}}",
+        "payment"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "Delete admin account",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "exec": [
+         "pm.globals.unset(\"admin_account_id\");",
+         "",
+         "pm.test(\"Status test\", function () {",
+         "    pm.response.to.have.status(204);",
+         "});"
+        ],
+        "type": "text/javascript"
+       }
+      }
+     ],
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/api/v1/account/{{admin_account_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "api",
+        "v1",
+        "account",
+        "{{admin_account_id}}"
+       ]
+      }
+     },
+     "response": []
+    }
+   ]
+  }
+ ],
+ "auth": {
+  "type": "bearer",
+  "bearer": [
+   {
+    "key": "token",
+    "value": "{{auth_token}}",
+    "type": "string"
+   }
+  ]
+ },
+ "event": [
+  {
+   "listen": "prerequest",
+   "script": {
+    "type": "text/javascript",
+    "exec": [
+     ""
+    ]
+   }
+  },
+  {
+   "listen": "test",
+   "script": {
+    "type": "text/javascript",
+    "exec": [
+     ""
+    ]
+   }
+  }
+ ],
+ "variable": [
+  {
+   "key": "base_url",
+   "value": "http://localhost:3000",
+   "type": "string"
+  }
+ ]
 }

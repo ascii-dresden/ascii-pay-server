@@ -336,3 +336,22 @@ CREATE TABLE shopping_list_item (
   purchase_id BIGINT REFERENCES purchase(id) ON DELETE SET NULL
 );
 CREATE INDEX idx_shopping_list_item_open ON shopping_list_item(created_at) WHERE done_at IS NULL;
+
+--##32 Multiple barcodes per product
+CREATE TABLE product_barcode (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  product_id BIGINT NOT NULL REFERENCES product(id) ON DELETE CASCADE,
+  code TEXT NOT NULL,
+  container_size INT NOT NULL DEFAULT 1,
+  label TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_product_barcode_code ON product_barcode(code);
+CREATE INDEX idx_product_barcode_product ON product_barcode(product_id);
+
+INSERT INTO product_barcode (product_id, code, container_size)
+  SELECT id, btrim(barcode), 1 FROM product
+  WHERE barcode IS NOT NULL AND btrim(barcode) <> '';
+
+DROP INDEX idx_product_barcode;
+ALTER TABLE product DROP COLUMN barcode;

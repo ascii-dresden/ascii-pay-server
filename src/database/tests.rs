@@ -7,7 +7,7 @@ use crate::{
     error::ServiceError,
     models::{
         Account, AuthMethod, AuthMethodType, AuthNfc, AuthPassword, CardType, CoinAmount, CoinType,
-        Image, Payment, PaymentItem, Product, Role, TransactionItem,
+        Image, Payment, PaymentItem, Product, ProductBarcode, Role, TransactionItem,
     },
 };
 
@@ -173,7 +173,7 @@ pub fn test_product_crud(pool: PgPool) {
         id: 0,
         price: CoinAmount([(CoinType::Cent, 150)].into_iter().collect()),
         bonus: CoinAmount(HashMap::new()),
-        barcode: Some("barcode".to_string()),
+        barcodes: vec![test_barcode("barcode")],
         category: "category".to_string(),
         name: "Product 1".to_string(),
         nickname: Some("nick's test".to_string()),
@@ -194,7 +194,7 @@ pub fn test_product_crud(pool: PgPool) {
                 .collect(),
         ),
         bonus: CoinAmount([(CoinType::BottleStamp, 1)].into_iter().collect()),
-        barcode: Some("123891".to_string()),
+        barcodes: vec![test_barcode("123891")],
         category: "kaltgetränk".to_string(),
         nickname: None,
         name: "testMate".to_string(),
@@ -216,7 +216,7 @@ pub fn test_product_crud(pool: PgPool) {
                 .collect(),
         ),
         bonus: CoinAmount([(CoinType::CoffeeStamp, 1)].into_iter().collect()),
-        barcode: None,
+        barcodes: Vec::new(),
         category: "heißgetränk".to_string(),
         nickname: None,
         purchase_tax: 19,
@@ -236,6 +236,12 @@ pub fn test_product_crud(pool: PgPool) {
     let mut product1_clone = product1.clone();
     let product1 = db.store_product(product1).await.unwrap();
     product1_clone.id = product1.id;
+    // stored barcodes come back with their own ids
+    assert_eq!(product1.barcodes.len(), 1);
+    assert_eq!(product1.barcodes[0].code, "barcode");
+    assert_eq!(product1.barcodes[0].container_size, 1);
+    assert!(product1.barcodes[0].id != 0);
+    product1_clone.barcodes = product1.barcodes.clone();
     assert_eq!(product1_clone, product1);
     assert!(product1.id != 0);
 
@@ -350,7 +356,7 @@ pub fn test_transaction(pool: PgPool) {
             id: 0,
             price: CoinAmount([(CoinType::Cent, 150)].into_iter().collect()),
             bonus: CoinAmount(HashMap::new()),
-            barcode: Some("barcode".to_string()),
+            barcodes: vec![test_barcode("barcode")],
             category: "category".to_string(),
             name: "Product 1".to_string(),
             nickname: Some("nick's test".to_string()),
@@ -377,7 +383,7 @@ pub fn test_transaction(pool: PgPool) {
                     .collect(),
             ),
             bonus: CoinAmount([(CoinType::BottleStamp, 1)].into_iter().collect()),
-            barcode: Some("123891".to_string()),
+            barcodes: vec![test_barcode("123891")],
             category: "kaltgetränk".to_string(),
             nickname: None,
             name: "testMate".to_string(),
@@ -521,6 +527,7 @@ pub fn test_transaction(pool: PgPool) {
 
 use crate::models::{
     InventoryCheckCompletion, InventoryCheckState, Purchase, PurchaseItem, PurchaseState,
+    ShoppingListItem, ShoppingListState,
 };
 use chrono::NaiveDate;
 
@@ -535,6 +542,16 @@ fn test_account(name: &str, role: Role) -> Account {
         enable_monthly_mail_report: false,
         enable_automatic_stamp_usage: true,
         status: None,
+    }
+}
+
+/// A barcode for a single unit, as the migration creates it for existing products.
+fn test_barcode(code: &str) -> ProductBarcode {
+    ProductBarcode {
+        id: 0,
+        code: code.to_string(),
+        container_size: 1,
+        label: String::new(),
     }
 }
 
@@ -553,7 +570,7 @@ fn test_product(
         purchase_tax: 19,
         nickname: None,
         image: None,
-        barcode: barcode.map(str::to_string),
+        barcodes: barcode.map(test_barcode).into_iter().collect(),
         category: category.to_string(),
         print_lists: vec![],
         tags: vec![],
@@ -884,6 +901,371 @@ async fn test_product_barcode_and_inventory_update(pool: PgPool) {
 }
 
 #[sqlx::test]
+async fn test_product_multiple_barcodes(pool: PgPool) {
+    let app_state = AppState::from_pool(pool).await;
+    let mut db = DatabaseConnection {
+        connection: app_state.pool.acquire().await.unwrap(),
+    };
+
+    // one article, two purchasing variants: the single bottle and the crate of 20
+    let mut mate = test_product("Mate", "Drinks", None, true, 40);
+    mate.barcodes = vec![
+        ProductBarcode {
+            id: 0,
+            code: "4001".to_string(),
+            container_size: 1,
+            label: "Einzelflasche".to_string(),
+        },
+        ProductBarcode {
+            id: 0,
+            code: "4002".to_string(),
+            container_size: 20,
+            label: "Kasten 20x0,5l".to_string(),
+        },
+    ];
+    let mate = db.store_product(mate).await.unwrap();
+
+    assert_eq!(mate.barcodes.len(), 2);
+    assert_eq!(
+        mate.primary_barcode().map(|b| b.code.as_str()),
+        Some("4001")
+    );
+    assert_eq!(mate.barcodes[1].container_size, 20);
+    assert_eq!(mate.barcodes[1].label, "Kasten 20x0,5l");
+    assert!(mate.barcodes.iter().all(|b| b.id != 0));
+
+    // both codes resolve to the same product, and reading it back keeps the order
+    let loaded = db.get_product_by_id(mate.id).await.unwrap().unwrap();
+    assert_eq!(loaded, mate);
+    assert_eq!(
+        db.get_product_by_barcode("4001").await.unwrap(),
+        Some(mate.clone())
+    );
+    assert_eq!(
+        db.get_product_by_barcode("4002").await.unwrap(),
+        Some(mate.clone())
+    );
+    assert_eq!(db.get_product_by_barcode("4003").await.unwrap(), None);
+    // the list endpoint carries them too
+    let all = db.get_all_products().await.unwrap();
+    assert_eq!(all.len(), 1);
+    assert_eq!(all[0].barcodes.len(), 2);
+
+    // storing normalizes: whitespace trimmed, empty dropped, duplicates collapsed, size >= 1
+    let mut messy = loaded.clone();
+    messy.barcodes = vec![
+        ProductBarcode {
+            id: 0,
+            code: "  4002  ".to_string(),
+            container_size: 0,
+            label: "  Kasten  ".to_string(),
+        },
+        ProductBarcode {
+            id: 0,
+            code: "4002".to_string(),
+            container_size: 20,
+            label: "duplicate".to_string(),
+        },
+        ProductBarcode {
+            id: 0,
+            code: "   ".to_string(),
+            container_size: 5,
+            label: String::new(),
+        },
+    ];
+    let messy = db.store_product(messy).await.unwrap();
+    assert_eq!(messy.barcodes.len(), 1);
+    assert_eq!(messy.barcodes[0].code, "4002");
+    assert_eq!(messy.barcodes[0].container_size, 1);
+    assert_eq!(messy.barcodes[0].label, "Kasten");
+    // the replaced code is gone
+    assert_eq!(db.get_product_by_barcode("4001").await.unwrap(), None);
+
+    // add a single code without rewriting the product
+    let added = db
+        .add_product_barcode(mate.id, "  4001 ", 6, " Sixpack ")
+        .await
+        .unwrap();
+    assert_eq!(added.code, "4001");
+    assert_eq!(added.container_size, 6);
+    assert_eq!(added.label, "Sixpack");
+    assert_eq!(
+        db.add_product_barcode(mate.id, "4001", 6, "").await,
+        Err(ServiceError::Conflict(
+            "the product already has this barcode"
+        ))
+    );
+    assert_eq!(
+        db.add_product_barcode(424242, "9999", 1, "").await,
+        Err(ServiceError::NotFound)
+    );
+    assert!(db.add_product_barcode(mate.id, "   ", 1, "").await.is_err());
+    let loaded = db.get_product_by_id(mate.id).await.unwrap().unwrap();
+    assert_eq!(
+        loaded
+            .barcodes
+            .iter()
+            .map(|b| b.code.as_str())
+            .collect::<Vec<_>>(),
+        vec!["4002", "4001"]
+    );
+
+    // a second product may use the same code; the lookup takes the lower product id
+    let mut other = test_product("Mate crate", "Drinks", None, false, 0);
+    other.barcodes = vec![test_barcode("4002")];
+    let other = db.store_product(other).await.unwrap();
+    assert_eq!(
+        db.get_product_by_barcode("4002")
+            .await
+            .unwrap()
+            .map(|p| p.id),
+        Some(mate.id)
+    );
+    let conflicts = db.get_products_with_barcode("4002").await.unwrap();
+    assert_eq!(
+        conflicts,
+        vec![
+            (mate.id, "Mate".to_string()),
+            (other.id, "Mate crate".to_string())
+        ]
+    );
+    assert_eq!(db.get_products_with_barcode("4001").await.unwrap().len(), 1);
+
+    // deleting a single code, and only from its own product
+    assert_eq!(
+        db.delete_product_barcode(other.id, added.id).await,
+        Err(ServiceError::NotFound)
+    );
+    db.delete_product_barcode(mate.id, added.id).await.unwrap();
+    assert_eq!(
+        db.delete_product_barcode(mate.id, added.id).await,
+        Err(ServiceError::NotFound)
+    );
+    let loaded = db.get_product_by_id(mate.id).await.unwrap().unwrap();
+    assert_eq!(loaded.barcodes.len(), 1);
+
+    // barcodes disappear with their product
+    db.delete_product(mate.id).await.unwrap();
+    assert_eq!(db.get_products_with_barcode("4002").await.unwrap().len(), 1);
+}
+
+#[sqlx::test]
+async fn test_completed_check_fills_the_shopping_list(pool: PgPool) {
+    let app_state = AppState::from_pool(pool).await;
+    let mut db = DatabaseConnection {
+        connection: app_state.pool.acquire().await.unwrap(),
+    };
+
+    let admin = db
+        .store_account(test_account("Admin", Role::Admin))
+        .await
+        .unwrap();
+    // bought by the crate of 20: 35 missing units are 2 crates
+    let mut mate = test_product("Mate", "Drinks", None, true, 40);
+    mate.barcodes = vec![ProductBarcode {
+        id: 0,
+        code: "4002".to_string(),
+        container_size: 20,
+        label: "Kasten".to_string(),
+    }];
+    let mate = db.store_product(mate).await.unwrap();
+    let chips = db
+        .store_product(test_product("Chips", "Snacks", None, true, 8))
+        .await
+        .unwrap();
+    let cola = db
+        .store_product(test_product("Cola", "Drinks", None, true, 5))
+        .await
+        .unwrap();
+    let water = db
+        .store_product(test_product("Water", "Drinks", None, true, 6))
+        .await
+        .unwrap();
+
+    // Water already sits on the list, added by hand: the check must not duplicate it
+    db.create_shopping_list_item(ShoppingListItem {
+        id: 0,
+        name: "Water".to_string(),
+        quantity: 1,
+        note: "by hand".to_string(),
+        product: Some(water.clone()),
+        created_by_account_id: Some(admin.id),
+        created_by_name: None,
+        created_at: Utc::now(),
+        done_at: None,
+        done_by_account_id: None,
+        purchase_id: None,
+    })
+    .await
+    .unwrap();
+
+    let check = db.create_inventory_check("", Some(admin.id)).await.unwrap();
+    db.set_inventory_check_item_count(check.id, mate.id, Some(5))
+        .await
+        .unwrap();
+    db.set_inventory_check_item_count(check.id, cola.id, Some(9))
+        .await
+        .unwrap();
+    db.set_inventory_check_item_count(check.id, water.id, Some(0))
+        .await
+        .unwrap();
+    // Chips stay uncounted
+
+    let result = db
+        .complete_inventory_check(
+            check.id,
+            InventoryCheckCompletion {
+                completed_by_account_id: Some(admin.id),
+                add_to_shopping_list: true,
+                shopping_list_note: "Inventur 2026-09-09".to_string(),
+                generate_purchase: false,
+                purchase_store: String::new(),
+                purchase_name: String::new(),
+            },
+        )
+        .await
+        .unwrap();
+
+    // counting the stock does not start a shopping trip
+    assert_eq!(result.purchase, None);
+    assert_eq!(result.check.generated_purchase_id, None);
+
+    // only Mate is added: Cola is above target, Chips uncounted, Water already on the list
+    assert_eq!(result.shopping_list_items.len(), 1);
+    let entry = &result.shopping_list_items[0];
+    assert_eq!(entry.name, "Mate");
+    assert_eq!(entry.product.as_ref().map(|p| p.id), Some(mate.id));
+    // 35 units missing, bought by the crate of 20 => 2 crates
+    assert_eq!(entry.quantity, 2);
+    assert_eq!(entry.note, "Inventur 2026-09-09: 5/40");
+    assert_eq!(entry.created_by_account_id, Some(admin.id));
+    assert_eq!(entry.done_at, None);
+
+    let open = db
+        .get_shopping_list_items(ShoppingListState::Open)
+        .await
+        .unwrap();
+    assert_eq!(
+        open.iter().map(|i| i.name.as_str()).collect::<Vec<_>>(),
+        vec!["Water", "Mate"]
+    );
+    // the hand-written entry is untouched
+    let water_entry = open.iter().find(|i| i.name == "Water").unwrap();
+    assert_eq!(water_entry.note, "by hand");
+    assert_eq!(water_entry.quantity, 1);
+
+    // a second check does not pile up a duplicate while the entry is still open
+    let check2 = db.create_inventory_check("", Some(admin.id)).await.unwrap();
+    db.set_inventory_check_item_count(check2.id, mate.id, Some(1))
+        .await
+        .unwrap();
+    let result2 = db
+        .complete_inventory_check(
+            check2.id,
+            InventoryCheckCompletion {
+                completed_by_account_id: Some(admin.id),
+                add_to_shopping_list: true,
+                shopping_list_note: "Inventur".to_string(),
+                generate_purchase: false,
+                purchase_store: String::new(),
+                purchase_name: String::new(),
+            },
+        )
+        .await
+        .unwrap();
+    assert!(result2.shopping_list_items.is_empty());
+
+    // once it has been bought, the next check puts it back on the list
+    db.mark_shopping_list_item_done(entry.id, Some(admin.id), None)
+        .await
+        .unwrap();
+    let check3 = db.create_inventory_check("", Some(admin.id)).await.unwrap();
+    db.set_inventory_check_item_count(check3.id, mate.id, Some(0))
+        .await
+        .unwrap();
+    let result3 = db
+        .complete_inventory_check(
+            check3.id,
+            InventoryCheckCompletion {
+                completed_by_account_id: Some(admin.id),
+                add_to_shopping_list: true,
+                shopping_list_note: "Inventur".to_string(),
+                generate_purchase: false,
+                purchase_store: String::new(),
+                purchase_name: String::new(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(result3.shopping_list_items.len(), 1);
+    // 40 missing at 20 per crate
+    assert_eq!(result3.shopping_list_items[0].quantity, 2);
+}
+
+#[sqlx::test]
+async fn test_generated_purchase_uses_primary_barcode_size(pool: PgPool) {
+    let app_state = AppState::from_pool(pool).await;
+    let mut db = DatabaseConnection {
+        connection: app_state.pool.acquire().await.unwrap(),
+    };
+
+    // no purchase history at all, but the product is bought by the crate
+    let mut mate = test_product("Mate", "Drinks", None, true, 40);
+    mate.barcodes = vec![ProductBarcode {
+        id: 0,
+        code: "4002".to_string(),
+        container_size: 20,
+        label: "Kasten".to_string(),
+    }];
+    let mate = db.store_product(mate).await.unwrap();
+    let chips = db
+        .store_product(test_product("Chips", "Snacks", None, true, 8))
+        .await
+        .unwrap();
+
+    let check = db.create_inventory_check("", None).await.unwrap();
+    db.set_inventory_check_item_count(check.id, mate.id, Some(5))
+        .await
+        .unwrap();
+    db.set_inventory_check_item_count(check.id, chips.id, Some(0))
+        .await
+        .unwrap();
+
+    let completion_result = db
+        .complete_inventory_check(
+            check.id,
+            InventoryCheckCompletion {
+                add_to_shopping_list: false,
+                shopping_list_note: String::new(),
+                generate_purchase: true,
+                purchase_store: "Store".to_string(),
+                purchase_name: "Inventory".to_string(),
+                completed_by_account_id: None,
+            },
+        )
+        .await
+        .unwrap();
+
+    let purchase = completion_result.purchase.expect("a purchase is generated");
+    let mate_item = purchase
+        .items
+        .iter()
+        .find(|i| i.product.as_ref().map(|p| p.id) == Some(mate.id))
+        .expect("mate is below target");
+    // 35 units missing, bought by the crate of 20 => 2 crates
+    assert_eq!(mate_item.container_size, 20);
+    assert_eq!(mate_item.container_count, 2);
+    // no barcode, no history: single units
+    let chips_item = purchase
+        .items
+        .iter()
+        .find(|i| i.product.as_ref().map(|p| p.id) == Some(chips.id))
+        .expect("chips are below target");
+    assert_eq!(chips_item.container_size, 1);
+    assert_eq!(chips_item.container_count, 8);
+}
+
+#[sqlx::test]
 async fn test_inventory_check_lifecycle(pool: PgPool) {
     let app_state = AppState::from_pool(pool).await;
     let mut db = DatabaseConnection {
@@ -990,11 +1372,13 @@ async fn test_inventory_check_lifecycle(pool: PgPool) {
 
     // complete with generation: Mate is 7 short -> ceil(7/6) = 2 containers at 899 cents;
     // Cola is not below target; Chips is uncounted and therefore skipped.
-    let (completed, purchase) = db
+    let completion_result = db
         .complete_inventory_check(
             check.id,
             InventoryCheckCompletion {
                 completed_by_account_id: Some(admin.id),
+                add_to_shopping_list: false,
+                shopping_list_note: String::new(),
                 generate_purchase: true,
                 purchase_store: "Metro".to_string(),
                 purchase_name: "Inventory 2026-09-07".to_string(),
@@ -1002,10 +1386,13 @@ async fn test_inventory_check_lifecycle(pool: PgPool) {
         )
         .await
         .unwrap();
+    let completed = completion_result.check;
+    let purchase = completion_result
+        .purchase
+        .expect("a purchase was generated");
     assert_eq!(completed.state, InventoryCheckState::Completed);
     assert!(completed.completed_at.is_some());
     assert_eq!(completed.completed_by_account_id, Some(admin.id));
-    let purchase = purchase.expect("a purchase was generated");
     assert_eq!(completed.generated_purchase_id, Some(purchase.id));
     assert_eq!(purchase.state, PurchaseState::Draft);
     assert_eq!(purchase.name, "Inventory 2026-09-07");
@@ -1026,6 +1413,8 @@ async fn test_inventory_check_lifecycle(pool: PgPool) {
             check.id,
             InventoryCheckCompletion {
                 completed_by_account_id: None,
+                add_to_shopping_list: false,
+                shopping_list_note: String::new(),
                 generate_purchase: false,
                 purchase_store: String::new(),
                 purchase_name: String::new(),
@@ -1045,11 +1434,13 @@ async fn test_inventory_check_lifecycle(pool: PgPool) {
     db.set_inventory_check_item_count(check2.id, cola.id, Some(9))
         .await
         .unwrap();
-    let (completed2, purchase2) = db
+    let completion_result2 = db
         .complete_inventory_check(
             check2.id,
             InventoryCheckCompletion {
                 completed_by_account_id: None,
+                add_to_shopping_list: false,
+                shopping_list_note: String::new(),
                 generate_purchase: true,
                 purchase_store: String::new(),
                 purchase_name: "x".to_string(),
@@ -1057,28 +1448,34 @@ async fn test_inventory_check_lifecycle(pool: PgPool) {
         )
         .await
         .unwrap();
-    assert_eq!(purchase2, None);
-    assert_eq!(completed2.generated_purchase_id, None);
-    assert_eq!(completed2.state, InventoryCheckState::Completed);
+    assert_eq!(completion_result2.purchase, None);
+    assert_eq!(completion_result2.check.generated_purchase_id, None);
+    assert_eq!(
+        completion_result2.check.state,
+        InventoryCheckState::Completed
+    );
 
     // third check: product without purchase history -> container size 1, cents 0
     let check3 = db.create_inventory_check("", None).await.unwrap();
     db.set_inventory_check_item_count(check3.id, chips.id, Some(2))
         .await
         .unwrap();
-    let (_, purchase3) = db
+    let purchase3 = db
         .complete_inventory_check(
             check3.id,
             InventoryCheckCompletion {
                 completed_by_account_id: None,
+                add_to_shopping_list: false,
+                shopping_list_note: String::new(),
                 generate_purchase: true,
                 purchase_store: String::new(),
                 purchase_name: "y".to_string(),
             },
         )
         .await
+        .unwrap()
+        .purchase
         .unwrap();
-    let purchase3 = purchase3.unwrap();
     assert_eq!(purchase3.items.len(), 1);
     assert_eq!(purchase3.items[0].container_size, 1);
     assert_eq!(purchase3.items[0].container_count, 6);
@@ -1086,11 +1483,13 @@ async fn test_inventory_check_lifecycle(pool: PgPool) {
 
     // fourth check without generation
     let check4 = db.create_inventory_check("", None).await.unwrap();
-    let (completed4, purchase4) = db
+    let result4 = db
         .complete_inventory_check(
             check4.id,
             InventoryCheckCompletion {
                 completed_by_account_id: None,
+                add_to_shopping_list: false,
+                shopping_list_note: String::new(),
                 generate_purchase: false,
                 purchase_store: String::new(),
                 purchase_name: String::new(),
@@ -1098,8 +1497,8 @@ async fn test_inventory_check_lifecycle(pool: PgPool) {
         )
         .await
         .unwrap();
-    assert_eq!(purchase4, None);
-    assert_eq!(completed4.generated_purchase_id, None);
+    assert_eq!(result4.purchase, None);
+    assert_eq!(result4.check.generated_purchase_id, None);
 
     // listing: newest first, summaries without items
     let all = db.get_inventory_checks(None).await.unwrap();
@@ -1173,18 +1572,21 @@ async fn test_inventory_estimate(pool: PgPool) {
     db.set_inventory_check_item_count(check.id, mate.id, Some(4))
         .await
         .unwrap();
-    let (completed, _) = db
+    let completed = db
         .complete_inventory_check(
             check.id,
             InventoryCheckCompletion {
                 completed_by_account_id: None,
+                add_to_shopping_list: false,
+                shopping_list_note: String::new(),
                 generate_purchase: false,
                 purchase_store: String::new(),
                 purchase_name: String::new(),
             },
         )
         .await
-        .unwrap();
+        .unwrap()
+        .check;
 
     let row = &db.get_inventory().await.unwrap()[0];
     assert_eq!(row.last_counted_quantity, Some(4));
@@ -1251,6 +1653,8 @@ async fn test_inventory_estimate(pool: PgPool) {
         check2.id,
         InventoryCheckCompletion {
             completed_by_account_id: None,
+            add_to_shopping_list: false,
+            shopping_list_note: String::new(),
             generate_purchase: false,
             purchase_store: String::new(),
             purchase_name: String::new(),
