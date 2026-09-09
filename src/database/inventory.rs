@@ -80,7 +80,10 @@ struct GeneratedItemRow {
     product_id: i64,
     name: String,
     missing: i32,
+    counted: i32,
+    target: i32,
     last_container_size: Option<i32>,
+    primary_barcode_size: Option<i32>,
     last_container_cents: Option<i32>,
 }
 
@@ -183,6 +186,60 @@ async fn lock_draft_check(conn: &mut PgConnection, id: u64) -> ServiceResult<()>
         InventoryCheckStateDto::Draft => Ok(()),
         InventoryCheckStateDto::Completed => Err(ServiceError::Conflict(CHECK_COMPLETED)),
     }
+}
+
+/// What `complete_inventory_check` produced.
+pub struct InventoryCheckCompletionResult {
+    pub check: models::InventoryCheck,
+    pub purchase: Option<models::Purchase>,
+    pub shopping_list_items: Vec<models::ShoppingListItem>,
+}
+
+/// The counted products of a check that are below their target, with everything needed to turn
+/// them into shopping list entries or purchase items: how many units are missing, and how big a
+/// container is (last finalized purchase, else the primary barcode, else single units).
+async fn fetch_missing_products(
+    tx: &mut PgConnection,
+    check_id: u64,
+) -> ServiceResult<Vec<GeneratedItemRow>> {
+    let r = sqlx::query_as::<_, GeneratedItemRow>(
+        r#"
+        SELECT
+            ici.product_id,
+            p.name,
+            ici.counted_quantity AS counted,
+            ici.target_quantity AS target,
+            (ici.target_quantity - ici.counted_quantity) AS missing,
+            lp.container_size AS last_container_size,
+            lp.container_cents AS last_container_cents,
+            pb.container_size AS primary_barcode_size
+        FROM inventory_check_item ici
+            INNER JOIN product p ON p.id = ici.product_id
+            LEFT JOIN LATERAL (
+                SELECT b.container_size
+                FROM product_barcode b
+                WHERE b.product_id = ici.product_id
+                ORDER BY b.id ASC
+                LIMIT 1
+            ) pb ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT pi.container_size, pi.container_cents
+                FROM purchase_item pi
+                    INNER JOIN purchase pu ON pu.id = pi.purchase_id
+                WHERE pi.product_id = ici.product_id AND pu.state = 'finalized'
+                ORDER BY pu.timestamp DESC, pu.id DESC, pi.created_at DESC, pi.id DESC
+                LIMIT 1
+            ) lp ON TRUE
+        WHERE ici.check_id = $1
+            AND ici.counted_quantity IS NOT NULL
+            AND ici.target_quantity - ici.counted_quantity > 0
+        ORDER BY p.category ASC, p.name ASC, p.id ASC
+        "#,
+    )
+    .bind(to_i64(check_id))
+    .fetch_all(tx)
+    .await;
+    to_service_result(r)
 }
 
 /// Number of containers needed to cover `missing` units, rounded up.
@@ -427,49 +484,75 @@ impl DatabaseConnection {
         Ok(())
     }
 
-    /// Completes a draft check and optionally generates a draft purchase for all counted
-    /// products below their target. Returns the check and the generated purchase (if any).
+    /// Completes a draft check. Every counted product below its target is put on the shared
+    /// shopping list (unless the caller opts out) and, only if explicitly requested, into a
+    /// draft purchase as well.
+    ///
+    /// Returns the check, the generated purchase (if any) and the shopping list entries that
+    /// were created.
     ///
     /// Fails with `Conflict` if the check is already completed.
     pub async fn complete_inventory_check(
         &mut self,
         id: u64,
         completion: models::InventoryCheckCompletion,
-    ) -> ServiceResult<(models::InventoryCheck, Option<models::Purchase>)> {
+    ) -> ServiceResult<InventoryCheckCompletionResult> {
         let mut tx = self.connection.begin().await?;
 
         lock_draft_check(tx.as_mut(), id).await?;
 
+        let mut shopping_list_item_ids: Vec<u64> = Vec::new();
+        if completion.add_to_shopping_list {
+            let missing = fetch_missing_products(tx.as_mut(), id).await?;
+            for row in missing {
+                // One open entry per product is enough: a second count must not pile up
+                // duplicates, and a manually added wish already covers the article.
+                let existing = sqlx::query(
+                    r#"
+                    SELECT 1 FROM shopping_list_item
+                    WHERE product_id = $1 AND done_at IS NULL
+                    LIMIT 1
+                    "#,
+                )
+                .bind(row.product_id)
+                .fetch_optional(tx.as_mut())
+                .await;
+                if to_service_result(existing)?.is_some() {
+                    continue;
+                }
+
+                let container_size = row
+                    .last_container_size
+                    .or(row.primary_barcode_size)
+                    .unwrap_or(1)
+                    .max(1);
+                let note = format!(
+                    "{}: {}/{}",
+                    completion.shopping_list_note, row.counted, row.target
+                );
+                let r = sqlx::query(
+                    r#"
+                    INSERT INTO shopping_list_item
+                        (name, quantity, note, product_id, created_by_account_id)
+                    VALUES ($1, $2, $3, $4, $5)
+                    RETURNING id
+                    "#,
+                )
+                .bind(&row.name)
+                // Quantity is in containers, the same unit the purchaser puts in the cart.
+                .bind(containers_needed(row.missing, container_size))
+                .bind(&note)
+                .bind(row.product_id)
+                .bind(completion.completed_by_account_id.map(to_i64))
+                .fetch_one(tx.as_mut())
+                .await;
+                shopping_list_item_ids.push(to_u64(to_service_result(r)?.get::<i64, _>(0)));
+            }
+        }
+
         let mut purchase_id: Option<u64> = None;
         if completion.generate_purchase {
-            let r = sqlx::query_as::<_, GeneratedItemRow>(
-                r#"
-                SELECT
-                    ici.product_id,
-                    p.name,
-                    (ici.target_quantity - ici.counted_quantity) AS missing,
-                    lp.container_size AS last_container_size,
-                    lp.container_cents AS last_container_cents
-                FROM inventory_check_item ici
-                    INNER JOIN product p ON p.id = ici.product_id
-                    LEFT JOIN LATERAL (
-                        SELECT pi.container_size, pi.container_cents
-                        FROM purchase_item pi
-                            INNER JOIN purchase pu ON pu.id = pi.purchase_id
-                        WHERE pi.product_id = ici.product_id AND pu.state = 'finalized'
-                        ORDER BY pu.timestamp DESC, pu.id DESC, pi.created_at DESC, pi.id DESC
-                        LIMIT 1
-                    ) lp ON TRUE
-                WHERE ici.check_id = $1
-                    AND ici.counted_quantity IS NOT NULL
-                    AND ici.target_quantity - ici.counted_quantity > 0
-                ORDER BY p.category ASC, p.name ASC, p.id ASC
-                "#,
-            )
-            .bind(to_i64(id))
-            .fetch_all(tx.as_mut())
-            .await;
-            let generated = to_service_result(r)?;
+            let generated = fetch_missing_products(tx.as_mut(), id).await?;
 
             if !generated.is_empty() {
                 let purchase = models::Purchase {
@@ -486,7 +569,13 @@ impl DatabaseConnection {
                 let new_purchase_id = insert_purchase(tx.as_mut(), &purchase).await?;
 
                 for row in generated {
-                    let container_size = row.last_container_size.unwrap_or(1).max(1);
+                    // Units per container: what we paid for last, else what the product's
+                    // primary barcode stands for, else single units.
+                    let container_size = row
+                        .last_container_size
+                        .or(row.primary_barcode_size)
+                        .unwrap_or(1)
+                        .max(1);
                     let product = models::Product {
                         id: to_u64(row.product_id),
                         // Only the id is used when storing the item.
@@ -496,7 +585,7 @@ impl DatabaseConnection {
                         purchase_tax: 0,
                         nickname: None,
                         image: None,
-                        barcode: None,
+                        barcodes: Vec::new(),
                         category: String::new(),
                         print_lists: Vec::new(),
                         tags: Vec::new(),
@@ -547,6 +636,17 @@ impl DatabaseConnection {
             None => None,
         };
 
-        Ok((check, purchase))
+        let mut shopping_list_items = Vec::new();
+        for item_id in shopping_list_item_ids {
+            if let Some(item) = self.get_shopping_list_item_by_id(item_id).await? {
+                shopping_list_items.push(item);
+            }
+        }
+
+        Ok(InventoryCheckCompletionResult {
+            check,
+            purchase,
+            shopping_list_items,
+        })
     }
 }

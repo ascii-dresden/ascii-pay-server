@@ -151,6 +151,22 @@ impl CoinAmount {
     }
 }
 
+/// One barcode of a product.
+///
+/// A barcode identifies a *purchasing variant* of the article: the code printed on the single
+/// bottle and the code printed on the crate belong to the same product but stand for a different
+/// number of single units (`container_size`). Codes that are pure aliases of each other simply
+/// use `container_size = 1`.
+#[derive(Debug, PartialEq, Clone)]
+pub struct ProductBarcode {
+    pub id: u64,
+    pub code: String,
+    /// Single units this code stands for (crate of 20 => 20). Always >= 1.
+    pub container_size: i32,
+    /// Free text shown next to the code, e.g. "Kasten 20x0,5l".
+    pub label: String,
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Product {
     pub id: u64,
@@ -160,13 +176,21 @@ pub struct Product {
     pub purchase_tax: i32,
     pub nickname: Option<String>,
     pub image: Option<Image>,
-    pub barcode: Option<String>,
+    /// All barcodes of the product, oldest first. The first entry is the primary code.
+    pub barcodes: Vec<ProductBarcode>,
     pub category: String,
     pub print_lists: Vec<String>,
     pub tags: Vec<String>,
     pub status_prices: Vec<ProductStatusPrice>,
     pub stocked: bool,
     pub target_quantity: i32,
+}
+
+impl Product {
+    /// The primary barcode of the product (the oldest one), if it has any.
+    pub fn primary_barcode(&self) -> Option<&ProductBarcode> {
+        self.barcodes.first()
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -350,6 +374,15 @@ pub struct InventoryRow {
 #[derive(Debug, PartialEq, Clone)]
 pub struct InventoryCheckCompletion {
     pub completed_by_account_id: Option<u64>,
+    /// Put every product below its target on the shared shopping list. This is the normal way
+    /// a check feeds the next shopping trip: the trip itself is created when someone actually
+    /// goes shopping, which is rarely the moment the stock is counted.
+    pub add_to_shopping_list: bool,
+    /// Prefix of the note on generated shopping list entries; the counted/target numbers are
+    /// appended to it.
+    pub shopping_list_note: String,
+    /// Create a draft purchase for the missing articles right away. Off by default; only useful
+    /// when the trip starts immediately after the count.
     pub generate_purchase: bool,
     pub purchase_store: String,
     pub purchase_name: String,

@@ -15,6 +15,7 @@ use crate::request_state::RequestState;
 
 use super::products::ProductDto;
 use super::purchases::PurchaseDto;
+use super::shopping_list::ShoppingListItemDto;
 
 pub fn router(app_state: AppState) -> ApiRouter {
     ApiRouter::new()
@@ -327,9 +328,19 @@ fn delete_inventory_check_docs(op: TransformOperation) -> TransformOperation {
         .security_requirement_scopes("SessionToken", ["purchaser", "admin"])
 }
 
-#[derive(Debug, Default, PartialEq, Deserialize, JsonSchema)]
+#[derive(Debug, PartialEq, Deserialize, JsonSchema)]
 pub struct CompleteInventoryCheckDto {
-    /// Create a draft purchase for all counted products below their target.
+    /// Put every counted product below its target on the shared shopping list. Defaults to
+    /// true: counting the stock and going shopping are separate moments, and the shopping list
+    /// is what carries the result from one to the other.
+    #[serde(default = "default_true")]
+    pub add_to_shopping_list: bool,
+    /// Note prefix of the generated shopping list entries; `<counted>/<target>` is appended.
+    /// Defaults to `Inventory <YYYY-MM-DD>`.
+    #[serde(default)]
+    pub note: Option<String>,
+    /// Additionally create a draft purchase for those products. Off by default; only useful
+    /// when the shopping trip starts right after the count.
     #[serde(default)]
     pub generate_purchase: bool,
     /// Store of the generated purchase (defaults to an empty string).
@@ -340,11 +351,30 @@ pub struct CompleteInventoryCheckDto {
     pub name: Option<String>,
 }
 
+fn default_true() -> bool {
+    true
+}
+
+impl Default for CompleteInventoryCheckDto {
+    fn default() -> Self {
+        Self {
+            add_to_shopping_list: true,
+            note: None,
+            generate_purchase: false,
+            store: None,
+            name: None,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, JsonSchema)]
 pub struct CompleteInventoryCheckResultDto {
     pub check: InventoryCheckDto,
-    /// The generated draft purchase, `null` if none was requested or nothing is below target.
+    /// The generated draft purchase, `null` unless one was explicitly requested.
     pub purchase: Option<PurchaseDto>,
+    /// The shopping list entries that were created. Products that already have an open entry
+    /// are skipped, so this can be shorter than the list of articles below target.
+    pub shopping_list_items: Vec<ShoppingListItemDto>,
 }
 
 async fn complete_inventory_check(
@@ -355,24 +385,30 @@ async fn complete_inventory_check(
     let account = state.session_require_purchaser_or_admin()?;
 
     let form = form.0;
+    let default_label = format!("Inventory {}", Utc::now().format("%Y-%m-%d"));
     let completion = models::InventoryCheckCompletion {
         completed_by_account_id: Some(account.id),
+        add_to_shopping_list: form.add_to_shopping_list,
+        shopping_list_note: form.note.unwrap_or_else(|| default_label.clone()),
         generate_purchase: form.generate_purchase,
         purchase_store: form.store.unwrap_or_default(),
-        purchase_name: form
-            .name
-            .unwrap_or_else(|| format!("Inventory {}", Utc::now().format("%Y-%m-%d"))),
+        purchase_name: form.name.unwrap_or(default_label),
     };
 
-    let (check, purchase) = state.db.complete_inventory_check(id, completion).await?;
+    let result = state.db.complete_inventory_check(id, completion).await?;
     Ok(Json(CompleteInventoryCheckResultDto {
-        check: InventoryCheckDto::from(&check),
-        purchase: purchase.as_ref().map(PurchaseDto::from),
+        check: InventoryCheckDto::from(&result.check),
+        purchase: result.purchase.as_ref().map(PurchaseDto::from),
+        shopping_list_items: result
+            .shopping_list_items
+            .iter()
+            .map(ShoppingListItemDto::from)
+            .collect(),
     }))
 }
 
 fn complete_inventory_check_docs(op: TransformOperation) -> TransformOperation {
-    op.description("Complete a draft check and optionally generate a draft purchase for the products below target. Uncounted items are skipped.")
+    op.description("Complete a draft check. Every counted product below its target is put on the shared shopping list (products that already have an open entry are skipped); a draft purchase is only created when explicitly requested. Uncounted items are skipped.")
         .tag("inventory")
         .response::<200, Json<CompleteInventoryCheckResultDto>>()
         .response_with::<404, (), _>(|res| res.description("The requested check does not exist!"))
