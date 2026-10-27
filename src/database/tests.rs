@@ -174,6 +174,7 @@ pub fn test_product_crud(pool: PgPool) {
         price: CoinAmount([(CoinType::Cent, 150)].into_iter().collect()),
         bonus: CoinAmount(HashMap::new()),
         barcodes: vec![test_barcode("barcode")],
+        sub_products: vec![],
         category: "category".to_string(),
         name: "Product 1".to_string(),
         nickname: Some("nick's test".to_string()),
@@ -195,6 +196,7 @@ pub fn test_product_crud(pool: PgPool) {
         ),
         bonus: CoinAmount([(CoinType::BottleStamp, 1)].into_iter().collect()),
         barcodes: vec![test_barcode("123891")],
+        sub_products: vec![],
         category: "kaltgetränk".to_string(),
         nickname: None,
         name: "testMate".to_string(),
@@ -217,6 +219,7 @@ pub fn test_product_crud(pool: PgPool) {
         ),
         bonus: CoinAmount([(CoinType::CoffeeStamp, 1)].into_iter().collect()),
         barcodes: Vec::new(),
+        sub_products: Vec::new(),
         category: "heißgetränk".to_string(),
         nickname: None,
         purchase_tax: 19,
@@ -357,6 +360,7 @@ pub fn test_transaction(pool: PgPool) {
             price: CoinAmount([(CoinType::Cent, 150)].into_iter().collect()),
             bonus: CoinAmount(HashMap::new()),
             barcodes: vec![test_barcode("barcode")],
+            sub_products: vec![],
             category: "category".to_string(),
             name: "Product 1".to_string(),
             nickname: Some("nick's test".to_string()),
@@ -384,6 +388,7 @@ pub fn test_transaction(pool: PgPool) {
             ),
             bonus: CoinAmount([(CoinType::BottleStamp, 1)].into_iter().collect()),
             barcodes: vec![test_barcode("123891")],
+            sub_products: vec![],
             category: "kaltgetränk".to_string(),
             nickname: None,
             name: "testMate".to_string(),
@@ -552,6 +557,7 @@ fn test_barcode(code: &str) -> ProductBarcode {
         code: code.to_string(),
         container_size: 1,
         label: String::new(),
+        sub_product_id: None,
     }
 }
 
@@ -571,6 +577,7 @@ fn test_product(
         nickname: None,
         image: None,
         barcodes: barcode.map(test_barcode).into_iter().collect(),
+        sub_products: vec![],
         category: category.to_string(),
         print_lists: vec![],
         tags: vec![],
@@ -616,6 +623,7 @@ fn test_item(
         barcode: None,
         collected,
         product: product.cloned(),
+        sub_product_id: None,
     }
 }
 
@@ -915,12 +923,14 @@ async fn test_product_multiple_barcodes(pool: PgPool) {
             code: "4001".to_string(),
             container_size: 1,
             label: "Einzelflasche".to_string(),
+            sub_product_id: None,
         },
         ProductBarcode {
             id: 0,
             code: "4002".to_string(),
             container_size: 20,
             label: "Kasten 20x0,5l".to_string(),
+            sub_product_id: None,
         },
     ];
     let mate = db.store_product(mate).await.unwrap();
@@ -959,18 +969,21 @@ async fn test_product_multiple_barcodes(pool: PgPool) {
             code: "  4002  ".to_string(),
             container_size: 0,
             label: "  Kasten  ".to_string(),
+            sub_product_id: None,
         },
         ProductBarcode {
             id: 0,
             code: "4002".to_string(),
             container_size: 20,
             label: "duplicate".to_string(),
+            sub_product_id: None,
         },
         ProductBarcode {
             id: 0,
             code: "   ".to_string(),
             container_size: 5,
             label: String::new(),
+            sub_product_id: None,
         },
     ];
     let messy = db.store_product(messy).await.unwrap();
@@ -983,23 +996,26 @@ async fn test_product_multiple_barcodes(pool: PgPool) {
 
     // add a single code without rewriting the product
     let added = db
-        .add_product_barcode(mate.id, "  4001 ", 6, " Sixpack ")
+        .add_product_barcode(mate.id, "  4001 ", 6, " Sixpack ", None)
         .await
         .unwrap();
     assert_eq!(added.code, "4001");
     assert_eq!(added.container_size, 6);
     assert_eq!(added.label, "Sixpack");
     assert_eq!(
-        db.add_product_barcode(mate.id, "4001", 6, "").await,
+        db.add_product_barcode(mate.id, "4001", 6, "", None).await,
         Err(ServiceError::Conflict(
             "the product already has this barcode"
         ))
     );
     assert_eq!(
-        db.add_product_barcode(424242, "9999", 1, "").await,
+        db.add_product_barcode(424242, "9999", 1, "", None).await,
         Err(ServiceError::NotFound)
     );
-    assert!(db.add_product_barcode(mate.id, "   ", 1, "").await.is_err());
+    assert!(db
+        .add_product_barcode(mate.id, "   ", 1, "", None)
+        .await
+        .is_err());
     let loaded = db.get_product_by_id(mate.id).await.unwrap().unwrap();
     assert_eq!(
         loaded
@@ -1067,6 +1083,7 @@ async fn test_completed_check_fills_the_shopping_list(pool: PgPool) {
         code: "4002".to_string(),
         container_size: 20,
         label: "Kasten".to_string(),
+        sub_product_id: None,
     }];
     let mate = db.store_product(mate).await.unwrap();
     let chips = db
@@ -1089,6 +1106,7 @@ async fn test_completed_check_fills_the_shopping_list(pool: PgPool) {
         quantity: 1,
         note: "by hand".to_string(),
         product: Some(water.clone()),
+        sub_product_id: None,
         created_by_account_id: Some(admin.id),
         created_by_name: None,
         created_at: Utc::now(),
@@ -1100,13 +1118,13 @@ async fn test_completed_check_fills_the_shopping_list(pool: PgPool) {
     .unwrap();
 
     let check = db.create_inventory_check("", Some(admin.id)).await.unwrap();
-    db.set_inventory_check_item_count(check.id, mate.id, Some(5))
+    db.set_inventory_check_item_count(check.id, mate.id, None, Some(5))
         .await
         .unwrap();
-    db.set_inventory_check_item_count(check.id, cola.id, Some(9))
+    db.set_inventory_check_item_count(check.id, cola.id, None, Some(9))
         .await
         .unwrap();
-    db.set_inventory_check_item_count(check.id, water.id, Some(0))
+    db.set_inventory_check_item_count(check.id, water.id, None, Some(0))
         .await
         .unwrap();
     // Chips stay uncounted
@@ -1156,7 +1174,7 @@ async fn test_completed_check_fills_the_shopping_list(pool: PgPool) {
 
     // a second check does not pile up a duplicate while the entry is still open
     let check2 = db.create_inventory_check("", Some(admin.id)).await.unwrap();
-    db.set_inventory_check_item_count(check2.id, mate.id, Some(1))
+    db.set_inventory_check_item_count(check2.id, mate.id, None, Some(1))
         .await
         .unwrap();
     let result2 = db
@@ -1180,7 +1198,7 @@ async fn test_completed_check_fills_the_shopping_list(pool: PgPool) {
         .await
         .unwrap();
     let check3 = db.create_inventory_check("", Some(admin.id)).await.unwrap();
-    db.set_inventory_check_item_count(check3.id, mate.id, Some(0))
+    db.set_inventory_check_item_count(check3.id, mate.id, None, Some(0))
         .await
         .unwrap();
     let result3 = db
@@ -1216,6 +1234,7 @@ async fn test_generated_purchase_uses_primary_barcode_size(pool: PgPool) {
         code: "4002".to_string(),
         container_size: 20,
         label: "Kasten".to_string(),
+        sub_product_id: None,
     }];
     let mate = db.store_product(mate).await.unwrap();
     let chips = db
@@ -1224,10 +1243,10 @@ async fn test_generated_purchase_uses_primary_barcode_size(pool: PgPool) {
         .unwrap();
 
     let check = db.create_inventory_check("", None).await.unwrap();
-    db.set_inventory_check_item_count(check.id, mate.id, Some(5))
+    db.set_inventory_check_item_count(check.id, mate.id, None, Some(5))
         .await
         .unwrap();
-    db.set_inventory_check_item_count(check.id, chips.id, Some(0))
+    db.set_inventory_check_item_count(check.id, chips.id, None, Some(0))
         .await
         .unwrap();
 
@@ -1344,22 +1363,22 @@ async fn test_inventory_check_lifecycle(pool: PgPool) {
 
     // count
     let item = db
-        .set_inventory_check_item_count(check.id, mate.id, Some(3))
+        .set_inventory_check_item_count(check.id, mate.id, None, Some(3))
         .await
         .unwrap();
     assert_eq!(item.product.id, mate.id);
     assert_eq!(item.target_quantity, 10);
     assert_eq!(item.counted_quantity, Some(3));
-    db.set_inventory_check_item_count(check.id, cola.id, Some(5))
+    db.set_inventory_check_item_count(check.id, cola.id, None, Some(5))
         .await
         .unwrap();
     assert_eq!(
-        db.set_inventory_check_item_count(check.id, 424242, Some(1))
+        db.set_inventory_check_item_count(check.id, 424242, None, Some(1))
             .await,
         Err(ServiceError::NotFound)
     );
     assert_eq!(
-        db.set_inventory_check_item_count(424242, mate.id, Some(1))
+        db.set_inventory_check_item_count(424242, mate.id, None, Some(1))
             .await,
         Err(ServiceError::NotFound)
     );
@@ -1424,14 +1443,14 @@ async fn test_inventory_check_lifecycle(pool: PgPool) {
         Err(ServiceError::Conflict(_))
     ));
     assert!(matches!(
-        db.set_inventory_check_item_count(check.id, mate.id, Some(4))
+        db.set_inventory_check_item_count(check.id, mate.id, None, Some(4))
             .await,
         Err(ServiceError::Conflict(_))
     ));
 
     // second check: nothing below target -> no purchase
     let check2 = db.create_inventory_check("", None).await.unwrap();
-    db.set_inventory_check_item_count(check2.id, cola.id, Some(9))
+    db.set_inventory_check_item_count(check2.id, cola.id, None, Some(9))
         .await
         .unwrap();
     let completion_result2 = db
@@ -1457,7 +1476,7 @@ async fn test_inventory_check_lifecycle(pool: PgPool) {
 
     // third check: product without purchase history -> container size 1, cents 0
     let check3 = db.create_inventory_check("", None).await.unwrap();
-    db.set_inventory_check_item_count(check3.id, chips.id, Some(2))
+    db.set_inventory_check_item_count(check3.id, chips.id, None, Some(2))
         .await
         .unwrap();
     let purchase3 = db
@@ -1569,7 +1588,7 @@ async fn test_inventory_estimate(pool: PgPool) {
     );
 
     let check = db.create_inventory_check("", None).await.unwrap();
-    db.set_inventory_check_item_count(check.id, mate.id, Some(4))
+    db.set_inventory_check_item_count(check.id, mate.id, None, Some(4))
         .await
         .unwrap();
     let completed = db
@@ -1646,7 +1665,7 @@ async fn test_inventory_estimate(pool: PgPool) {
 
     // a newer count resets the baseline
     let check2 = db.create_inventory_check("", None).await.unwrap();
-    db.set_inventory_check_item_count(check2.id, mate.id, Some(20))
+    db.set_inventory_check_item_count(check2.id, mate.id, None, Some(20))
         .await
         .unwrap();
     db.complete_inventory_check(
@@ -1697,6 +1716,7 @@ async fn test_shopping_list_lifecycle(pool: PgPool) {
             quantity: 2,
             note: "note".to_string(),
             product: product.cloned(),
+            sub_product_id: None,
             created_by_account_id: created_by,
             created_by_name: None,
             created_at: Utc::now(),
@@ -1867,4 +1887,468 @@ async fn test_shopping_list_lifecycle(pool: PgPool) {
         .await
         .unwrap()
         .is_empty());
+}
+
+// ---------------------------------------------------------------------------
+// Sub products
+// ---------------------------------------------------------------------------
+
+use crate::models::SubProduct;
+
+fn test_sub_product(name: &str, purchase_tax: i32) -> SubProduct {
+    SubProduct {
+        id: 0,
+        name: name.to_string(),
+        purchase_tax,
+        active: true,
+        show_on_print_list: false,
+        target_quantity: 0,
+    }
+}
+
+#[sqlx::test]
+async fn test_sub_products(pool: PgPool) {
+    let app_state = AppState::from_pool(pool).await;
+    let mut db = DatabaseConnection {
+        connection: app_state.pool.acquire().await.unwrap(),
+    };
+
+    let haribo = db
+        .store_product(test_product("Haribo", "Snacks", None, true, 10))
+        .await
+        .unwrap();
+    let other = db
+        .store_product(test_product("Chips", "Snacks", None, true, 5))
+        .await
+        .unwrap();
+
+    // create two, names are trimmed and empty names are rejected
+    let stored = db
+        .store_sub_products(
+            haribo.id,
+            &[
+                test_sub_product(" Goldbären ", 7),
+                SubProduct {
+                    show_on_print_list: true,
+                    ..test_sub_product("Tropifrutti", 19)
+                },
+            ],
+        )
+        .await
+        .unwrap();
+    assert_eq!(stored.len(), 2);
+    assert_eq!(stored[0].name, "Goldbären");
+    assert_eq!(stored[0].purchase_tax, 7);
+    assert!(!stored[0].show_on_print_list);
+    assert!(stored[1].show_on_print_list);
+    let (gold, tropi) = (stored[0].clone(), stored[1].clone());
+    assert!(db
+        .store_sub_products(haribo.id, &[test_sub_product("  ", 7)])
+        .await
+        .is_err());
+    // a sub product of another product cannot be updated through this one
+    assert!(db
+        .store_sub_products(other.id, &[gold.clone()])
+        .await
+        .is_err());
+
+    // the sub products come with the product, and they never show up as products
+    let loaded = db.get_product_by_id(haribo.id).await.unwrap().unwrap();
+    assert_eq!(loaded.sub_products, vec![gold.clone(), tropi.clone()]);
+    assert_eq!(db.get_all_products().await.unwrap().len(), 2);
+
+    // barcodes link to sub products, but only to the product's own
+    let mut with_codes = loaded.clone();
+    with_codes.barcodes = vec![
+        ProductBarcode {
+            sub_product_id: Some(gold.id),
+            ..test_barcode("4001")
+        },
+        ProductBarcode {
+            sub_product_id: Some(tropi.id),
+            ..test_barcode("4002")
+        },
+        test_barcode("4000"),
+    ];
+    let with_codes = db.store_product(with_codes).await.unwrap();
+    assert_eq!(
+        with_codes
+            .barcodes
+            .iter()
+            .map(|b| b.sub_product_id)
+            .collect::<Vec<_>>(),
+        vec![Some(gold.id), Some(tropi.id), None]
+    );
+    let mut foreign = other.clone();
+    foreign.barcodes = vec![ProductBarcode {
+        sub_product_id: Some(gold.id),
+        ..test_barcode("5000")
+    }];
+    assert_eq!(
+        db.store_product(foreign).await.err(),
+        Some(ServiceError::BadRequest(
+            "sub product does not belong to the product".to_string()
+        ))
+    );
+    assert!(db
+        .add_product_barcode(other.id, "5001", 1, "", Some(tropi.id))
+        .await
+        .is_err());
+    let added = db
+        .add_product_barcode(haribo.id, "4003", 10, "Karton", Some(tropi.id))
+        .await
+        .unwrap();
+    assert_eq!(added.sub_product_id, Some(tropi.id));
+
+    // rename and change the tax of one sub product
+    let renamed = db
+        .update_sub_product(
+            haribo.id,
+            &SubProduct {
+                name: "Goldbären 175g".to_string(),
+                purchase_tax: 19,
+                ..gold.clone()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(renamed.name, "Goldbären 175g");
+    // the print list flag can be switched on its own
+    let printed = db
+        .update_sub_product(
+            haribo.id,
+            &SubProduct {
+                show_on_print_list: true,
+                ..renamed.clone()
+            },
+        )
+        .await
+        .unwrap();
+    assert!(printed.show_on_print_list);
+    let renamed = db
+        .update_sub_product(
+            haribo.id,
+            &SubProduct {
+                show_on_print_list: false,
+                ..printed
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        db.update_sub_product(other.id, &renamed).await.err(),
+        Some(ServiceError::NotFound)
+    );
+
+    // something bought as Tropifrutti: dropping it from the list only deactivates it,
+    // while the unused Goldbären is deleted and its codes fall back to the parent
+    let mut item = test_item("Tropifrutti", Some(&haribo), 1, 3, 129, true);
+    item.sub_product_id = Some(tropi.id);
+    db.create_purchase(test_purchase(
+        PurchaseState::Finalized,
+        Utc::now(),
+        vec![item],
+    ))
+    .await
+    .unwrap();
+    let stored = db
+        .store_sub_products(haribo.id, &[test_sub_product("Color-Rado", 7)])
+        .await
+        .unwrap();
+    let loaded = db.get_product_by_id(haribo.id).await.unwrap().unwrap();
+    assert_eq!(
+        loaded
+            .sub_products
+            .iter()
+            .map(|s| (s.name.as_str(), s.active))
+            .collect::<Vec<_>>(),
+        vec![("Tropifrutti", false), ("Color-Rado", true)]
+    );
+    assert_eq!(stored[0].name, "Color-Rado");
+    assert_eq!(
+        loaded
+            .barcodes
+            .iter()
+            .find(|b| b.code == "4001")
+            .unwrap()
+            .sub_product_id,
+        None
+    );
+
+    // deleting the product removes its sub products
+    let bought = db
+        .get_purchases_by_product_id(haribo.id)
+        .await
+        .unwrap()
+        .unwrap();
+    db.delete_purchase(bought[0].id).await.unwrap();
+    db.delete_product(haribo.id).await.unwrap();
+    assert_eq!(
+        db.update_sub_product(haribo.id, &tropi).await.err(),
+        Some(ServiceError::NotFound)
+    );
+}
+
+/// Purchase items of a sub product belong to the parent for everything stock related, and old
+/// items are sorted into sub products by the code they were bought with.
+#[sqlx::test]
+async fn test_sub_product_purchases(pool: PgPool) {
+    let app_state = AppState::from_pool(pool).await;
+    let mut db = DatabaseConnection {
+        connection: app_state.pool.acquire().await.unwrap(),
+    };
+
+    let mut haribo = test_product("Haribo", "Snacks", None, true, 10);
+    haribo.barcodes = vec![test_barcode("4001"), test_barcode("4002")];
+    let haribo = db.store_product(haribo).await.unwrap();
+
+    // bought before there were sub products: both codes land on the parent
+    let mut gold = test_item("Goldbären", Some(&haribo), 1, 4, 129, true);
+    gold.barcode = Some("4001".to_string());
+    let mut tropi = test_item("Tropifrutti", Some(&haribo), 1, 2, 149, true);
+    tropi.barcode = Some(" 4002 ".to_string());
+    let mut unknown = test_item("Haribo", Some(&haribo), 1, 1, 99, true);
+    unknown.barcode = Some("9999".to_string());
+    let old = db
+        .create_purchase(test_purchase(
+            PurchaseState::Finalized,
+            Utc::now() - Duration::days(1),
+            vec![gold, tropi, unknown],
+        ))
+        .await
+        .unwrap();
+    assert!(old.items.iter().all(|i| i.sub_product_id.is_none()));
+
+    // grouping the codes sorts the old items in
+    let subs = db
+        .store_sub_products(
+            haribo.id,
+            &[
+                test_sub_product("Goldbären", 7),
+                test_sub_product("Tropifrutti", 7),
+            ],
+        )
+        .await
+        .unwrap();
+    let mut grouped = db.get_product_by_id(haribo.id).await.unwrap().unwrap();
+    grouped.barcodes[0].sub_product_id = Some(subs[0].id);
+    grouped.barcodes[1].sub_product_id = Some(subs[1].id);
+    let grouped = db.store_product(grouped).await.unwrap();
+
+    let old = db.get_purchase_by_id(old.id).await.unwrap().unwrap();
+    assert_eq!(
+        old.items
+            .iter()
+            .map(|i| i.sub_product_id)
+            .collect::<Vec<_>>(),
+        vec![Some(subs[0].id), Some(subs[1].id), None]
+    );
+
+    // an explicit choice is never overwritten by the backfill
+    let mut draft = test_item("Goldbären", Some(&grouped), 1, 1, 129, true);
+    draft.barcode = Some("4001".to_string());
+    draft.sub_product_id = Some(subs[1].id);
+    let draft = db
+        .create_purchase(test_purchase(PurchaseState::Draft, Utc::now(), vec![draft]))
+        .await
+        .unwrap();
+    db.store_product(grouped.clone()).await.unwrap();
+    let draft = db.get_purchase_by_id(draft.id).await.unwrap().unwrap();
+    assert_eq!(draft.items[0].sub_product_id, Some(subs[1].id));
+
+    // updating an item keeps or changes the sub product
+    let mut item = draft.items[0].clone();
+    item.sub_product_id = Some(subs[0].id);
+    let item = db
+        .update_purchase_item(draft.id, item.id, item)
+        .await
+        .unwrap();
+    assert_eq!(item.sub_product_id, Some(subs[0].id));
+
+    // the stock still lives on the parent: 4 + 2 + 1 units bought
+    let row = &db.get_inventory().await.unwrap()[0];
+    assert_eq!(row.product.id, haribo.id);
+    assert_eq!(
+        db.get_purchases_by_product_id(haribo.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .len(),
+        2
+    );
+
+    // shopping list entries can ask for a specific sub product
+    let wish = db
+        .create_shopping_list_item(ShoppingListItem {
+            id: 0,
+            name: "Haribo".to_string(),
+            quantity: 2,
+            note: String::new(),
+            product: Some(grouped.clone()),
+            sub_product_id: Some(subs[1].id),
+            created_by_account_id: None,
+            created_by_name: None,
+            created_at: Utc::now(),
+            done_at: None,
+            done_by_account_id: None,
+            purchase_id: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(wish.sub_product_id, Some(subs[1].id));
+    let mut changed = wish.clone();
+    changed.sub_product_id = None;
+    let changed = db.update_shopping_list_item(changed).await.unwrap();
+    assert_eq!(changed.sub_product_id, None);
+}
+
+/// A product with sub products is only a heading in the inventory: it is counted per sub
+/// product, each with its own target, and missing sub products land on the shopping list.
+#[sqlx::test]
+async fn test_sub_product_inventory(pool: PgPool) {
+    let app_state = AppState::from_pool(pool).await;
+    let mut db = DatabaseConnection {
+        connection: app_state.pool.acquire().await.unwrap(),
+    };
+
+    let haribo = db
+        .store_product(test_product("Haribo", "Snacks", None, true, 99))
+        .await
+        .unwrap();
+    let mate = db
+        .store_product(test_product("Mate", "Drinks", None, true, 10))
+        .await
+        .unwrap();
+    let subs = db
+        .store_sub_products(
+            haribo.id,
+            &[
+                SubProduct {
+                    target_quantity: 10,
+                    ..test_sub_product("Tropifrutti", 7)
+                },
+                SubProduct {
+                    target_quantity: 8,
+                    ..test_sub_product("Goldbären", 7)
+                },
+                SubProduct {
+                    target_quantity: 50,
+                    active: false,
+                    ..test_sub_product("Old", 7)
+                },
+            ],
+        )
+        .await
+        .unwrap();
+    let (tropi, gold) = (subs[0].clone(), subs[1].clone());
+
+    // one item per active sub product instead of the product, ordered by name
+    let check = db.create_inventory_check("", None).await.unwrap();
+    assert_eq!(
+        check
+            .items
+            .iter()
+            .map(|i| (i.product.id, i.sub_product_id, i.target_quantity))
+            .collect::<Vec<_>>(),
+        vec![
+            (mate.id, None, 10),
+            (haribo.id, Some(gold.id), 8),
+            (haribo.id, Some(tropi.id), 10),
+        ]
+    );
+
+    // the product itself cannot be counted, its sub products can
+    assert_eq!(
+        db.set_inventory_check_item_count(check.id, haribo.id, None, Some(3))
+            .await
+            .err(),
+        Some(ServiceError::NotFound)
+    );
+    let counted = db
+        .set_inventory_check_item_count(check.id, haribo.id, Some(gold.id), Some(2))
+        .await
+        .unwrap();
+    assert_eq!(counted.sub_product_id, Some(gold.id));
+    assert_eq!(counted.counted_quantity, Some(2));
+    db.set_inventory_check_item_count(check.id, haribo.id, Some(tropi.id), Some(10))
+        .await
+        .unwrap();
+    db.set_inventory_check_item_count(check.id, mate.id, None, Some(10))
+        .await
+        .unwrap();
+
+    let result = db
+        .complete_inventory_check(
+            check.id,
+            InventoryCheckCompletion {
+                completed_by_account_id: None,
+                add_to_shopping_list: true,
+                shopping_list_note: "Inventur".to_string(),
+                generate_purchase: true,
+                purchase_store: "Store".to_string(),
+                purchase_name: "Restock".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+    // only Goldbären is missing: one wish under the Haribo heading, one purchase item
+    let wishes = db
+        .get_shopping_list_items(ShoppingListState::Open)
+        .await
+        .unwrap();
+    assert_eq!(
+        wishes
+            .iter()
+            .map(|w| (w.name.as_str(), w.sub_product_id, w.quantity))
+            .collect::<Vec<_>>(),
+        vec![("Haribo", Some(gold.id), 6)]
+    );
+    let purchase = result.purchase.unwrap();
+    assert_eq!(purchase.items.len(), 1);
+    assert_eq!(purchase.items[0].name, "Haribo · Goldbären");
+    assert_eq!(purchase.items[0].sub_product_id, Some(gold.id));
+
+    // the overview sums the sub products and lists them
+    let rows = db.get_inventory().await.unwrap();
+    let row = rows.iter().find(|r| r.product.id == haribo.id).unwrap();
+    assert_eq!(row.target_quantity, 18);
+    assert_eq!(row.last_counted_quantity, Some(12));
+    assert_eq!(row.estimated_quantity, Some(12));
+    assert_eq!(
+        row.sub_products
+            .iter()
+            .map(|s| (s.sub_product_id, s.target_quantity, s.last_counted_quantity))
+            .collect::<Vec<_>>(),
+        vec![(gold.id, 8, Some(2)), (tropi.id, 10, Some(10))]
+    );
+    let row = rows.iter().find(|r| r.product.id == mate.id).unwrap();
+    assert_eq!(row.target_quantity, 10);
+    assert!(row.sub_products.is_empty());
+
+    // a second count does not pile up a second wish for the same sub product
+    let check = db.create_inventory_check("", None).await.unwrap();
+    db.set_inventory_check_item_count(check.id, haribo.id, Some(gold.id), Some(1))
+        .await
+        .unwrap();
+    db.complete_inventory_check(
+        check.id,
+        InventoryCheckCompletion {
+            completed_by_account_id: None,
+            add_to_shopping_list: true,
+            shopping_list_note: "Inventur".to_string(),
+            generate_purchase: false,
+            purchase_store: String::new(),
+            purchase_name: String::new(),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        db.get_shopping_list_items(ShoppingListState::Open)
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
 }

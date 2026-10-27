@@ -13,7 +13,7 @@ use crate::error::{ServiceError, ServiceResult};
 use crate::models;
 use crate::request_state::RequestState;
 
-use super::products::ProductDto;
+use super::products::{resolve_sub_product, ProductDto};
 
 pub fn router(app_state: AppState) -> ApiRouter {
     ApiRouter::new()
@@ -89,6 +89,8 @@ pub struct PurchaseItemDto {
     pub barcode: Option<String>,
     pub collected: bool,
     pub product: Option<ProductDto>,
+    /// Sub product of `product` that was bought (see `product.sub_products`).
+    pub sub_product_id: Option<u64>,
 }
 
 impl From<&models::PurchaseItem> for PurchaseItemDto {
@@ -105,6 +107,7 @@ impl From<&models::PurchaseItem> for PurchaseItemDto {
             barcode: value.barcode.to_owned(),
             collected: value.collected,
             product,
+            sub_product_id: value.sub_product_id,
         }
     }
 }
@@ -236,6 +239,9 @@ pub struct SavePurchaseItemDto {
     pub collected: bool,
     #[serde(default)]
     pub product_id: Option<u64>,
+    /// Sub product of `product_id` that was bought.
+    #[serde(default)]
+    pub sub_product_id: Option<u64>,
 }
 
 async fn create_purchase(
@@ -504,11 +510,13 @@ async fn resolve_item(
         barcode: item_dto.barcode.clone(),
         collected: item_dto.collected,
         product: None,
+        sub_product_id: None,
     };
 
     if let Some(product_id) = item_dto.product_id {
         item.product = state.db.get_product_by_id(product_id).await?;
     }
+    item.sub_product_id = resolve_sub_product(item.product.as_ref(), item_dto.sub_product_id)?;
 
     Ok(item)
 }
@@ -673,6 +681,7 @@ mod tests {
             barcode: None,
             collected: true,
             product_id: None,
+            sub_product_id: None,
         };
 
         let state = request_state(&app_state, Some(admin.clone())).await;

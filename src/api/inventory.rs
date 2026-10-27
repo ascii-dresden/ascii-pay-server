@@ -35,6 +35,13 @@ pub fn router(app_state: AppState) -> ApiRouter {
             put_with(set_inventory_check_item, set_inventory_check_item_docs),
         )
         .api_route(
+            "/inventory/check/:id/item/:product_id/sub-product/:sub_product_id",
+            put_with(
+                set_inventory_check_sub_product_item,
+                set_inventory_check_sub_product_item_docs,
+            ),
+        )
+        .api_route(
             "/inventory/check/:id/complete",
             aide::axum::routing::post_with(complete_inventory_check, complete_inventory_check_docs),
         )
@@ -50,6 +57,13 @@ pub struct InventoryLastPurchaseDto {
 }
 
 #[derive(Debug, PartialEq, Serialize, JsonSchema)]
+pub struct InventorySubProductRowDto {
+    pub sub_product_id: u64,
+    pub target_quantity: i32,
+    pub last_counted_quantity: Option<i32>,
+}
+
+#[derive(Debug, PartialEq, Serialize, JsonSchema)]
 pub struct InventoryRowDto {
     pub product: ProductDto,
     pub target_quantity: i32,
@@ -59,6 +73,9 @@ pub struct InventoryRowDto {
     /// the product was never counted.
     pub estimated_quantity: Option<i64>,
     pub last_purchase: Option<InventoryLastPurchaseDto>,
+    /// Per active sub product: target and last count. With sub products the product row holds
+    /// their sums and is only a heading.
+    pub sub_products: Vec<InventorySubProductRowDto>,
 }
 
 impl From<&models::InventoryRow> for InventoryRowDto {
@@ -78,6 +95,15 @@ impl From<&models::InventoryRow> for InventoryRowDto {
                     container_size: lp.container_size,
                     container_cents: lp.container_cents,
                 }),
+            sub_products: value
+                .sub_products
+                .iter()
+                .map(|s| InventorySubProductRowDto {
+                    sub_product_id: s.sub_product_id,
+                    target_quantity: s.target_quantity,
+                    last_counted_quantity: s.last_counted_quantity,
+                })
+                .collect(),
         }
     }
 }
@@ -141,6 +167,8 @@ impl From<&models::InventoryCheck> for InventoryCheckSummaryDto {
 #[derive(Debug, PartialEq, Serialize, JsonSchema)]
 pub struct InventoryCheckItemDto {
     pub product: ProductDto,
+    /// Set when the product is counted per sub product (see `product.sub_products`).
+    pub sub_product_id: Option<u64>,
     pub target_quantity: i32,
     pub counted_quantity: Option<i32>,
 }
@@ -149,6 +177,7 @@ impl From<&models::InventoryCheckItem> for InventoryCheckItemDto {
     fn from(value: &models::InventoryCheckItem) -> Self {
         Self {
             product: (&value.product).into(),
+            sub_product_id: value.sub_product_id,
             target_quantity: value.target_quantity,
             counted_quantity: value.counted_quantity,
         }
@@ -263,14 +292,16 @@ pub struct SetInventoryCheckItemDto {
     pub counted_quantity: Option<i32>,
 }
 
-async fn set_inventory_check_item(
-    mut state: RequestState,
-    Path((id, product_id)): Path<(u64, u64)>,
-    form: Json<SetInventoryCheckItemDto>,
+async fn store_inventory_check_item_count(
+    state: &mut RequestState,
+    id: u64,
+    product_id: u64,
+    sub_product_id: Option<u64>,
+    form: SetInventoryCheckItemDto,
 ) -> ServiceResult<Json<InventoryCheckItemDto>> {
     state.session_require_purchaser_or_admin()?;
 
-    let counted_quantity = form.0.counted_quantity;
+    let counted_quantity = form.counted_quantity;
     if counted_quantity.is_some_and(|q| q < 0) {
         return Err(ServiceError::BadRequest(
             "counted_quantity must not be negative".to_string(),
@@ -279,9 +310,39 @@ async fn set_inventory_check_item(
 
     let item = state
         .db
-        .set_inventory_check_item_count(id, product_id, counted_quantity)
+        .set_inventory_check_item_count(id, product_id, sub_product_id, counted_quantity)
         .await?;
     Ok(Json(InventoryCheckItemDto::from(&item)))
+}
+
+async fn set_inventory_check_item(
+    mut state: RequestState,
+    Path((id, product_id)): Path<(u64, u64)>,
+    form: Json<SetInventoryCheckItemDto>,
+) -> ServiceResult<Json<InventoryCheckItemDto>> {
+    store_inventory_check_item_count(&mut state, id, product_id, None, form.0).await
+}
+
+async fn set_inventory_check_sub_product_item(
+    mut state: RequestState,
+    Path((id, product_id, sub_product_id)): Path<(u64, u64, u64)>,
+    form: Json<SetInventoryCheckItemDto>,
+) -> ServiceResult<Json<InventoryCheckItemDto>> {
+    store_inventory_check_item_count(&mut state, id, product_id, Some(sub_product_id), form.0).await
+}
+
+fn set_inventory_check_sub_product_item_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Record the counted quantity of a sub product in a draft check. Products with active sub products are counted per sub product.")
+        .tag("inventory")
+        .response::<200, Json<InventoryCheckItemDto>>()
+        .response_with::<400, (), _>(|res| res.description("Negative quantity!"))
+        .response_with::<404, (), _>(|res| {
+            res.description("The requested check or sub product is not part of the check!")
+        })
+        .response_with::<409, (), _>(|res| res.description("The check is completed!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["purchaser", "admin"])
 }
 
 fn set_inventory_check_item_docs(op: TransformOperation) -> TransformOperation {

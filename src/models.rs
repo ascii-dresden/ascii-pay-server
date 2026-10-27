@@ -165,6 +165,27 @@ pub struct ProductBarcode {
     pub container_size: i32,
     /// Free text shown next to the code, e.g. "Kasten 20x0,5l".
     pub label: String,
+    /// Sub product this code belongs to; `None` means the code belongs to the product itself.
+    pub sub_product_id: Option<u64>,
+}
+
+/// A purchasing variant of a product that is tracked on its own but sold as the parent.
+///
+/// "Haribo" is sold for one price, but Goldbären and Tropifrutti are bought separately and cost
+/// differently. Sub products carry their own name, barcodes and purchase tax so their purchase
+/// prices can be compared without mixing them up; price, stock and the snack list stay with the
+/// parent product.
+#[derive(Debug, PartialEq, Clone)]
+pub struct SubProduct {
+    pub id: u64,
+    pub name: String,
+    pub purchase_tax: i32,
+    /// Inactive sub products are kept for their purchase history but no longer offered.
+    pub active: bool,
+    /// Listed below the parent on every print list (snack list) the parent is on.
+    pub show_on_print_list: bool,
+    /// Target stock in single units; with sub products the inventory is kept per sub product.
+    pub target_quantity: i32,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -178,6 +199,8 @@ pub struct Product {
     pub image: Option<Image>,
     /// All barcodes of the product, oldest first. The first entry is the primary code.
     pub barcodes: Vec<ProductBarcode>,
+    /// Sub products, oldest first.
+    pub sub_products: Vec<SubProduct>,
     pub category: String,
     pub print_lists: Vec<String>,
     pub tags: Vec<String>,
@@ -190,6 +213,10 @@ impl Product {
     /// The primary barcode of the product (the oldest one), if it has any.
     pub fn primary_barcode(&self) -> Option<&ProductBarcode> {
         self.barcodes.first()
+    }
+
+    pub fn has_sub_product(&self, sub_product_id: u64) -> bool {
+        self.sub_products.iter().any(|s| s.id == sub_product_id)
     }
 }
 
@@ -321,6 +348,8 @@ pub struct PurchaseItem {
     pub barcode: Option<String>,
     pub collected: bool,
     pub product: Option<Product>,
+    /// Sub product of `product` that was bought; `product` stays the parent.
+    pub sub_product_id: Option<u64>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -348,6 +377,8 @@ pub struct InventoryCheck {
 #[derive(Debug, PartialEq, Clone)]
 pub struct InventoryCheckItem {
     pub product: Product,
+    /// Set when the product is counted per sub product (one item per sub product).
+    pub sub_product_id: Option<u64>,
     pub target_quantity: i32,
     pub counted_quantity: Option<i32>,
 }
@@ -368,6 +399,16 @@ pub struct InventoryRow {
     pub last_counted_at: Option<DateTime<Utc>>,
     pub estimated_quantity: Option<i64>,
     pub last_purchase: Option<InventoryLastPurchase>,
+    /// Per active sub product: target and last count. Empty for products without sub
+    /// products; otherwise the product row holds the sums.
+    pub sub_products: Vec<InventorySubProductRow>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct InventorySubProductRow {
+    pub sub_product_id: u64,
+    pub target_quantity: i32,
+    pub last_counted_quantity: Option<i32>,
 }
 
 /// Parameters for completing an inventory check.
@@ -403,6 +444,8 @@ pub struct ShoppingListItem {
     pub quantity: i32,
     pub note: String,
     pub product: Option<Product>,
+    /// Specific sub product of `product` that is wanted; `None` means any of them.
+    pub sub_product_id: Option<u64>,
     pub created_by_account_id: Option<u64>,
     /// Display name of the creating account (resolved on read, ignored on write).
     pub created_by_name: Option<String>,

@@ -63,6 +63,14 @@ pub fn router(app_state: AppState) -> ApiRouter {
             delete_with(delete_product_barcode, delete_product_barcode_docs),
         )
         .api_route(
+            "/product/:id/sub-products",
+            post_with(add_sub_product, add_sub_product_docs),
+        )
+        .api_route(
+            "/product/:id/sub-product/:sub_product_id",
+            put_with(update_sub_product, update_sub_product_docs),
+        )
+        .api_route(
             "/products/inventory",
             put_with(update_products_inventory, update_products_inventory_docs),
         )
@@ -95,6 +103,8 @@ pub struct ProductBarcodeDto {
     pub container_size: i32,
     /// Free text shown next to the code, e.g. "Kasten 20x0,5l".
     pub label: String,
+    /// Sub product this code belongs to; `null` means the product itself.
+    pub sub_product_id: Option<u64>,
 }
 
 impl From<&models::ProductBarcode> for ProductBarcodeDto {
@@ -104,6 +114,35 @@ impl From<&models::ProductBarcode> for ProductBarcodeDto {
             code: value.code.to_owned(),
             container_size: value.container_size,
             label: value.label.to_owned(),
+            sub_product_id: value.sub_product_id,
+        }
+    }
+}
+
+/// A purchasing variant that is tracked on its own (name, codes, purchase tax, price history)
+/// but sold as the parent product.
+#[derive(Debug, PartialEq, Serialize, JsonSchema)]
+pub struct SubProductDto {
+    pub id: u64,
+    pub name: String,
+    pub purchase_tax: i32,
+    /// Inactive sub products keep their history but are no longer offered.
+    pub active: bool,
+    /// Listed below the product on every print list (snack list) the product is on.
+    pub show_on_print_list: bool,
+    /// Target stock in single units (inventory is counted per sub product).
+    pub target_quantity: i32,
+}
+
+impl From<&models::SubProduct> for SubProductDto {
+    fn from(value: &models::SubProduct) -> Self {
+        Self {
+            id: value.id,
+            name: value.name.to_owned(),
+            purchase_tax: value.purchase_tax,
+            active: value.active,
+            show_on_print_list: value.show_on_print_list,
+            target_quantity: value.target_quantity,
         }
     }
 }
@@ -120,6 +159,7 @@ pub struct ProductDto {
     /// `barcodes` is the full list.
     pub barcode: Option<String>,
     pub barcodes: Vec<ProductBarcodeDto>,
+    pub sub_products: Vec<SubProductDto>,
     pub category: String,
     pub print_lists: Vec<String>,
     pub tags: Vec<String>,
@@ -139,6 +179,7 @@ impl From<&models::Product> for ProductDto {
             nickname: value.nickname.to_owned(),
             barcode: value.primary_barcode().map(|b| b.code.to_owned()),
             barcodes: value.barcodes.iter().map(ProductBarcodeDto::from).collect(),
+            sub_products: value.sub_products.iter().map(SubProductDto::from).collect(),
             category: value.category.to_owned(),
             print_lists: value.print_lists.to_owned(),
             tags: value.tags.to_owned(),
@@ -198,21 +239,108 @@ pub struct SaveProductBarcodeDto {
     pub container_size: i32,
     #[serde(default)]
     pub label: String,
+    /// Existing sub product of this product the code belongs to.
+    #[serde(default)]
+    pub sub_product_id: Option<u64>,
+    /// `key` of an entry in `sub_products` of the same save request. Lets a code reference a
+    /// sub product that is created by that request. Takes precedence over `sub_product_id`.
+    #[serde(default)]
+    pub sub_product_key: Option<String>,
 }
 
 fn default_container_size() -> i32 {
     1
 }
 
-impl From<&SaveProductBarcodeDto> for models::ProductBarcode {
-    fn from(value: &SaveProductBarcodeDto) -> Self {
-        Self {
-            id: 0,
-            code: value.code.to_owned(),
-            container_size: value.container_size,
-            label: value.label.to_owned(),
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Debug, PartialEq, Deserialize, JsonSchema)]
+pub struct SaveSubProductDto {
+    /// Existing sub product to update; absent creates a new one.
+    #[serde(default)]
+    pub id: Option<u64>,
+    /// Client chosen key that barcodes of the same request can reference via
+    /// `sub_product_key`.
+    #[serde(default)]
+    pub key: Option<String>,
+    pub name: String,
+    /// Defaults to the purchase tax of the parent product.
+    #[serde(default)]
+    pub purchase_tax: Option<i32>,
+    #[serde(default = "default_true")]
+    pub active: bool,
+    /// Defaults to false.
+    #[serde(default)]
+    pub show_on_print_list: bool,
+    /// Defaults to 0.
+    #[serde(default)]
+    pub target_quantity: i32,
+}
+
+impl SaveSubProductDto {
+    fn to_model(&self, parent_purchase_tax: i32) -> models::SubProduct {
+        models::SubProduct {
+            id: self.id.unwrap_or(0),
+            name: self.name.to_owned(),
+            purchase_tax: self.purchase_tax.unwrap_or(parent_purchase_tax),
+            active: self.active,
+            show_on_print_list: self.show_on_print_list,
+            target_quantity: self.target_quantity,
         }
     }
+}
+
+/// Checks a sub product reference of a purchase or shopping list item: it needs a product and
+/// must be one of that product's sub products.
+pub(super) fn resolve_sub_product(
+    product: Option<&models::Product>,
+    sub_product_id: Option<u64>,
+) -> ServiceResult<Option<u64>> {
+    let Some(sub_product_id) = sub_product_id else {
+        return Ok(None);
+    };
+    match product {
+        Some(product) if product.has_sub_product(sub_product_id) => Ok(Some(sub_product_id)),
+        _ => Err(ServiceError::BadRequest(
+            "sub product does not belong to the product".to_owned(),
+        )),
+    }
+}
+
+/// Turns the barcodes of a save request into models, resolving `sub_product_key` against the
+/// sub products stored by the same request (`stored` is in the order of `sub_products`).
+fn link_barcodes(
+    barcodes: &[SaveProductBarcodeDto],
+    sub_products: Option<&[SaveSubProductDto]>,
+    stored: &[models::SubProduct],
+) -> ServiceResult<Vec<models::ProductBarcode>> {
+    barcodes
+        .iter()
+        .map(|barcode| {
+            let sub_product_id = match barcode.sub_product_key.as_deref() {
+                Some(key) => {
+                    let index = sub_products
+                        .unwrap_or_default()
+                        .iter()
+                        .position(|s| s.key.as_deref() == Some(key))
+                        .ok_or_else(|| {
+                            ServiceError::BadRequest(format!("unknown sub product key '{key}'"))
+                        })?;
+                    Some(stored[index].id)
+                }
+                None => barcode.sub_product_id,
+            };
+            Ok(models::ProductBarcode {
+                id: 0,
+                code: barcode.code.to_owned(),
+                container_size: barcode.container_size,
+                label: barcode.label.to_owned(),
+                sub_product_id,
+            })
+        })
+        .collect()
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
@@ -227,6 +355,11 @@ pub struct SaveProductDto {
     pub barcode: Option<String>,
     /// Full list of barcodes. When present it replaces all barcodes of the product.
     pub barcodes: Option<Vec<SaveProductBarcodeDto>>,
+    /// Full list of sub products. When present it replaces the sub products of the product:
+    /// entries with an `id` are updated, the others created. Sub products missing from the list
+    /// are deleted, or only deactivated if something was already bought as them.
+    #[serde(default)]
+    pub sub_products: Option<Vec<SaveSubProductDto>>,
     pub category: String,
     pub print_lists: Vec<String>,
     pub tags: Vec<String>,
@@ -237,30 +370,81 @@ pub struct SaveProductDto {
     pub target_quantity: i32,
 }
 
-/// Resolves the barcodes of a save request.
-///
-/// `barcodes` is authoritative and replaces the whole list. `None` means the request does not
-/// know about multiple barcodes: on create the legacy single `barcode` field is used, on update
-/// the existing barcodes are left alone, so an old client that echoes `barcode` back cannot drop
-/// the variants it never saw.
-fn resolve_barcodes(form: &SaveProductDto) -> Option<Vec<models::ProductBarcode>> {
-    form.barcodes
-        .as_ref()
-        .map(|barcodes| barcodes.iter().map(models::ProductBarcode::from).collect())
-}
-
 /// The legacy single `barcode` field as a barcode list, for create requests.
-fn legacy_barcodes(form: &SaveProductDto) -> Vec<models::ProductBarcode> {
-    form.barcode
+fn legacy_barcodes(barcode: Option<&str>) -> Vec<models::ProductBarcode> {
+    barcode
         .iter()
         .filter(|code| !code.trim().is_empty())
         .map(|code| models::ProductBarcode {
             id: 0,
-            code: code.to_owned(),
+            code: code.to_string(),
             container_size: 1,
             label: String::new(),
+            sub_product_id: None,
         })
         .collect()
+}
+
+/// The parts of a save request that are stored after the product row itself.
+struct ProductChildren {
+    /// Legacy single barcode (create only).
+    barcode: Option<String>,
+    barcodes: Option<Vec<SaveProductBarcodeDto>>,
+    sub_products: Option<Vec<SaveSubProductDto>>,
+}
+
+/// Stores the product row, then its sub products, then its barcodes (which may reference sub
+/// products created by the same request), and returns the product as stored.
+///
+/// `barcodes` is authoritative and replaces the whole list. `None` means the request does not
+/// know about multiple barcodes: on create the legacy single `barcode` field is used, on update
+/// the existing barcodes are left alone, so an old client that echoes `barcode` back cannot drop
+/// the variants it never saw. `sub_products` works the same way (absent = untouched).
+async fn save_product(
+    state: &mut RequestState,
+    mut product: models::Product,
+    children: ProductChildren,
+) -> ServiceResult<models::Product> {
+    let is_new = product.id == 0;
+    if is_new {
+        // Barcodes may point at sub products that only exist once the product does.
+        product.barcodes = Vec::new();
+    }
+    let product = state.db.store_product(product).await?;
+
+    let stored_sub_products = match children.sub_products.as_deref() {
+        Some(sub_products) => {
+            let models: Vec<models::SubProduct> = sub_products
+                .iter()
+                .map(|s| s.to_model(product.purchase_tax))
+                .collect();
+            state.db.store_sub_products(product.id, &models).await?
+        }
+        None => Vec::new(),
+    };
+
+    let barcodes = match children.barcodes.as_deref() {
+        Some(barcodes) => Some(link_barcodes(
+            barcodes,
+            children.sub_products.as_deref(),
+            &stored_sub_products,
+        )?),
+        None if is_new => Some(legacy_barcodes(children.barcode.as_deref())),
+        None => None,
+    };
+    if let Some(barcodes) = barcodes {
+        let product_id = i64::try_from(product.id).expect("id is always less than 2**63");
+        state
+            .db
+            .replace_product_barcodes(product_id, &barcodes)
+            .await?;
+    }
+
+    state
+        .db
+        .get_product_by_id(product.id)
+        .await?
+        .ok_or(ServiceError::NotFound)
 }
 
 async fn create_product(
@@ -272,7 +456,11 @@ async fn create_product(
     let form = form.0;
 
     let status_prices = resolve_status_prices(&mut state, &form.status_prices).await?;
-    let barcodes = resolve_barcodes(&form).unwrap_or_else(|| legacy_barcodes(&form));
+    let children = ProductChildren {
+        barcode: form.barcode,
+        barcodes: form.barcodes,
+        sub_products: form.sub_products,
+    };
 
     let product = models::Product {
         id: 0,
@@ -281,7 +469,8 @@ async fn create_product(
         bonus: form.bonus.into(),
         purchase_tax: form.purchase_tax,
         nickname: form.nickname,
-        barcodes,
+        barcodes: Vec::new(),
+        sub_products: Vec::new(),
         category: form.category,
         print_lists: form.print_lists,
         tags: form.tags,
@@ -291,7 +480,7 @@ async fn create_product(
         target_quantity: form.target_quantity,
     };
 
-    let product = state.db.store_product(product).await?;
+    let product = save_product(&mut state, product, children).await?;
     Ok(Json(ProductDto::from(&product)))
 }
 
@@ -315,7 +504,11 @@ async fn update_product(
     let product = state.db.get_product_by_id(id).await?;
 
     let status_prices = resolve_status_prices(&mut state, &form.status_prices).await?;
-    let barcodes = resolve_barcodes(&form);
+    let children = ProductChildren {
+        barcode: None,
+        barcodes: form.barcodes,
+        sub_products: form.sub_products,
+    };
 
     if let Some(mut product) = product {
         product.name = form.name;
@@ -323,9 +516,6 @@ async fn update_product(
         product.bonus = form.bonus.into();
         product.nickname = form.nickname;
         product.purchase_tax = form.purchase_tax;
-        if let Some(barcodes) = barcodes {
-            product.barcodes = barcodes;
-        }
         product.category = form.category;
         product.print_lists = form.print_lists;
         product.tags = form.tags;
@@ -333,7 +523,7 @@ async fn update_product(
         product.stocked = form.stocked;
         product.target_quantity = form.target_quantity;
 
-        let product = state.db.store_product(product).await?;
+        let product = save_product(&mut state, product, children).await?;
         return Ok(Json(ProductDto::from(&product)));
     }
 
@@ -424,9 +614,20 @@ async fn add_product_barcode(
     state.session_require_purchaser_or_admin()?;
 
     let form = form.0;
+    if form.sub_product_key.is_some() {
+        return Err(ServiceError::BadRequest(
+            "sub_product_key is only supported when saving the whole product".to_owned(),
+        ));
+    }
     let barcode = state
         .db
-        .add_product_barcode(id, &form.code, form.container_size, &form.label)
+        .add_product_barcode(
+            id,
+            &form.code,
+            form.container_size,
+            &form.label,
+            form.sub_product_id,
+        )
         .await?;
 
     Ok((StatusCode::CREATED, Json(ProductBarcodeDto::from(&barcode))))
@@ -436,6 +637,9 @@ fn add_product_barcode_docs(op: TransformOperation) -> TransformOperation {
     op.description("Add a single barcode to an existing product, without rewriting the product.")
         .tag("products")
         .response::<201, Json<ProductBarcodeDto>>()
+        .response_with::<400, (), _>(|res| {
+            res.description("The sub product does not belong to this product!")
+        })
         .response_with::<404, (), _>(|res| res.description("The requested product does not exist!"))
         .response_with::<409, (), _>(|res| res.description("The product already has this barcode!"))
         .response_with::<401, (), _>(|res| res.description("Missing login!"))
@@ -463,6 +667,70 @@ fn delete_product_barcode_docs(op: TransformOperation) -> TransformOperation {
         .response_with::<401, (), _>(|res| res.description("Missing login!"))
         .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
         .security_requirement_scopes("SessionToken", ["purchaser", "admin"])
+}
+
+async fn add_sub_product(
+    mut state: RequestState,
+    Path(id): Path<u64>,
+    form: Json<SaveSubProductDto>,
+) -> ServiceResult<(StatusCode, Json<SubProductDto>)> {
+    state.session_require_purchaser_or_admin()?;
+
+    let product = state
+        .db
+        .get_product_by_id(id)
+        .await?
+        .ok_or(ServiceError::NotFound)?;
+    let mut sub_product = form.0.to_model(product.purchase_tax);
+    sub_product.id = 0;
+
+    let sub_product = state.db.add_sub_product(id, &sub_product).await?;
+    Ok((StatusCode::CREATED, Json(SubProductDto::from(&sub_product))))
+}
+
+fn add_sub_product_docs(op: TransformOperation) -> TransformOperation {
+    op.description("Add a sub product to an existing product, without rewriting the product. `id` and `key` are ignored; `purchase_tax` defaults to the product's.")
+        .tag("products")
+        .response::<201, Json<SubProductDto>>()
+        .response_with::<400, (), _>(|res| res.description("The name is empty!"))
+        .response_with::<404, (), _>(|res| res.description("The requested product does not exist!"))
+        .response_with::<401, (), _>(|res| res.description("Missing login!"))
+        .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+        .security_requirement_scopes("SessionToken", ["purchaser", "admin"])
+}
+
+async fn update_sub_product(
+    mut state: RequestState,
+    Path((id, sub_product_id)): Path<(u64, u64)>,
+    form: Json<SaveSubProductDto>,
+) -> ServiceResult<Json<SubProductDto>> {
+    state.session_require_purchaser_or_admin()?;
+
+    let product = state
+        .db
+        .get_product_by_id(id)
+        .await?
+        .ok_or(ServiceError::NotFound)?;
+    let mut sub_product = form.0.to_model(product.purchase_tax);
+    sub_product.id = sub_product_id;
+
+    let sub_product = state.db.update_sub_product(id, &sub_product).await?;
+    Ok(Json(SubProductDto::from(&sub_product)))
+}
+
+fn update_sub_product_docs(op: TransformOperation) -> TransformOperation {
+    op.description(
+        "Rename, re-tax or (de)activate a sub product. `id` and `key` of the body are ignored.",
+    )
+    .tag("products")
+    .response::<200, Json<SubProductDto>>()
+    .response_with::<400, (), _>(|res| res.description("The name is empty!"))
+    .response_with::<404, (), _>(|res| {
+        res.description("The sub product does not belong to this product!")
+    })
+    .response_with::<401, (), _>(|res| res.description("Missing login!"))
+    .response_with::<403, (), _>(|res| res.description("Missing permissions!"))
+    .security_requirement_scopes("SessionToken", ["purchaser", "admin"])
 }
 
 #[derive(Debug, PartialEq, Deserialize, JsonSchema)]
@@ -663,9 +931,11 @@ mod tests {
                     code: code.to_string(),
                     container_size: 1,
                     label: String::new(),
+                    sub_product_id: None,
                 })
                 .into_iter()
                 .collect(),
+            sub_products: Vec::new(),
             category: "cat".to_string(),
             print_lists: vec![],
             tags: vec![],
@@ -813,9 +1083,12 @@ mod tests {
                         code: code.to_string(),
                         container_size: size,
                         label: String::new(),
+                        sub_product_id: None,
+                        sub_product_key: None,
                     })
                     .collect()
             }),
+            sub_products: None,
             category: "Drinks".to_string(),
             print_lists: vec![],
             tags: vec![],
@@ -905,6 +1178,193 @@ mod tests {
         assert_eq!(updated.barcode, None);
     }
 
+    fn save_sub_product(id: Option<u64>, key: Option<&str>, name: &str) -> SaveSubProductDto {
+        SaveSubProductDto {
+            id,
+            key: key.map(str::to_string),
+            name: name.to_string(),
+            purchase_tax: None,
+            active: true,
+            show_on_print_list: false,
+            target_quantity: 0,
+        }
+    }
+
+    fn save_barcode(
+        code: &str,
+        sub_product_id: Option<u64>,
+        key: Option<&str>,
+    ) -> SaveProductBarcodeDto {
+        SaveProductBarcodeDto {
+            code: code.to_string(),
+            container_size: 1,
+            label: String::new(),
+            sub_product_id,
+            sub_product_key: key.map(str::to_string),
+        }
+    }
+
+    /// One save creates the product, its sub products and the codes pointing at them.
+    #[sqlx::test]
+    async fn save_dto_sub_products(pool: PgPool) {
+        let app_state = AppState::from_pool(pool).await;
+        let admin = DatabaseConnection {
+            connection: app_state.pool.acquire().await.unwrap(),
+        }
+        .store_account(admin_account())
+        .await
+        .unwrap();
+
+        let mut form = save_product(None, None);
+        form.purchase_tax = 7;
+        form.sub_products = Some(vec![
+            save_sub_product(None, Some("new-1"), "Goldbären"),
+            SaveSubProductDto {
+                purchase_tax: Some(19),
+                ..save_sub_product(None, Some("new-2"), "Tropifrutti")
+            },
+        ]);
+        form.barcodes = Some(vec![
+            save_barcode("4001", None, Some("new-1")),
+            save_barcode("4002", None, Some("new-2")),
+            save_barcode("4000", None, None),
+        ]);
+        let state = request_state(&app_state, Some(admin.clone())).await;
+        let created = create_product(state, Json(form)).await.unwrap().0;
+
+        let gold = &created.sub_products[0];
+        let tropi = &created.sub_products[1];
+        assert_eq!((gold.name.as_str(), gold.purchase_tax), ("Goldbären", 7));
+        assert_eq!(
+            (tropi.name.as_str(), tropi.purchase_tax),
+            ("Tropifrutti", 19)
+        );
+        assert_eq!(
+            created
+                .barcodes
+                .iter()
+                .map(|b| (b.code.as_str(), b.sub_product_id))
+                .collect::<Vec<_>>(),
+            vec![
+                ("4001", Some(gold.id)),
+                ("4002", Some(tropi.id)),
+                ("4000", None)
+            ]
+        );
+
+        // an update can mix existing ids with a new key; leaving out `sub_products`
+        // keeps them untouched
+        let mut form = save_product(None, None);
+        form.sub_products = Some(vec![
+            save_sub_product(Some(gold.id), None, "Goldbären 175g"),
+            save_sub_product(Some(tropi.id), None, "Tropifrutti"),
+            save_sub_product(None, Some("x"), "Color-Rado"),
+        ]);
+        form.barcodes = Some(vec![
+            save_barcode("4001", Some(gold.id), None),
+            save_barcode("4003", None, Some("x")),
+        ]);
+        let state = request_state(&app_state, Some(admin.clone())).await;
+        let updated = update_product(state, Path(created.id), Json(form))
+            .await
+            .unwrap()
+            .0;
+        assert_eq!(updated.sub_products.len(), 3);
+        assert_eq!(updated.sub_products[0].name, "Goldbären 175g");
+        let rado = updated.sub_products[2].id;
+        assert_eq!(updated.barcodes[1].sub_product_id, Some(rado));
+
+        let state = request_state(&app_state, Some(admin.clone())).await;
+        let unchanged = update_product(state, Path(created.id), Json(save_product(None, None)))
+            .await
+            .unwrap()
+            .0;
+        assert_eq!(unchanged.sub_products, updated.sub_products);
+        assert_eq!(unchanged.barcodes[1].sub_product_id, Some(rado));
+
+        // unknown keys and ids of other products are rejected
+        let mut form = save_product(None, None);
+        form.barcodes = Some(vec![save_barcode("4001", None, Some("nope"))]);
+        let state = request_state(&app_state, Some(admin.clone())).await;
+        assert!(matches!(
+            update_product(state, Path(created.id), Json(form)).await,
+            Err(ServiceError::BadRequest(_))
+        ));
+
+        let state = request_state(&app_state, Some(admin.clone())).await;
+        let other = create_product(state, Json(save_product(None, None)))
+            .await
+            .unwrap()
+            .0;
+        let mut form = save_product(None, None);
+        form.barcodes = Some(vec![save_barcode("5000", Some(rado), None)]);
+        let state = request_state(&app_state, Some(admin.clone())).await;
+        assert!(matches!(
+            update_product(state, Path(other.id), Json(form)).await,
+            Err(ServiceError::BadRequest(_))
+        ));
+
+        // the single endpoints
+        let state = request_state(&app_state, Some(admin.clone())).await;
+        let (status, added) = add_sub_product(
+            state,
+            Path(created.id),
+            Json(save_sub_product(Some(999), None, "Phantasia")),
+        )
+        .await
+        .unwrap();
+        assert_eq!(status, StatusCode::CREATED);
+        assert_ne!(added.id, 999);
+        // inherits the parent's current tax (the updates above sent 19)
+        assert_eq!(added.purchase_tax, 19);
+
+        let state = request_state(&app_state, Some(admin.clone())).await;
+        let deactivated = update_sub_product(
+            state,
+            Path((created.id, added.id)),
+            Json(SaveSubProductDto {
+                active: false,
+                ..save_sub_product(None, None, "Phantasia")
+            }),
+        )
+        .await
+        .unwrap()
+        .0;
+        assert!(!deactivated.active);
+
+        let state = request_state(&app_state, Some(admin.clone())).await;
+        assert!(matches!(
+            update_sub_product(
+                state,
+                Path((other.id, added.id)),
+                Json(save_sub_product(None, None, "Phantasia")),
+            )
+            .await,
+            Err(ServiceError::NotFound)
+        ));
+
+        // purchase and shopping list items only accept the product's own sub products
+        let parent = state_product(&app_state, created.id).await;
+        assert_eq!(
+            resolve_sub_product(Some(&parent), Some(rado)),
+            Ok(Some(rado))
+        );
+        assert_eq!(resolve_sub_product(Some(&parent), None), Ok(None));
+        assert!(resolve_sub_product(None, Some(rado)).is_err());
+        let other = state_product(&app_state, other.id).await;
+        assert!(resolve_sub_product(Some(&other), Some(rado)).is_err());
+    }
+
+    async fn state_product(app_state: &AppState, id: u64) -> models::Product {
+        DatabaseConnection {
+            connection: app_state.pool.acquire().await.unwrap(),
+        }
+        .get_product_by_id(id)
+        .await
+        .unwrap()
+        .unwrap()
+    }
+
     #[sqlx::test]
     async fn barcode_endpoints(pool: PgPool) {
         let app_state = AppState::from_pool(pool).await;
@@ -940,6 +1400,8 @@ mod tests {
                 code: "4712".to_string(),
                 container_size: 20,
                 label: "Kasten".to_string(),
+                sub_product_id: None,
+                sub_product_key: None,
             })
         };
 
