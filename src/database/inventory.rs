@@ -61,6 +61,7 @@ impl From<InventoryCheckRow> for models::InventoryCheck {
 struct InventoryCheckItemRow {
     check_item_target_quantity: i32,
     check_item_counted_quantity: Option<i32>,
+    check_item_sub_product_id: Option<i64>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -76,9 +77,21 @@ struct InventoryStatsRow {
 }
 
 #[derive(sqlx::FromRow)]
+struct InventorySubProductStatsRow {
+    product_id: i64,
+    sub_product_id: i64,
+    target_quantity: i32,
+    last_counted_quantity: Option<i32>,
+}
+
+#[derive(sqlx::FromRow)]
 struct GeneratedItemRow {
     product_id: i64,
+    sub_product_id: Option<i64>,
+    /// Name of the product.
     name: String,
+    /// Name of the sub product, if the item is counted per sub product.
+    sub_product_name: Option<String>,
     missing: i32,
     counted: i32,
     target: i32,
@@ -101,13 +114,16 @@ fn check_item_query(where_clause: &str) -> String {
         SELECT
             ici.target_quantity AS check_item_target_quantity,
             ici.counted_quantity AS check_item_counted_quantity,
+            ici.sub_product_id AS check_item_sub_product_id,
             {PRODUCT_COLUMNS}
         FROM inventory_check_item ici
             INNER JOIN product p ON p.id = ici.product_id
+            LEFT JOIN sub_product isp ON isp.id = ici.sub_product_id
             {PRODUCT_STATUS_JOINS}
         WHERE {where_clause}
-        GROUP BY ici.check_id, ici.product_id, p.id
-        ORDER BY p.category ASC, p.name ASC, p.id ASC
+        GROUP BY ici.check_id, ici.product_id, ici.sub_product_id, ici.target_quantity,
+            ici.counted_quantity, p.id, isp.id
+        ORDER BY p.category ASC, p.name ASC, p.id ASC, isp.name ASC NULLS FIRST, isp.id ASC
         "#
     )
 }
@@ -117,6 +133,7 @@ fn check_item_from_row(row: &PgRow) -> ServiceResult<models::InventoryCheckItem>
     let product: models::Product = to_service_result(ProductRow::from_row(row))?.into();
     Ok(models::InventoryCheckItem {
         product,
+        sub_product_id: item_row.check_item_sub_product_id.map(to_u64),
         target_quantity: item_row.check_item_target_quantity,
         counted_quantity: item_row.check_item_counted_quantity,
     })
@@ -153,12 +170,14 @@ async fn fetch_check_item(
     conn: &mut PgConnection,
     check_id: u64,
     product_id: u64,
+    sub_product_id: Option<u64>,
 ) -> ServiceResult<Option<models::InventoryCheckItem>> {
     let r = sqlx::query(&check_item_query(
-        "ici.check_id = $1 AND ici.product_id = $2",
+        "ici.check_id = $1 AND ici.product_id = $2 AND ici.sub_product_id IS NOT DISTINCT FROM $3",
     ))
     .bind(to_i64(check_id))
     .bind(to_i64(product_id))
+    .bind(sub_product_id.map(to_i64))
     .fetch_optional(conn)
     .await;
 
@@ -206,7 +225,9 @@ async fn fetch_missing_products(
         r#"
         SELECT
             ici.product_id,
+            ici.sub_product_id,
             p.name,
+            isp.name AS sub_product_name,
             ici.counted_quantity AS counted,
             ici.target_quantity AS target,
             (ici.target_quantity - ici.counted_quantity) AS missing,
@@ -215,11 +236,13 @@ async fn fetch_missing_products(
             pb.container_size AS primary_barcode_size
         FROM inventory_check_item ici
             INNER JOIN product p ON p.id = ici.product_id
+            LEFT JOIN sub_product isp ON isp.id = ici.sub_product_id
             LEFT JOIN LATERAL (
+                -- the sub product's own first code, else the product's primary code
                 SELECT b.container_size
                 FROM product_barcode b
                 WHERE b.product_id = ici.product_id
-                ORDER BY b.id ASC
+                ORDER BY (b.sub_product_id IS NOT DISTINCT FROM ici.sub_product_id) DESC, b.id ASC
                 LIMIT 1
             ) pb ON TRUE
             LEFT JOIN LATERAL (
@@ -227,13 +250,14 @@ async fn fetch_missing_products(
                 FROM purchase_item pi
                     INNER JOIN purchase pu ON pu.id = pi.purchase_id
                 WHERE pi.product_id = ici.product_id AND pu.state = 'finalized'
+                    AND (ici.sub_product_id IS NULL OR pi.sub_product_id = ici.sub_product_id)
                 ORDER BY pu.timestamp DESC, pu.id DESC, pi.created_at DESC, pi.id DESC
                 LIMIT 1
             ) lp ON TRUE
         WHERE ici.check_id = $1
             AND ici.counted_quantity IS NOT NULL
             AND ici.target_quantity - ici.counted_quantity > 0
-        ORDER BY p.category ASC, p.name ASC, p.id ASC
+        ORDER BY p.category ASC, p.name ASC, p.id ASC, isp.name ASC NULLS FIRST
         "#,
     )
     .bind(to_i64(check_id))
@@ -281,12 +305,14 @@ impl DatabaseConnection {
                 lp.container_cents AS last_purchase_container_cents
             FROM product p
                 LEFT JOIN LATERAL (
-                    SELECT ici.counted_quantity, ic.completed_at
+                    -- the newest completed count; a product counted per sub product sums them
+                    SELECT sum(ici.counted_quantity)::INT AS counted_quantity, ic.completed_at
                     FROM inventory_check_item ici
                         INNER JOIN inventory_check ic ON ic.id = ici.check_id
                     WHERE ici.product_id = p.id
                         AND ic.state = 'completed'
                         AND ici.counted_quantity IS NOT NULL
+                    GROUP BY ic.id, ic.completed_at
                     ORDER BY ic.completed_at DESC, ic.id DESC
                     LIMIT 1
                 ) lc ON TRUE
@@ -318,18 +344,61 @@ impl DatabaseConnection {
         .await;
         let stats = to_service_result(stats)?;
 
+        let sub_rows = sqlx::query_as::<_, InventorySubProductStatsRow>(
+            r#"
+            SELECT
+                sp.product_id,
+                sp.id AS sub_product_id,
+                sp.target_quantity,
+                lc.counted_quantity AS last_counted_quantity
+            FROM sub_product sp
+                INNER JOIN product p ON p.id = sp.product_id
+                LEFT JOIN LATERAL (
+                    SELECT ici.counted_quantity
+                    FROM inventory_check_item ici
+                        INNER JOIN inventory_check ic ON ic.id = ici.check_id
+                    WHERE ici.sub_product_id = sp.id
+                        AND ic.state = 'completed'
+                        AND ici.counted_quantity IS NOT NULL
+                    ORDER BY ic.completed_at DESC, ic.id DESC
+                    LIMIT 1
+                ) lc ON TRUE
+            WHERE p.stocked AND sp.active
+            ORDER BY sp.name ASC, sp.id ASC
+            "#,
+        )
+        .fetch_all(self.connection.as_mut())
+        .await;
+        let sub_rows = to_service_result(sub_rows)?;
+
         let mut out = Vec::with_capacity(products.len());
         for product_row in products {
             let product: models::Product = product_row.into();
             let stat = stats.iter().find(|s| to_u64(s.product_id) == product.id);
+            let sub_products: Vec<models::InventorySubProductRow> = sub_rows
+                .iter()
+                .filter(|s| to_u64(s.product_id) == product.id)
+                .map(|s| models::InventorySubProductRow {
+                    sub_product_id: to_u64(s.sub_product_id),
+                    target_quantity: s.target_quantity,
+                    last_counted_quantity: s.last_counted_quantity,
+                })
+                .collect();
+            // With sub products the product is only a heading: its target is their sum.
+            let target_quantity = if sub_products.is_empty() {
+                product.target_quantity
+            } else {
+                sub_products.iter().map(|s| s.target_quantity).sum()
+            };
 
             let mut row = models::InventoryRow {
-                target_quantity: product.target_quantity,
+                target_quantity,
                 product,
                 last_counted_quantity: None,
                 last_counted_at: None,
                 estimated_quantity: None,
                 last_purchase: None,
+                sub_products,
             };
 
             if let Some(stat) = stat {
@@ -384,7 +453,9 @@ impl DatabaseConnection {
         fetch_check(self.connection.as_mut(), id).await
     }
 
-    /// Creates a draft check with one item per stocked product (target snapshot).
+    /// Creates a draft check with one item per stocked product (target snapshot). A product with
+    /// active sub products gets one item per sub product instead: the product itself is only a
+    /// heading then.
     ///
     /// Fails with `Conflict` if a draft check already exists.
     pub async fn create_inventory_check(
@@ -422,8 +493,17 @@ impl DatabaseConnection {
 
         let r = sqlx::query(
             r#"
-            INSERT INTO inventory_check_item (check_id, product_id, target_quantity)
-            SELECT $1, id, target_quantity FROM product WHERE stocked
+            INSERT INTO inventory_check_item (check_id, product_id, sub_product_id, target_quantity)
+            SELECT $1, p.id, NULL, p.target_quantity
+            FROM product p
+            WHERE p.stocked AND NOT EXISTS (
+                SELECT 1 FROM sub_product sp WHERE sp.product_id = p.id AND sp.active
+            )
+            UNION ALL
+            SELECT $1, p.id, sp.id, sp.target_quantity
+            FROM product p
+                INNER JOIN sub_product sp ON sp.product_id = p.id AND sp.active
+            WHERE p.stocked
             "#,
         )
         .bind(check_id)
@@ -438,11 +518,13 @@ impl DatabaseConnection {
             .ok_or(ServiceError::NotFound)
     }
 
-    /// Records the counted quantity (or clears it with `None`) for a product of a draft check.
+    /// Records the counted quantity (or clears it with `None`) for a product of a draft check,
+    /// or for one of its sub products when the product is counted per sub product.
     pub async fn set_inventory_check_item_count(
         &mut self,
         check_id: u64,
         product_id: u64,
+        sub_product_id: Option<u64>,
         counted_quantity: Option<i32>,
     ) -> ServiceResult<models::InventoryCheckItem> {
         let mut tx = self.connection.begin().await?;
@@ -454,11 +536,13 @@ impl DatabaseConnection {
             UPDATE inventory_check_item
             SET counted_quantity = $3
             WHERE check_id = $1 AND product_id = $2
+                AND sub_product_id IS NOT DISTINCT FROM $4
             "#,
         )
         .bind(to_i64(check_id))
         .bind(to_i64(product_id))
         .bind(counted_quantity)
+        .bind(sub_product_id.map(to_i64))
         .execute(tx.as_mut())
         .await;
         if to_service_result(r)?.rows_affected() != 1 {
@@ -467,9 +551,14 @@ impl DatabaseConnection {
 
         to_service_result(tx.commit().await)?;
 
-        fetch_check_item(self.connection.as_mut(), check_id, product_id)
-            .await?
-            .ok_or(ServiceError::NotFound)
+        fetch_check_item(
+            self.connection.as_mut(),
+            check_id,
+            product_id,
+            sub_product_id,
+        )
+        .await?
+        .ok_or(ServiceError::NotFound)
     }
 
     pub async fn delete_inventory_check(&mut self, id: u64) -> ServiceResult<()> {
@@ -505,16 +594,18 @@ impl DatabaseConnection {
         if completion.add_to_shopping_list {
             let missing = fetch_missing_products(tx.as_mut(), id).await?;
             for row in missing {
-                // One open entry per product is enough: a second count must not pile up
-                // duplicates, and a manually added wish already covers the article.
+                // One open entry per product (or sub product) is enough: a second count must not
+                // pile up duplicates, and a manually added wish already covers the article.
                 let existing = sqlx::query(
                     r#"
                     SELECT 1 FROM shopping_list_item
-                    WHERE product_id = $1 AND done_at IS NULL
+                    WHERE product_id = $1 AND sub_product_id IS NOT DISTINCT FROM $2
+                        AND done_at IS NULL
                     LIMIT 1
                     "#,
                 )
                 .bind(row.product_id)
+                .bind(row.sub_product_id)
                 .fetch_optional(tx.as_mut())
                 .await;
                 if to_service_result(existing)?.is_some() {
@@ -533,8 +624,8 @@ impl DatabaseConnection {
                 let r = sqlx::query(
                     r#"
                     INSERT INTO shopping_list_item
-                        (name, quantity, note, product_id, created_by_account_id)
-                    VALUES ($1, $2, $3, $4, $5)
+                        (name, quantity, note, product_id, created_by_account_id, sub_product_id)
+                    VALUES ($1, $2, $3, $4, $5, $6)
                     RETURNING id
                     "#,
                 )
@@ -544,6 +635,7 @@ impl DatabaseConnection {
                 .bind(&note)
                 .bind(row.product_id)
                 .bind(completion.completed_by_account_id.map(to_i64))
+                .bind(row.sub_product_id)
                 .fetch_one(tx.as_mut())
                 .await;
                 shopping_list_item_ids.push(to_u64(to_service_result(r)?.get::<i64, _>(0)));
@@ -586,6 +678,7 @@ impl DatabaseConnection {
                         nickname: None,
                         image: None,
                         barcodes: Vec::new(),
+                        sub_products: Vec::new(),
                         category: String::new(),
                         print_lists: Vec::new(),
                         tags: Vec::new(),
@@ -595,7 +688,10 @@ impl DatabaseConnection {
                     };
                     let item = models::PurchaseItem {
                         id: 0,
-                        name: row.name,
+                        name: match &row.sub_product_name {
+                            Some(sub) => format!("{} · {}", row.name, sub),
+                            None => row.name,
+                        },
                         container_size,
                         container_count: containers_needed(row.missing, container_size),
                         container_cents: row.last_container_cents.unwrap_or(0),
@@ -603,6 +699,7 @@ impl DatabaseConnection {
                         barcode: None,
                         collected: false,
                         product: Some(product),
+                        sub_product_id: row.sub_product_id.map(to_u64),
                     };
                     insert_purchase_item(tx.as_mut(), new_purchase_id, &item).await?;
                 }

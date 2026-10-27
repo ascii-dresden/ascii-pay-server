@@ -12,7 +12,7 @@ use crate::error::{ServiceError, ServiceResult};
 use crate::models;
 use crate::request_state::RequestState;
 
-use super::products::ProductDto;
+use super::products::{resolve_sub_product, ProductDto};
 
 pub fn router(app_state: AppState) -> ApiRouter {
     ApiRouter::new()
@@ -67,6 +67,8 @@ pub struct ShoppingListItemDto {
     pub quantity: i32,
     pub note: String,
     pub product: Option<ProductDto>,
+    /// Specific sub product of `product` (see `product.sub_products`); `null` means any.
+    pub sub_product_id: Option<u64>,
     pub created_by_account_id: Option<u64>,
     pub created_by_name: Option<String>,
     pub created_at: String,
@@ -83,6 +85,7 @@ impl From<&models::ShoppingListItem> for ShoppingListItemDto {
             quantity: value.quantity,
             note: value.note.to_owned(),
             product: value.product.as_ref().map(|product| product.into()),
+            sub_product_id: value.sub_product_id,
             created_by_account_id: value.created_by_account_id,
             created_by_name: value.created_by_name.to_owned(),
             created_at: format!("{:?}", value.created_at),
@@ -107,6 +110,9 @@ pub struct SaveShoppingListItemDto {
     /// Optional reference to a product of the assortment.
     #[serde(default)]
     pub product_id: Option<u64>,
+    /// Optional specific sub product of `product_id`.
+    #[serde(default)]
+    pub sub_product_id: Option<u64>,
 }
 
 #[derive(Debug, Default, PartialEq, Deserialize, JsonSchema)]
@@ -129,6 +135,7 @@ struct ResolvedItem {
     quantity: i32,
     note: String,
     product: Option<models::Product>,
+    sub_product_id: Option<u64>,
 }
 
 async fn resolve_item(
@@ -172,11 +179,14 @@ async fn resolve_item(
         (None, None) => unreachable!("checked above"),
     };
 
+    let sub_product_id = resolve_sub_product(product.as_ref(), form.sub_product_id)?;
+
     Ok(ResolvedItem {
         name,
         quantity,
         note: form.note.unwrap_or_default(),
         product,
+        sub_product_id,
     })
 }
 
@@ -245,6 +255,17 @@ pub async fn create_shopping_list_item(
     let account = state.session_require_login()?;
 
     let resolved = resolve_item(&mut state, form.0).await?;
+    // A product with sub products is only a heading: the wish names the sub product.
+    if resolved.sub_product_id.is_none()
+        && resolved
+            .product
+            .as_ref()
+            .is_some_and(|p| p.sub_products.iter().any(|s| s.active))
+    {
+        return Err(ServiceError::BadRequest(
+            "the product has sub products, choose one of them".to_string(),
+        ));
+    }
 
     let item = models::ShoppingListItem {
         id: 0,
@@ -252,6 +273,7 @@ pub async fn create_shopping_list_item(
         quantity: resolved.quantity,
         note: resolved.note,
         product: resolved.product,
+        sub_product_id: resolved.sub_product_id,
         created_by_account_id: Some(account.id),
         created_by_name: None,
         created_at: chrono::Utc::now(),
@@ -265,11 +287,11 @@ pub async fn create_shopping_list_item(
 }
 
 fn create_shopping_list_item_docs(op: TransformOperation) -> TransformOperation {
-    op.description("Add an item to the shopping list. Either `name` or `product_id` is required; the creator is taken from the session.")
+    op.description("Add an item to the shopping list. Either `name` or `product_id` is required; the creator is taken from the session. A product with active sub products needs `sub_product_id`.")
         .tag("shopping-list")
         .response::<201, Json<ShoppingListItemDto>>()
         .response_with::<400, (), _>(|res| {
-            res.description("Missing name/product or quantity below 1!")
+            res.description("Missing name/product, quantity below 1 or missing sub product!")
         })
         .response_with::<404, (), _>(|res| {
             res.description("The referenced product does not exist!")
@@ -297,6 +319,7 @@ pub async fn update_shopping_list_item(
     item.quantity = resolved.quantity;
     item.note = resolved.note;
     item.product = resolved.product;
+    item.sub_product_id = resolved.sub_product_id;
 
     let item = state.db.update_shopping_list_item(item).await?;
     Ok(Json(ShoppingListItemDto::from(&item)))

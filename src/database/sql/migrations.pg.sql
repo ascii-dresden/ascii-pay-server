@@ -355,3 +355,26 @@ INSERT INTO product_barcode (product_id, code, container_size)
 
 DROP INDEX idx_product_barcode;
 ALTER TABLE product DROP COLUMN barcode;
+
+--##33 Sub products
+CREATE TABLE sub_product (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  product_id BIGINT NOT NULL REFERENCES product(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  purchase_tax INT NOT NULL DEFAULT 19,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  show_on_print_list BOOLEAN NOT NULL DEFAULT FALSE,
+  target_quantity INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_sub_product_product ON sub_product(product_id);
+
+ALTER TABLE product_barcode ADD COLUMN sub_product_id BIGINT REFERENCES sub_product(id) ON DELETE SET NULL;
+ALTER TABLE purchase_item ADD COLUMN sub_product_id BIGINT REFERENCES sub_product(id) ON DELETE SET NULL;
+ALTER TABLE shopping_list_item ADD COLUMN sub_product_id BIGINT REFERENCES sub_product(id) ON DELETE SET NULL;
+
+-- A product with sub products is counted per sub product: one check item per sub product.
+ALTER TABLE inventory_check_item ADD COLUMN sub_product_id BIGINT REFERENCES sub_product(id) ON DELETE CASCADE;
+ALTER TABLE inventory_check_item DROP CONSTRAINT inventory_check_item_pkey;
+CREATE UNIQUE INDEX idx_inventory_check_item_unique
+  ON inventory_check_item (check_id, product_id, coalesce(sub_product_id, 0));

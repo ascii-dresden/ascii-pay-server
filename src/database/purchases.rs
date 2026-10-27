@@ -62,6 +62,7 @@ struct PurchaseItemRow {
     purchase_item_best_before: Option<NaiveDate>,
     purchase_item_barcode: Option<String>,
     purchase_item_collected: bool,
+    purchase_item_sub_product_id: Option<i64>,
 }
 
 fn to_u64(id: i64) -> u64 {
@@ -85,6 +86,7 @@ fn purchase_item_query(where_clause: &str) -> String {
             item.best_before as purchase_item_best_before,
             item.barcode as purchase_item_barcode,
             item.collected as purchase_item_collected,
+            item.sub_product_id as purchase_item_sub_product_id,
             {PRODUCT_COLUMNS}
         FROM purchase_item item
             LEFT OUTER JOIN product p ON item.product_id = p.id
@@ -109,6 +111,7 @@ fn purchase_item_from_row(row: &PgRow) -> ServiceResult<(u64, models::PurchaseIt
         barcode: item_row.purchase_item_barcode,
         collected: item_row.purchase_item_collected,
         product: None,
+        sub_product_id: item_row.purchase_item_sub_product_id.map(to_u64),
     };
 
     let product_id: Option<i64> = row.get("id");
@@ -248,8 +251,8 @@ pub(super) async fn insert_purchase_item(
         r#"
         INSERT INTO purchase_item (
             purchase_id, name, container_size, container_count, container_cents,
-            product_id, best_before, barcode, collected
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            product_id, best_before, barcode, collected, sub_product_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING id
         "#,
     )
@@ -262,6 +265,7 @@ pub(super) async fn insert_purchase_item(
     .bind(item.best_before)
     .bind(item.barcode.as_deref())
     .bind(item.collected)
+    .bind(item.sub_product_id.map(to_i64))
     .fetch_one(conn)
     .await;
 
@@ -513,7 +517,8 @@ impl DatabaseConnection {
             r#"
             UPDATE purchase_item
             SET name = $3, container_size = $4, container_count = $5, container_cents = $6,
-                product_id = $7, best_before = $8, barcode = $9, collected = $10
+                product_id = $7, best_before = $8, barcode = $9, collected = $10,
+                sub_product_id = $11
             WHERE purchase_id = $1 AND id = $2
             "#,
         )
@@ -527,6 +532,7 @@ impl DatabaseConnection {
         .bind(item.best_before)
         .bind(item.barcode.as_deref())
         .bind(item.collected)
+        .bind(item.sub_product_id.map(to_i64))
         .execute(tx.as_mut())
         .await;
         if to_service_result(r)?.rows_affected() != 1 {

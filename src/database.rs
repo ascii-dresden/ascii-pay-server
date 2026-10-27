@@ -18,8 +18,8 @@ use crate::error::{ServiceError, ServiceResult};
 use crate::models::{
     self, Account, AccountStatus, AppleWalletPass, AppleWalletRegistration, AuthMethod,
     AuthMethodType, AuthNfc, AuthPassword, AuthRequest, CardType, CoinAmount, CoinType, Image,
-    PaymentItem, Product, ProductBarcode, ProductStatusPrice, Role, Session, Transaction,
-    TransactionItem,
+    PaymentItem, Product, ProductBarcode, ProductStatusPrice, Role, Session, SubProduct,
+    Transaction, TransactionItem,
 };
 
 const MINIMUM_PAYMENT_CENTS: i32 = 0;
@@ -30,6 +30,7 @@ mod inventory;
 mod migration;
 mod purchases;
 mod shopping_list;
+mod sub_products;
 #[cfg(test)]
 mod tests;
 
@@ -503,6 +504,13 @@ const PRODUCT_COLUMNS: &str = r#"
     coalesce((SELECT array_agg(pb.code ORDER BY pb.id) FROM product_barcode pb WHERE pb.product_id = p.id), '{}') as barcode_code,
     coalesce((SELECT array_agg(pb.container_size ORDER BY pb.id) FROM product_barcode pb WHERE pb.product_id = p.id), '{}') as barcode_container_size,
     coalesce((SELECT array_agg(pb.label ORDER BY pb.id) FROM product_barcode pb WHERE pb.product_id = p.id), '{}') as barcode_label,
+    coalesce((SELECT array_agg(coalesce(pb.sub_product_id, 0) ORDER BY pb.id) FROM product_barcode pb WHERE pb.product_id = p.id), '{}') as barcode_sub_product_id,
+    coalesce((SELECT array_agg(sp.id ORDER BY sp.id) FROM sub_product sp WHERE sp.product_id = p.id), '{}') as sub_product_id,
+    coalesce((SELECT array_agg(sp.name ORDER BY sp.id) FROM sub_product sp WHERE sp.product_id = p.id), '{}') as sub_product_name,
+    coalesce((SELECT array_agg(sp.purchase_tax ORDER BY sp.id) FROM sub_product sp WHERE sp.product_id = p.id), '{}') as sub_product_purchase_tax,
+    coalesce((SELECT array_agg(sp.active ORDER BY sp.id) FROM sub_product sp WHERE sp.product_id = p.id), '{}') as sub_product_active,
+    coalesce((SELECT array_agg(sp.show_on_print_list ORDER BY sp.id) FROM sub_product sp WHERE sp.product_id = p.id), '{}') as sub_product_show_on_print_list,
+    coalesce((SELECT array_agg(sp.target_quantity ORDER BY sp.id) FROM sub_product sp WHERE sp.product_id = p.id), '{}') as sub_product_target_quantity,
     p.category as category,
     p.print_lists as print_lists,
     p.tags as tags,
@@ -550,6 +558,21 @@ struct ProductRow {
     barcode_container_size: Vec<i32>,
     #[sqlx(default)]
     barcode_label: Vec<String>,
+    /// `0` stands for "no sub product" (array_agg cannot be decoded with NULL elements here).
+    #[sqlx(default)]
+    barcode_sub_product_id: Vec<i64>,
+    #[sqlx(default)]
+    sub_product_id: Vec<i64>,
+    #[sqlx(default)]
+    sub_product_name: Vec<String>,
+    #[sqlx(default)]
+    sub_product_purchase_tax: Vec<i32>,
+    #[sqlx(default)]
+    sub_product_active: Vec<bool>,
+    #[sqlx(default)]
+    sub_product_show_on_print_list: Vec<bool>,
+    #[sqlx(default)]
+    sub_product_target_quantity: Vec<i32>,
     category: String,
     print_lists: Vec<String>,
     tags: Vec<String>,
@@ -630,6 +653,23 @@ impl From<ProductRow> for Product {
                     code: value.barcode_code[i].clone(),
                     container_size: value.barcode_container_size[i],
                     label: value.barcode_label[i].clone(),
+                    sub_product_id: value
+                        .barcode_sub_product_id
+                        .get(i)
+                        .filter(|id| **id > 0)
+                        .map(|id| (*id).try_into().expect("IDs are non-negative")),
+                })
+                .collect(),
+            sub_products: (0..value.sub_product_id.len())
+                .map(|i| SubProduct {
+                    id: value.sub_product_id[i]
+                        .try_into()
+                        .expect("IDs are non-negative"),
+                    name: value.sub_product_name[i].clone(),
+                    purchase_tax: value.sub_product_purchase_tax[i],
+                    active: value.sub_product_active[i],
+                    show_on_print_list: value.sub_product_show_on_print_list[i],
+                    target_quantity: value.sub_product_target_quantity[i],
                 })
                 .collect(),
             category: value.category,
@@ -648,6 +688,7 @@ struct ProductBarcodeRow {
     code: String,
     container_size: i32,
     label: String,
+    sub_product_id: Option<i64>,
 }
 
 impl From<ProductBarcodeRow> for ProductBarcode {
@@ -657,6 +698,9 @@ impl From<ProductBarcodeRow> for ProductBarcode {
             code: value.code,
             container_size: value.container_size,
             label: value.label,
+            sub_product_id: value
+                .sub_product_id
+                .map(|id| id.try_into().expect("IDs are non-negative")),
         }
     }
 }
@@ -1374,7 +1418,9 @@ impl DatabaseConnection {
     ///
     /// Codes are trimmed, empty ones are dropped, duplicate codes within the product are
     /// collapsed (first one wins) and container sizes are clamped to at least 1.
-    async fn replace_product_barcodes(
+    ///
+    /// Fails with `BadRequest` if a barcode references a sub product of another product.
+    pub(crate) async fn replace_product_barcodes(
         &mut self,
         product_id: i64,
         barcodes: &[ProductBarcode],
@@ -1382,6 +1428,7 @@ impl DatabaseConnection {
         let mut codes: Vec<String> = Vec::new();
         let mut sizes: Vec<i32> = Vec::new();
         let mut labels: Vec<String> = Vec::new();
+        let mut sub_product_ids: Vec<Option<i64>> = Vec::new();
         for barcode in barcodes {
             let code = barcode.code.trim();
             if code.is_empty() || codes.iter().any(|c| c == code) {
@@ -1390,7 +1437,15 @@ impl DatabaseConnection {
             codes.push(code.to_owned());
             sizes.push(barcode.container_size.max(1));
             labels.push(barcode.label.trim().to_owned());
+            sub_product_ids.push(
+                barcode
+                    .sub_product_id
+                    .map(|id| i64::try_from(id).expect("id is always less than 2**63")),
+            );
         }
+
+        let referenced: Vec<i64> = sub_product_ids.iter().flatten().copied().collect();
+        self.ensure_sub_products_of(product_id, &referenced).await?;
 
         let r = sqlx::query(r#"DELETE FROM product_barcode WHERE product_id = $1"#)
             .bind(product_id)
@@ -1404,23 +1459,81 @@ impl DatabaseConnection {
 
         let r = sqlx::query_as::<_, ProductBarcodeRow>(
             r#"
-            INSERT INTO product_barcode (product_id, code, container_size, label)
-            SELECT $1, code, container_size, label
-            FROM UNNEST($2::TEXT[], $3::INT[], $4::TEXT[]) AS input (code, container_size, label)
-            RETURNING id, code, container_size, label
+            INSERT INTO product_barcode (product_id, code, container_size, label, sub_product_id)
+            SELECT $1, code, container_size, label, sub_product_id
+            FROM UNNEST($2::TEXT[], $3::INT[], $4::TEXT[], $5::BIGINT[])
+                AS input (code, container_size, label, sub_product_id)
+            RETURNING id, code, container_size, label, sub_product_id
             "#,
         )
         .bind(product_id)
         .bind(&codes)
         .bind(&sizes)
         .bind(&labels)
+        .bind(&sub_product_ids)
         .fetch_all(self.connection.as_mut())
         .await;
+        let stored = to_service_result(r)?;
 
-        Ok(to_service_result(r)?
-            .into_iter()
-            .map(ProductBarcode::from)
-            .collect())
+        self.backfill_purchase_item_sub_products(product_id).await?;
+
+        Ok(stored.into_iter().map(ProductBarcode::from).collect())
+    }
+
+    /// Fails with `BadRequest` unless every id is a sub product of the given product.
+    async fn ensure_sub_products_of(
+        &mut self,
+        product_id: i64,
+        sub_product_ids: &[i64],
+    ) -> ServiceResult<()> {
+        if sub_product_ids.is_empty() {
+            return Ok(());
+        }
+        let r = sqlx::query(
+            r#"
+            SELECT count(DISTINCT id) AS found
+            FROM sub_product
+            WHERE product_id = $1 AND id = ANY($2::BIGINT[])
+            "#,
+        )
+        .bind(product_id)
+        .bind(sub_product_ids)
+        .fetch_one(self.connection.as_mut())
+        .await;
+        let found: i64 = to_service_result(r)?.get("found");
+
+        let mut distinct = sub_product_ids.to_vec();
+        distinct.sort_unstable();
+        distinct.dedup();
+        if found != distinct.len() as i64 {
+            return Err(ServiceError::BadRequest(
+                "sub product does not belong to the product".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Assigns past purchase items of the product to the sub product of the barcode they were
+    /// bought with. Only items without a sub product are touched, so an explicit choice is
+    /// never overwritten. This is what sorts the old price history once codes are grouped.
+    async fn backfill_purchase_item_sub_products(&mut self, product_id: i64) -> ServiceResult<()> {
+        let r = sqlx::query(
+            r#"
+            UPDATE purchase_item pi
+            SET sub_product_id = pb.sub_product_id
+            FROM product_barcode pb
+            WHERE pi.product_id = $1
+                AND pb.product_id = $1
+                AND pi.sub_product_id IS NULL
+                AND pb.sub_product_id IS NOT NULL
+                AND btrim(pi.barcode) = pb.code
+            "#,
+        )
+        .bind(product_id)
+        .execute(self.connection.as_mut())
+        .await;
+        to_service_result(r)?;
+        Ok(())
     }
 
     /// Adds a single barcode to a product without touching the rest of the product.
@@ -1433,8 +1546,11 @@ impl DatabaseConnection {
         code: &str,
         container_size: i32,
         label: &str,
+        sub_product_id: Option<u64>,
     ) -> ServiceResult<ProductBarcode> {
         let product_id = i64::try_from(product_id).expect("id is always less than 2**63");
+        let sub_product_id =
+            sub_product_id.map(|id| i64::try_from(id).expect("id is always less than 2**63"));
         let code = code.trim();
         if code.is_empty() {
             return Err(ServiceError::BadRequest(
@@ -1463,21 +1579,28 @@ impl DatabaseConnection {
             ));
         }
 
+        let referenced: Vec<i64> = sub_product_id.into_iter().collect();
+        self.ensure_sub_products_of(product_id, &referenced).await?;
+
         let r = sqlx::query_as::<_, ProductBarcodeRow>(
             r#"
-            INSERT INTO product_barcode (product_id, code, container_size, label)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id, code, container_size, label
+            INSERT INTO product_barcode (product_id, code, container_size, label, sub_product_id)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id, code, container_size, label, sub_product_id
             "#,
         )
         .bind(product_id)
         .bind(code)
         .bind(container_size.max(1))
         .bind(label.trim())
+        .bind(sub_product_id)
         .fetch_one(self.connection.as_mut())
         .await;
+        let barcode = to_service_result(r)?.into();
 
-        Ok(to_service_result(r)?.into())
+        self.backfill_purchase_item_sub_products(product_id).await?;
+
+        Ok(barcode)
     }
 
     /// Deletes one barcode of a product. `NotFound` when it does not belong to the product.

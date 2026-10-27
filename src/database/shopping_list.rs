@@ -21,6 +21,7 @@ struct ShoppingListItemRow {
     sli_name: String,
     sli_quantity: i32,
     sli_note: String,
+    sli_sub_product_id: Option<i64>,
     sli_created_by_account_id: Option<i64>,
     sli_created_by_name: Option<String>,
     sli_created_at: DateTime<Utc>,
@@ -47,6 +48,7 @@ fn item_query(where_clause: &str, order_clause: &str) -> String {
             sli.name as sli_name,
             sli.quantity as sli_quantity,
             sli.note as sli_note,
+            sli.sub_product_id as sli_sub_product_id,
             sli.created_by_account_id as sli_created_by_account_id,
             creator.name as sli_created_by_name,
             sli.created_at as sli_created_at,
@@ -73,6 +75,7 @@ fn item_from_row(row: &PgRow) -> ServiceResult<models::ShoppingListItem> {
         quantity: item_row.sli_quantity,
         note: item_row.sli_note,
         product: None,
+        sub_product_id: item_row.sli_sub_product_id.map(to_u64),
         created_by_account_id: item_row.sli_created_by_account_id.map(to_u64),
         created_by_name: item_row.sli_created_by_name,
         created_at: item_row.sli_created_at,
@@ -169,8 +172,10 @@ impl DatabaseConnection {
     ) -> ServiceResult<models::ShoppingListItem> {
         let r = sqlx::query(
             r#"
-            INSERT INTO shopping_list_item (name, quantity, note, product_id, created_by_account_id)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO shopping_list_item (
+                name, quantity, note, product_id, created_by_account_id, sub_product_id
+            )
+            VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING id
             "#,
         )
@@ -179,6 +184,7 @@ impl DatabaseConnection {
         .bind(item.note.as_str())
         .bind(item.product.as_ref().map(|p| to_i64(p.id)))
         .bind(item.created_by_account_id.map(to_i64))
+        .bind(item.sub_product_id.map(to_i64))
         .fetch_one(self.connection.as_mut())
         .await;
         let id = to_u64(to_service_result(r)?.get::<i64, _>(0));
@@ -204,7 +210,7 @@ impl DatabaseConnection {
         let r = sqlx::query(
             r#"
             UPDATE shopping_list_item
-            SET name = $2, quantity = $3, note = $4, product_id = $5
+            SET name = $2, quantity = $3, note = $4, product_id = $5, sub_product_id = $6
             WHERE id = $1
             "#,
         )
@@ -213,6 +219,7 @@ impl DatabaseConnection {
         .bind(item.quantity)
         .bind(item.note.as_str())
         .bind(item.product.as_ref().map(|p| to_i64(p.id)))
+        .bind(item.sub_product_id.map(to_i64))
         .execute(tx.as_mut())
         .await;
         to_service_result(r)?;
